@@ -1317,7 +1317,7 @@ export function startPathFinder(opts = {}) {
 async function pfLoadApp() {
   try {
     const M = JSON.parse(document.getElementById('pf-mods').textContent);
-    if (!new Function('return ' + M.inside)()) return null;
+    if (!(await new Function('return ' + M.inside)())) return null; // darf auch ein Promise sein (Handschlag mit der App)
     const urls = {};
     for (const m of M.mods) { let c = m.code; for (const [spec, name] of Object.entries(m.map)) c = c.split("'" + spec + "'").join("'" + urls[name] + "'").split('"' + spec + '"').join('"' + urls[name] + '"'); urls[m.name] = URL.createObjectURL(new Blob([c], { type: 'text/javascript' })); }
     const P = await import(urls[M.entry]);
