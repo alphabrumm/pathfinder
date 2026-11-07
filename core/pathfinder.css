@@ -316,3 +316,19 @@ button { font: inherit; color: inherit; }
 /* Beim Ziehen nichts markieren */
 body.pf-dragging, body.pf-dragging * { -webkit-user-select: none !important; user-select: none !important; cursor: grabbing !important; }
 .lp-match .chip, .lp-gap .gchip, .lp-stops a { -webkit-user-drag: none; }
+
+/* Aufgabe mit Ergebnis */
+.lp-answer { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.lp-answer input { font: calc(16px * var(--fz)) var(--font-body); padding: 8px 10px; min-height: 44px; width: 10em; border: 2px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); }
+.lp-answer .lp-btn { margin: 0; }
+.lp-task .fb { font-weight: 700; margin-top: 6px; }
+/* Exportierter Lernpfad */
+body.pf-player { background: var(--bg, #fdf8f3); }
+/* Zertifikat drucken: nur die Urkunde */
+@media print {
+  body.printing-cert > *:not(.ed-dlg) { display: none !important; }
+  body.printing-cert .ed-dlg { position: static; transform: none; box-shadow: none; width: auto; max-height: none; }
+  body.printing-cert .ed-dlg header, body.printing-cert .ed-dlg .ed-form { display: none !important; }
+  body.printing-cert .ed-certprev { margin: 0; }
+  body.printing-cert { overflow: visible; }
+}

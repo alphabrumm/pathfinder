@@ -64,6 +64,26 @@ const CORE = {
 };
 const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match']);
 
+/* ---------- ZIP-Datei (ohne Kompression) für SCORM-Pakete ---------- */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+export function zip(files) {
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  const d = new Date(), time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  for (const [name, content] of Object.entries(files)) {
+    const data = typeof content === 'string' ? enc.encode(content) : content, nm = enc.encode(name), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true); h.setUint16(10, time, true); h.setUint16(12, date, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, nm.length, true); h.setUint16(28, 0, true);
+    parts.push(new Uint8Array(h.buffer), nm, data);
+    const c = new DataView(new ArrayBuffer(46)); c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true); c.setUint16(12, time, true); c.setUint16(14, date, true); c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, nm.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), nm);
+    off += 30 + nm.length + data.length;
+  }
+  const size = central.reduce((a, x) => a + x.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, Object.keys(files).length, true); e.setUint16(10, Object.keys(files).length, true); e.setUint32(12, size, true); e.setUint32(16, off, true);
+  const all = [...parts, ...central, new Uint8Array(e.buffer)], out = new Uint8Array(all.reduce((a, x) => a + x.length, 0)); let p = 0; for (const x of all) { out.set(x, p); p += x.length; }
+  return out;
+}
+
 /** Startet den Editor in der Seite (die Seite liefert das Gerüst mit #lp, #scroll und der Leiste). */
 export function startPathFinder(opts = {}) {
   const plugins = opts.plugins || [], host = opts.host || {};
@@ -101,19 +121,42 @@ export function startPathFinder(opts = {}) {
   const docList = () => { try { return JSON.parse(LS.get(DOCS)) || []; } catch (e) { return []; } };
   const saveDocList = l => LS.set(DOCS, JSON.stringify(l));
   const loadDoc = id => { try { const d = JSON.parse(LS.get(DOCKEY(id))); return d ? migrate(d) : null; } catch (e) { return null; } };
+  const PLAYER = !!opts.player; // exportierter Lernpfad: nur abspielen, kein Editor
   let doc = null;
-  {
+  if (PLAYER) doc = migrate(opts.doc);
+  else {
     const cur = LS.get(CUR); doc = cur && loadDoc(cur);
     if (!doc && opts.legacy) { const l = opts.legacy(); if (l) doc = migrate(l); }
     if (!doc) doc = migrate(sample());
   }
-  let mode = 'edit', selId = null, curSid = null, single = false, fz = 1;
+  let mode = PLAYER ? 'preview' : 'edit', selId = null, curSid = null, single = false, fz = 1;
   let hist = [JSON.stringify(doc)], fut = [], pending = null;
-  const freshProg = () => ({ solved: {}, quiz: {}, tips: {}, sol: {}, visited: {}, tries: {}, start: Date.now() });
+  const freshProg = () => ({ solved: {}, quiz: {}, tips: {}, sol: {}, visited: {}, tries: {}, start: Date.now(), active: 0 });
   let prog = freshProg();
+  /* Aktive Bearbeitungszeit: zählt nur, solange die Seite sichtbar ist und in den letzten 2 Minuten benutzt wurde */
+  let lastUse = Date.now();
+  ['pointerdown', 'keydown', 'scroll', 'input'].forEach(ev => addEventListener(ev, () => { lastUse = Date.now(); }, { capture: true, passive: true }));
+  setInterval(() => { if (mode === 'preview' && document.visibilityState === 'visible' && Date.now() - lastUse < 120000) { prog.active = (prog.active || 0) + 10000; if (PLAYER) progSave(); } }, 10000);
+  /* Fortschritt im exportierten Lernpfad: im Browser oder – als SCORM-Lernpaket – in Moodle */
+  const PROGKEY = 'pathfinder.fortschritt.' + doc.id;
+  const scorm = PLAYER && opts.scorm ? scormConnect() : null;
+  if (PLAYER) {
+    let saved = null;
+    try { saved = JSON.parse((scorm && scorm.get('cmi.suspend_data')) || LS.get(PROGKEY) || 'null'); } catch (e) { }
+    if (saved) prog = { ...freshProg(), ...saved };
+  }
+  function progSave() {
+    if (!PLAYER) return;
+    const keep = { solved: prog.solved, tips: prog.tips, sol: prog.sol, visited: prog.visited, start: prog.start, active: prog.active, sent: prog.sent, quiz: prog.quiz };
+    let txt = JSON.stringify(keep);
+    if (txt.length > 4000) { delete keep.quiz; txt = JSON.stringify(keep); } // SCORM 1.2 erlaubt höchstens 4096 Zeichen
+    LS.set(PROGKEY, txt);
+    if (scorm) scorm.report(txt);
+  }
 
   const lp = $('#lp'), scroller = $('#scroll');
   function save() {
+    if (PLAYER) return;
     const ok = LS.set(DOCKEY(doc.id), JSON.stringify(doc));
     LS.set(CUR, doc.id);
     const l = docList(), i = l.findIndex(x => x.id === doc.id), e = { id: doc.id, title: doc.title || 'ohne Titel', form: doc.form, t: Date.now() };
@@ -128,7 +171,7 @@ export function startPathFinder(opts = {}) {
   function softCommit() { $('#saved').textContent = '…'; clearTimeout(pending); pending = setTimeout(commit, 500); }
   function undo() { if (pending) commit(); if (hist.length < 2) return; fut.push(hist.pop()); doc = JSON.parse(hist[hist.length - 1]); save(); render(); updUndo(); }
   function redo() { if (!fut.length) return; const s = fut.pop(); hist.push(s); doc = JSON.parse(s); save(); render(); updUndo(); }
-  function updUndo() { $('#bUndo').disabled = hist.length < 2; $('#bRedo').disabled = !fut.length; }
+  function updUndo() { if (!$('#bUndo')) return; $('#bUndo').disabled = hist.length < 2; $('#bRedo').disabled = !fut.length; }
   function openDoc(d) { if (pending) commit(); doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); selId = null; curSid = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; }
 
   function findBlock(id) {
@@ -247,9 +290,10 @@ export function startPathFinder(opts = {}) {
     });
     if (E()) h += `<button class="ed-add-station" data-act="addStation">＋ Neue Station</button>`;
     if (doc.cert.on || E()) h += certHtml();
-    h += `</main><footer class="lp-foot">${doc.form === 'challenge' ? 'Challenge' : 'Lernpfad'} · erstellt mit PathFinder · läuft komplett im Browser</footer>`;
+    h += `</main><footer class="lp-foot">${doc.form === 'challenge' ? 'Challenge' : 'Lernpfad'} · erstellt mit PathFinder · läuft komplett im Browser${scorm?.ok ? ' · Fortschritt wird in der Lernplattform gespeichert' : ''}</footer>`;
     lp.innerHTML = h;
     runAnims();
+    if (PLAYER) progSave();
     scroller.scrollTop = sc;
     if (selId && !findBlock(selId)) selId = null;
     markSel();
@@ -305,7 +349,15 @@ export function startPathFinder(opts = {}) {
         return wrap(b, `<div class="lp-card lp-file"><div class="hd"><span class="fic">${/\.xlsx?$/i.test(b.name || '') ? '📊' : '📎'}</span><b>${esc(b.name || (E() ? '(noch keine Datei – ⚙)' : ''))}</b>${b.data ? `<span class="sz">${Math.round(b.data.length * .75 / 1024)} KB</span>` : ''}</div>${ce('html', b.html, 'Beschreibung (optional)', { rich: true })}<div><button class="lp-btn" data-run="download">⇩ Herunterladen</button>${extra}</div></div>`);
       }
       case 'html': return wrap(b, E() ? `<div class="lp-htmlblk"><div class="lab">HTML-Baustein <button class="lp-btn alt" data-bact="cfg" style="min-height:32px;margin:0 0 0 8px;font-size:13px">HTML bearbeiten</button></div><div class="inner">${b.html || '<i>leer</i>'}</div></div>` : `<div class="lp-html">${b.html}</div>`);
-      case 'task': return wrap(b, taskCard(b, { buttons: `<button class="lp-btn${ok ? ' alt' : ''}" data-run="done">${ok ? '✓ erledigt' : 'Erledigt'}</button>` }));
+      case 'task': {
+        if (b.answer) { // Ergebnis eintippen und prüfen lassen
+          const st = prog.quiz[b.id];
+          const btn = `<span class="lp-answer"><input data-ans value="${esc(st?.v || '')}" placeholder="${esc(b.answerPh || 'Ergebnis')}" autocomplete="off" autocapitalize="off" spellcheck="false"${ok ? ' disabled' : ''}><button class="lp-btn" data-run="answer"${ok ? ' disabled' : ''}>Prüfen</button></span>`
+            + (st && !E() ? `<div class="fb" style="color:var(${st.ok ? '--good' : '--bad'})">${st.ok ? '✓ Richtig!' : '✗ Das stimmt noch nicht. Rechne nochmal nach.'}</div>` : '');
+          return wrap(b, taskCard(b, { buttons: btn, hint: `Richtig ist: <b>${esc(b.answer.split('|').join(' oder '))}</b>` }));
+        }
+        return wrap(b, taskCard(b, { buttons: `<button class="lp-btn${ok ? ' alt' : ''}" data-run="done">${ok ? '✓ erledigt' : 'Erledigt'}</button>` }));
+      }
       case 'quiz': {
         const st = prog.quiz[b.id] || {};
         let h = `<div class="lp-card lp-quiz"><div class="hd"><b class="lp-ctitle">${b.qs.length > 1 ? `Quiz · ${b.qs.length} Fragen` : 'Quiz'}</b>${xpTag(b)}<span class="lp-state">${ok ? '✓ alles richtig' : ''}</span></div>`;
@@ -366,6 +418,11 @@ export function startPathFinder(opts = {}) {
   const xpNow = () => xpBlocks().filter(b => prog.solved[b.id]).reduce((a, b) => a + (+b.xp || 0), 0);
   const markSel = () => $$('.blk', lp).forEach(e => e.classList.toggle('sel', e.dataset.id === selId));
   const normAns = s => String(s).trim().toLowerCase().replace(/\s+/g, '').replace(',', '.');
+  /** Antwort prüfen: Text ohne Groß/Klein und Leerzeichen, Zahlen auch mit Komma und kleinen Rundungsunterschieden */
+  function isAnswer(expected, v) {
+    const num = x => { const t = String(x).trim().replace(/\s|€|%/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'); return /^[-+]?\d*\.?\d+$/.test(t) ? parseFloat(t) : NaN; };
+    return String(expected || '').split('|').some(e => { const a = num(e), b = num(v); if (!isNaN(a) && !isNaN(b)) return Math.abs(a - b) <= Math.max(1e-9, Math.abs(a) * 1e-9, 0.005); return normAns(e) === normAns(v); });
+  }
   function isGapOk(b, i, v) { const a = [...(b.html || '').matchAll(/\[\[(.+?)\]\]/g)][i]; return !!a && a[1].split('|').some(x => normAns(x) === normAns(v)); }
 
   /* ---------- Eingaben im Bearbeiten-Modus ---------- */
@@ -433,6 +490,7 @@ export function startPathFinder(opts = {}) {
     if (d.dataset.tip != null) prog.tips[id + ':' + d.dataset.tip] = 1;
     if (d.dataset.sol) prog.sol[id] = 1;
   }, true);
+  lp.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.matches?.('[data-ans]')) { ev.preventDefault(); runAction(ev.target.closest('.blk').dataset.id, 'answer'); } });
   lp.addEventListener('input', ev => {
     if (E()) return; const inp = ev.target.closest('[data-gap]'); if (!inp) return;
     const id = inp.closest('.blk').dataset.id, r = findBlock(id); (prog.quiz[id] || (prog.quiz[id] = {}))[inp.dataset.n] = inp.value;
@@ -524,6 +582,7 @@ export function startPathFinder(opts = {}) {
 
   /* ---------- Tastenkürzel ---------- */
   document.addEventListener('keydown', e => {
+    if (PLAYER) return;
     if (pop && pop._key && pop._key(e)) return;
     if ($('.ed-dlg')) { if (e.key === 'Escape') closeDlg(false); return; }
     if (!e.target.closest?.('#lp, body') || e.target.closest?.('.pf-side')) return; // Eingaben in der App nebenan nicht abfangen
@@ -650,7 +709,7 @@ export function startPathFinder(opts = {}) {
     reveal: [{ k: 'summary', l: 'Überschrift der Klappbox', t: 'text' }],
     file: [{ k: 'data', l: 'Datei', t: 'file' }, { k: 'name', l: 'Dateiname', t: 'text' }],
     html: [{ k: 'html', l: 'HTML', t: 'code', help: 'Wird für Schüler so angezeigt. Skripte laufen erst im exportierten Lernpfad.' }],
-    task: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'tips', l: 'Tipps (werden nacheinander aufgedeckt)', t: 'list', ph: 'Tipp' }, { k: 'solution', l: 'Lösung zum Aufdecken (leer = keine)', t: 'text' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }, XP],
+    task: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'answer', l: 'Ergebnis zur Selbstkontrolle (optional)', t: 'text', help: 'Leer = Schüler hakt „Erledigt“ ab. Sonst tippen sie das Ergebnis ein; mehrere richtige mit | trennen. Zahlen werden mit Komma oder Punkt erkannt.' }, { k: 'tips', l: 'Tipps (werden nacheinander aufgedeckt)', t: 'list', ph: 'Tipp' }, { k: 'solution', l: 'Lösung zum Aufdecken (leer = keine)', t: 'text' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }, XP],
     quiz: [{ k: 'qs', l: 'Fragen', t: 'qs' }, XP],
     gap: [{ k: 'bank', l: 'Begriffe zum Ziehen anbieten (statt Tippen)', t: 'check' }, { k: 'extra', l: 'Zusätzliche falsche Begriffe (Ablenker)', t: 'list', ph: 'Begriff', show: b => b.bank }, { k: 'heft', l: 'Als Hefteintrag gestalten (mit Titel)', t: 'check' }, XP],
     match: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'pairs', l: 'Paare', t: 'pairs' }, XP],
@@ -804,10 +863,11 @@ export function startPathFinder(opts = {}) {
   /* ---------- Zertifikat (Muster; das PDF folgt mit dem Export) ---------- */
   function certPreview() {
     const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
-    const mins = Math.max(1, Math.round((Date.now() - prog.start) / 60000));
+    const mins = Math.max(1, Math.round((prog.active || 0) / 60000));
     const c = doc.cert, p = PALETTES[doc.design.pal].l;
     const rows = doc.stations.map(s => { const ch = checksOf(s), n = ch.filter(id => prog.solved[id]).length; const tips = s.blocks.reduce((a, b) => a + Object.keys(prog.tips).filter(k => k.startsWith(b.id + ':')).length, 0); const sols = s.blocks.filter(b => prog.sol[b.id]).length; return `<tr><td>${esc(s.title)}</td><td>${ch.length ? `${n} / ${ch.length}` : '–'}</td>${c.show.tipps ? `<td>${tips || sols ? `${tips} Tipp${tips === 1 ? '' : 's'}${sols ? `, ${sols} Lösung` : ''}` : 'ohne Hilfe'}</td>` : ''}</tr>`; }).join('');
-    el.innerHTML = `<header><b>★ Zertifikat – Muster</b><button class="ok" data-x="ok">Schließen</button></header>
+    el.classList.add('cert-dlg');
+    el.innerHTML = `<header><b>★ ${PLAYER ? 'Dein Zertifikat' : 'Zertifikat – Muster'}</b>${PLAYER ? '<button data-print="1">🖨 Drucken / als PDF</button>' : ''}<button class="ok" data-x="ok">Schließen</button></header>
       <div class="ed-form"><label>Dein Name<input type="text" id="certName" value="Max Muster"></label></div>
       <div class="ed-certprev" style="border-color:${p.a1}"><div style="font-size:12px;letter-spacing:.14em;color:#888">${esc(plain(doc.kicker)).toUpperCase()}</div>
       <h2 style="color:${p.a1}">${doc.form === 'challenge' ? 'Challenge-Urkunde' : 'Zertifikat'}</h2><div style="font-size:20px;font-weight:700;margin:8px 0" id="certN">Max Muster</div>
@@ -818,7 +878,7 @@ export function startPathFinder(opts = {}) {
       <div class="code">Prüfcode K7M-2QX</div></div>
       <div class="ed-form"><span class="help">Mit dem Export entsteht daraus ein PDF zum Speichern oder Hochladen in Moodle. Die Zeit zählt nur, solange der Lernpfad offen ist und benutzt wird.</span></div>`;
     el.addEventListener('input', e => { if (e.target.id === 'certName') $('#certN', el).textContent = e.target.value; });
-    el.addEventListener('click', e => { if (e.target.closest('[data-x]')) closeDlg(false); });
+    el.addEventListener('click', e => { if (e.target.closest('[data-x]')) closeDlg(false); if (e.target.closest('[data-print]')) { document.body.classList.add('printing-cert'); setTimeout(() => { print(); document.body.classList.remove('printing-cert'); }, 50); } });
   }
 
   /* ---------- Knöpfe in Lernpfaden ---------- */
@@ -828,6 +888,11 @@ export function startPathFinder(opts = {}) {
     if (t?.run) { t.run(a, b, ctx); return; }
     if (E() && a !== 'download') { toast('In der <b>Vorschau</b> (⌘P) ausprobieren'); return; }
     if (a === 'done') { prog.solved[id] = !prog.solved[id]; render(); }
+    if (a === 'answer') {
+      const inp = $(`.blk[data-id="${id}"] [data-ans]`, lp), v = inp?.value || '';
+      const okA = isAnswer(b.answer, v); prog.quiz[id] = { v, ok: okA };
+      if (okA) solve(id); else { prog.tries[id] = (prog.tries[id] || 0) + 1; render(); }
+    }
     if (a === 'copy') { if (host.copyCode) host.copyCode(b); else { navigator.clipboard?.writeText(b.code || '').then(() => toast('⧉ kopiert'), () => toast('Kopieren nicht möglich')); } }
     if (a === 'gapcheck') { prog.quiz[id + ':chk'] = 1; const n = [...(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].length, got = prog.quiz[id] || {}; let all = true; for (let i = 0; i < n; i++) if (got[i] == null || !isGapOk(b, i, got[i])) all = false; if (all) solve(id); else { render(); toast('Noch nicht alles richtig – rote Lücken nochmal ansehen.'); } }
     if (a === 'download') { if (!b.data) { toast('Noch keine Datei – ⚙'); return; } const bin = atob(b.data), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); const url = URL.createObjectURL(new Blob([u8])); const l = document.createElement('a'); l.href = url; l.download = b.name || 'datei'; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(url); l.remove(); }, 3000); }
@@ -873,6 +938,7 @@ export function startPathFinder(opts = {}) {
     render();
     toast(m === 'preview' ? '▶ Vorschau – so sehen es die Schüler. Fortschritt wird hier nur probeweise gezählt.' : '✎ Bearbeiten');
   }
+  if (!PLAYER) {
   $('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
   $('#bUndo').onclick = undo; $('#bRedo').onclick = redo;
   $('#bSingle').onclick = () => { single = !single; $('#bSingle').classList.toggle('on', single); $('#bSingle').setAttribute('aria-pressed', String(single)); render(); scroller.scrollTop = 0; };
@@ -887,10 +953,11 @@ export function startPathFinder(opts = {}) {
       <button data-m="json"><b>{ } Dokument ansehen</b><span>so wird der Lernpfad gespeichert</span></button>
       <button data-m="keys"><b>⌘ Tastenkürzel</b><span>für die iPad-Tastatur</span></button>
       <button data-m="del"><b>🗑 Diesen Lernpfad löschen</b><span>nur in diesem Browser</span></button>
-      <button data-m="export" disabled style="opacity:.5"><b>⇩ Export</b><span>HTML für Moodle · SCORM-Lernpaket – folgt</span></button></div>`;
+      <button data-m="export"><b>⇩ Export</b><span>HTML-Datei für Moodle · SCORM-Lernpaket</span></button></div>`;
     document.body.appendChild(pop); placePop(e.currentTarget);
     pop.onclick = ev => {
       const m = ev.target.closest('[data-m]')?.dataset.m; if (!m) return; closePop();
+      if (m === 'export') { openExport(); return; }
       if (m === 'reset') { prog = freshProg(); host.reset?.(); render(); toast('Fortschritt zurückgesetzt'); }
       if (m === 'del') { if (!confirm('„' + (doc.title || 'ohne Titel') + '“ in diesem Browser löschen?')) return; LS.del(DOCKEY(doc.id)); saveDocList(docList().filter(x => x.id !== doc.id)); const next = docList()[0]; openDoc(next ? loadDoc(next.id) : sample()); }
       if (m === 'json') infoDlg('{ } Dokument', `<pre style="margin:0;padding:12px;font:12px/1.4 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all">${esc(JSON.stringify(doc, (k, v) => typeof v === 'string' && v.length > 200 && /^(data:|[A-Za-z0-9+/=]{200})/.test(v) ? v.slice(0, 40) + '…' : v, 2))}</pre>`);
@@ -898,6 +965,139 @@ export function startPathFinder(opts = {}) {
     };
   };
   addEventListener('beforeunload', () => { if (pending) commit(); });
+  } // Ende Editor-Leiste
+  if (scorm) { addEventListener('pagehide', () => scorm.finish(JSON.stringify(prog))); }
+
+  /* ---------- Export: HTML-Datei und SCORM-Lernpaket ---------- */
+  function exportDoc(settings) {
+    const d = clone(doc); let converted = 0;
+    const env = { doc: d, sheetBefore(st, i) { for (let k = i - 1; k >= 0; k--) { const x = st.blocks[k]; if (x.sheet?.cells) return x.sheet; } for (const s2 of d.stations) { if (s2 === st) break; for (let k = s2.blocks.length - 1; k >= 0; k--) if (s2.blocks[k].sheet?.cells) return s2.blocks[k].sheet; } return null; } };
+    for (const st of d.stations) {
+      const out = [];
+      st.blocks.forEach((b, i) => {
+        const t = def(b);
+        if (t?.exportAs) { const r = t.exportAs(b, { ...env, station: st, index: i, ctx }); converted++; [].concat(r || []).forEach(x => out.push({ id: x.id || uid(), ...x })); }
+        else out.push(b);
+      });
+      st.blocks = out;
+    }
+    d.cert = { ...d.cert, on: !!settings.cert };
+    d.pass = settings.pass;
+    return { d, converted };
+  }
+  const BASE = new URL('.', import.meta.url);
+  async function fetchText(u) { const r = await fetch(new URL(u, BASE), { cache: 'no-cache' }); if (!r.ok) throw new Error(u); return r.text(); }
+  async function fetchData(u, type) { const r = await fetch(new URL(u, BASE)); if (!r.ok) throw new Error(u); const buf = new Uint8Array(await r.arrayBuffer()); let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000)); return `data:${type};base64,${btoa(bin)}`; }
+  async function buildHtml(d, scormMode) {
+    const SC = '<' + '/script>';
+    let css = await fetchText('pathfinder.css');
+    const fonts = {}; for (const m of css.matchAll(/url\(\.\.\/fonts\/([^)]+)\)/g)) fonts[m[1]] = fonts[m[1]] || await fetchData('../fonts/' + m[1], 'font/ttf');
+    css = css.replace(/url\(\.\.\/fonts\/([^)]+)\)/g, (m, f) => `url(${fonts[f]})`);
+    css += plugins.map(p => p.css || '').join('\n');
+    const js = (await fetchText('pathfinder.js')).replace(/<\/script/gi, '<\\/script');
+    const json = JSON.stringify(d).replace(/</g, '\\u003c');
+    return `<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>${esc(d.title || 'Lernpfad')}</title><meta name="generator" content="PathFinder">
+<style>${css}</style></head>
+<body class="pf-player"><div class="app"><section class="lpwrap"><div class="lp-scroll" id="scroll"><div class="lp" id="lp"></div></div></section></div>
+<script type="application/json" id="pf-doc">${json}${SC}
+<script type="module">
+${js}
+startPathFinder({ player: true, scorm: ${scormMode ? 'true' : 'false'}, doc: JSON.parse(document.getElementById('pf-doc').textContent) });
+${SC}
+</body></html>`;
+  }
+  const fileName = (ext) => (doc.title || 'Lernpfad').replace(/[^\wäöüÄÖÜß -]+/g, '').trim().replace(/\s+/g, '_').slice(0, 60) + ext;
+  function download(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 4000); }
+  function manifest(d) {
+    const t = esc(d.title || 'Lernpfad'), id = 'pathfinder-' + String(d.id).replace(/[^\w-]/g, '');
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="${id}" version="1.0" xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2" xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd http://www.imsglobal.org/xsd/imsmd_rootv1p2p1 imsmd_rootv1p2p1.xsd http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd">
+  <metadata><schema>ADL SCORM</schema><schemaversion>1.2</schemaversion></metadata>
+  <organizations default="org1">
+    <organization identifier="org1"><title>${t}</title>
+      <item identifier="item1" identifierref="res1" isvisible="true"><title>${t}</title><adlcp:masteryscore>${d.pass}</adlcp:masteryscore></item>
+    </organization>
+  </organizations>
+  <resources>
+    <resource identifier="res1" type="webcontent" adlcp:scormtype="sco" href="index.html"><file href="index.html"/></resource>
+  </resources>
+</manifest>
+`;
+  }
+  function openExport() {
+    if (pending) commit();
+    const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
+    const appBlocks = doc.stations.flatMap(s => s.blocks.filter(b => def(b)?.exportAs));
+    const st = { fmt: 'html', pass: doc.pass || 80, cert: doc.cert.on };
+    const draw = () => {
+      el.innerHTML = `<header><b>⇩ Export</b><button data-x="1">Abbrechen</button><button class="ok" data-go="1">Exportieren</button></header><div class="ed-form">
+        <span class="ed-dseg" data-eseg="fmt"><button data-v="html" aria-pressed="${st.fmt === 'html'}">📄 HTML-Datei</button><button data-v="scorm" aria-pressed="${st.fmt === 'scorm'}">🎓 SCORM-Lernpaket</button></span>
+        <span class="help">${st.fmt === 'html' ? 'Eine einzige Datei mit Schriften und Bildern – läuft offline. In Moodle/ByCS als <b>Datei</b> hochladen. Der Fortschritt bleibt im Browser des Schülers.' : 'ZIP-Datei für die Aktivität <b>„Lernpaket“</b> in Moodle/ByCS. Moodle speichert den Fortschritt (auch beim Gerätewechsel) und trägt Punkte, Bestanden, Zeit und die Ergebnisse der einzelnen Aufgaben ein.'}</span>
+        ${st.fmt === 'scorm' ? `<label>Bestanden ab (% der Aufgaben${doc.form === 'challenge' ? ' bzw. XP' : ''})<input type="number" min="0" max="100" id="exPass" value="${st.pass}"></label>` : ''}
+        <label class="chk"><input type="checkbox" id="exCert"${st.cert ? ' checked' : ''}>Zertifikat am Ende anbieten</label>
+        ${appBlocks.length ? `<div class="ed-hint" style="font-size:13px">${appBlocks.length} App-Baustein${appBlocks.length > 1 ? 'e werden' : ' wird'} für den Export umgewandelt: Aufgaben werden zur <b>Selbstkontrolle</b> (Schüler tippen das Ergebnis ein, das vorher berechnet wird), Tabellen werden als Tabelle gezeigt.</div>` : ''}
+        <span class="help">Alles entsteht hier im Browser; nichts wird hochgeladen.</span></div>`;
+    };
+    draw();
+    el.addEventListener('click', async e => {
+      const t = e.target.closest('button'); if (!t) return;
+      if (t.dataset.x) { closeDlg(false); return; }
+      const sg = t.closest('[data-eseg]'); if (sg) { st.fmt = t.dataset.v; draw(); return; }
+      if (t.dataset.go) {
+        st.pass = Math.max(0, Math.min(100, +($('#exPass', el)?.value ?? st.pass))); st.cert = $('#exCert', el).checked;
+        t.disabled = true; t.textContent = 'erstelle …';
+        try {
+          const { d } = exportDoc(st);
+          const html = await buildHtml(d, st.fmt === 'scorm');
+          if (st.fmt === 'html') download(new Blob([html], { type: 'text/html' }), fileName('.html'));
+          else download(new Blob([zip({ 'imsmanifest.xml': manifest(d), 'index.html': html })], { type: 'application/zip' }), fileName('_SCORM.zip'));
+          closeDlg(false); toast(st.fmt === 'html' ? '⇩ HTML-Datei erstellt' : '⇩ SCORM-Lernpaket erstellt – in Moodle als „Lernpaket“ hochladen');
+        } catch (er) { t.disabled = false; t.textContent = 'Exportieren'; toast('Export fehlgeschlagen: ' + esc(er.message)); }
+      }
+    });
+  }
+
+  /* ---------- SCORM 1.2: Verbindung zur Lernplattform ---------- */
+  function scormConnect() {
+    let API = null;
+    try { let w = window; for (let n = 0; w && n < 12; n++) { if (w.API) { API = w.API; break; } if (w === w.parent) break; w = w.parent; } } catch (e) { }
+    try { if (!API && window.opener && window.opener.API) API = window.opener.API; } catch (e) { }
+    if (!API) return { ok: false, get: () => '', report() { }, finish() { } };
+    const t0 = Date.now();
+    API.LMSInitialize('');
+    const st = API.LMSGetValue('cmi.core.lesson_status');
+    if (!st || st === 'not attempted') API.LMSSetValue('cmi.core.lesson_status', 'incomplete');
+    const nInter = () => +API.LMSGetValue('cmi.interactions._count') || 0;
+    return {
+      ok: true,
+      get: k => API.LMSGetValue(k),
+      report(txt) {
+        const checks = doc.stations.flatMap(s => { const c = s.blocks.filter(isCheck); return c.map(b => ({ id: b.id, w: doc.form === 'challenge' ? (+b.xp || 1) : 1 })).concat(s.check ? [{ id: 'st:' + s.id, w: doc.form === 'challenge' ? 0 : 1 }] : []); });
+        const max = checks.reduce((a, c) => a + c.w, 0) || 1, got = checks.filter(c => prog.solved[c.id]).reduce((a, c) => a + c.w, 0);
+        const pct = Math.round(100 * got / max);
+        API.LMSSetValue('cmi.core.score.min', '0'); API.LMSSetValue('cmi.core.score.max', '100'); API.LMSSetValue('cmi.core.score.raw', String(pct));
+        const allDone = checks.every(c => prog.solved[c.id]);
+        API.LMSSetValue('cmi.core.lesson_status', pct >= (doc.pass ?? 80) ? 'passed' : allDone ? 'failed' : 'incomplete');
+        prog.sent = prog.sent || []; // schon gemeldete Ergebnisse (SCORM 1.2 kann sie nicht zurücklesen)
+        for (const c of checks) if (prog.solved[c.id] && !prog.sent.includes(c.id)) {
+          const n = nInter(); prog.sent.push(c.id);
+          API.LMSSetValue(`cmi.interactions.${n}.id`, String(c.id).replace(/[^\w:-]/g, '_'));
+          API.LMSSetValue(`cmi.interactions.${n}.type`, 'performance');
+          API.LMSSetValue(`cmi.interactions.${n}.result`, 'correct');
+        }
+        API.LMSSetValue('cmi.suspend_data', JSON.stringify({ ...JSON.parse(txt), sent: prog.sent }).slice(0, 4096));
+        API.LMSCommit('');
+      },
+      finish(txt) {
+        const s = Math.round((Date.now() - t0) / 1000), hh = String(Math.floor(s / 3600)).padStart(4, '0'), mm = String(Math.floor(s / 60) % 60).padStart(2, '0'), ss = String(s % 60).padStart(2, '0');
+        API.LMSSetValue('cmi.core.session_time', `${hh}:${mm}:${ss}`);
+        API.LMSSetValue('cmi.core.exit', 'suspend');
+        API.LMSCommit(''); API.LMSFinish('');
+      },
+    };
+  }
 
   /* ---------- Schnittstelle für Erweiterungen und die App ---------- */
   const ctx = {

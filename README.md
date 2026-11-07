@@ -7,7 +7,9 @@ die Seite später sehen. Gebaut für das iPad (mit oder ohne Tastatur).
 * **Alles lokal:** kein Login, kein Server, keine Daten an Dritte. Lernpfade werden im Browser gespeichert.
 * **Design zum Zusammenklicken:** Lernpfad oder Challenge, 10 Farbpaletten, 3 Schriftstile, runde oder eckige Stationen,
   eigenes Kopfbild, Textanimationen.
-* **Export** als eigenständige HTML-Datei (z. B. für Moodle/ByCS) und als SCORM-Lernpaket – in Arbeit.
+* **Export** (⋯ → Export) als eigenständige HTML-Datei für Moodle/ByCS (läuft offline, Fortschritt im Browser) und als
+  **SCORM-1.2-Lernpaket** für die Aktivität „Lernpaket“: Moodle speichert den Fortschritt und erhält Punkte, Bestanden/nicht bestanden,
+  Bearbeitungszeit und die gelösten Aufgaben. App-Bausteine (z. B. FlowPad-Aufgaben) werden dabei zur Selbstkontrolle umgewandelt.
 
 ## Kern und Erweiterungen
 
