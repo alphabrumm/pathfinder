@@ -401,8 +401,12 @@ export function startPathFinder(opts = {}) {
     let h = `<div class="lp-card lp-task${ok ? ' ok' : ''}"><div class="hd">${ce('title', b.title, 'Aufgabe 1', { tag: 'b', cls: 'lp-ctitle' })}${xpTag(b)}${where ? `<span class="where">${esc(where)}</span>` : ''}<span class="lp-state">${ok ? '✓ geschafft' : ''}</span></div>`;
     h += imgHtml(b.img, '', 'klein') + ce('html', b.html, 'Arbeitsauftrag …', { rich: true });
     h += `<div>${buttons}</div>` + (E() && hint ? `<div class="ed-hint">${hint}</div>` : '');
-    (b.tips || []).forEach((t, i) => { h += `<details data-tip="${i}"><summary>Tipp ${i + 1}</summary><div>${t}</div></details>`; });
-    if (b.solution) h += `<details data-sol="1"><summary>Lösung anzeigen</summary><div>${b.solution}</div></details>`;
+    let k = 0;
+    (b.tips || []).forEach((t, i) => {
+      const hid = !!b.tipsHide?.[i]; if (hid && !E()) return; if (!hid) k++;
+      h += `<details data-tip="${i}"${hid ? ' class="pf-hidden"' : ''}><summary>${hid ? `Tipp · <span class="pf-hid">für Schüler verborgen</span>` : `Tipp ${k}`}</summary><div>${t}</div></details>`;
+    });
+    if (b.solution && (!b.solHide || E())) h += `<details data-sol="1"${b.solHide ? ' class="pf-hidden"' : ''}><summary>Lösung anzeigen${b.solHide ? ` · <span class="pf-hid">für Schüler verborgen</span>` : ''}</summary><div>${b.solution}</div></details>`;
     if (E() && !(b.tips || []).length && !b.solution) h += `<div class="ed-hint">Tipps und Lösung über ⚙ hinzufügen</div>`;
     return h + '</div>';
   }
@@ -790,7 +794,7 @@ export function startPathFinder(opts = {}) {
     reveal: [{ k: 'summary', l: 'Überschrift der Klappbox', t: 'text' }],
     file: [{ k: 'data', l: 'Datei', t: 'file' }, { k: 'name', l: 'Dateiname', t: 'text' }],
     html: [{ k: 'html', l: 'HTML', t: 'code', help: 'Wird für Schüler so angezeigt. Skripte laufen erst im exportierten Lernpfad.' }],
-    task: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'answer', l: 'Ergebnis zur Selbstkontrolle (optional)', t: 'text', help: 'Leer = Schüler hakt „Erledigt“ ab. Sonst tippen sie das Ergebnis ein; mehrere richtige mit | trennen. Zahlen werden mit Komma oder Punkt erkannt.' }, { k: 'tips', l: 'Tipps (werden nacheinander aufgedeckt)', t: 'list', ph: 'Tipp' }, { k: 'solution', l: 'Lösung zum Aufdecken (leer = keine)', t: 'text' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }, XP],
+    task: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'answer', l: 'Ergebnis zur Selbstkontrolle (optional)', t: 'text', help: 'Leer = Schüler hakt „Erledigt“ ab. Sonst tippen sie das Ergebnis ein; mehrere richtige mit | trennen. Zahlen werden mit Komma oder Punkt erkannt.' }, { k: 'tips', l: 'Tipps (werden nacheinander aufgedeckt)', t: 'list', ph: 'Tipp', vis: 'tipsHide' }, { k: 'solution', l: 'Lösung zum Aufdecken (leer = keine)', t: 'text' }, { k: 'solHide', l: 'Lösung für Schüler sichtbar', t: 'shown', show: b => !!b.solution }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }, XP],
     quiz: [{ k: 'qs', l: 'Fragen', t: 'qs' }, XP],
     gap: [{ k: 'bank', l: 'Begriffe zum Ziehen anbieten (statt Tippen)', t: 'check' }, { k: 'extra', l: 'Zusätzliche falsche Begriffe (Ablenker)', t: 'list', ph: 'Begriff', show: b => b.bank }, { k: 'heft', l: 'Als Hefteintrag gestalten (mit Titel)', t: 'check' }, XP],
     match: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'pairs', l: 'Paare', t: 'pairs' }, XP],
@@ -847,11 +851,12 @@ export function startPathFinder(opts = {}) {
         if (f.t === 'text') h += `<label>${esc(f.l)}<input type="text" data-k="${f.k}" value="${esc(plain(v ?? ''))}">${help}</label>`;
         else if (f.t === 'number') h += `<label>${esc(f.l)}<input type="number" min="0" data-k="${f.k}" value="${esc(v ?? 0)}">${help}</label>`;
         else if (f.t === 'check') h += `<label class="chk"><input type="checkbox" data-k="${f.k}"${v ? ' checked' : ''}>${esc(f.l)}</label>`;
+        else if (f.t === 'shown') h += `<label class="chk"><input type="checkbox" data-k="${f.k}"${v ? '' : ' checked'}>${esc(f.l)}</label>`;
         else if (f.t === 'select') h += `<label>${esc(f.l)}<select data-k="${f.k}">${f.o.map(([k, n]) => `<option value="${k}"${k === (v ?? '') ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>${help}</label>`;
         else if (f.t === 'code') h += `<label>${esc(f.l)}<textarea class="mono" data-k="${f.k}" style="min-height:220px" spellcheck="false">${esc(v)}</textarea>${help}</label>`;
         else if (f.t === 'cell') h += `<div class="row"><label>${esc(f.l)}<input type="text" class="mono" data-k="${f.k}" value="${esc(v)}" placeholder="D2" autocapitalize="characters"></label>${takeBtn('cell', f.k)}</div>`;
         else if (f.t === 'formula') h += `<div class="row"><label>${esc(f.l)}<input type="text" class="mono" data-k="${f.k}" value="${esc(v)}" placeholder="=B2*C2" autocapitalize="off" autocorrect="off" spellcheck="false">${help}</label>${takeBtn('formula', f.k)}</div>`;
-        else if (f.t === 'list') h += `<label>${esc(f.l)}</label><div class="list">${(v || []).map((t, i) => `<div class="it"><input type="text" data-li="${f.k}" data-i="${i}" value="${esc(plain(t))}" placeholder="${esc(f.ph)} ${i + 1}"><button data-ldel="${f.k}" data-i="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-ladd="${f.k}">＋ ${esc(f.ph)}</button></div>`;
+        else if (f.t === 'list') h += `<label>${esc(f.l)}</label>${f.vis ? '<span class="help">👁 = für Schüler sichtbar · antippen zum Verbergen</span>' : ''}<div class="list">${(v || []).map((t, i) => `<div class="it">${f.vis ? (hid => `<button class="pf-eye${hid ? ' off' : ''}" data-lvis="${f.vis}" data-i="${i}" aria-pressed="${!hid}" title="${hid ? 'verborgen – antippen zum Zeigen' : 'sichtbar – antippen zum Verbergen'}">${hid ? '🙈' : '👁'}</button>`)(!!(b[f.vis] || [])[i]) : ''}<input type="text" data-li="${f.k}" data-i="${i}" value="${esc(plain(t))}" placeholder="${esc(f.ph)} ${i + 1}"><button data-ldel="${f.k}" data-i="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-ladd="${f.k}">＋ ${esc(f.ph)}</button></div>`;
         else if (f.t === 'qs') h += `<label>${esc(f.l)}</label>${v.map((q, qi) => `<fieldset><legend>Frage ${qi + 1}</legend><input type="text" data-qq="${qi}" value="${esc(plain(q.q))}" placeholder="Frage"><div class="list">${q.opts.map((o, i) => `<div class="it"><input type="radio" name="ok${qi}" data-qok2="${qi}.${i}"${o.ok ? ' checked' : ''} title="richtig" style="width:24px;height:24px"><input type="text" data-qt="${qi}.${i}" value="${esc(plain(o.t))}" placeholder="Antwort ${i + 1}"><button data-qodel="${qi}.${i}" aria-label="entfernen">✕</button></div><div class="it" style="padding-left:30px"><input type="text" data-qfb="${qi}.${i}" value="${esc(plain(o.fb))}" placeholder="Rückmeldung zu dieser Antwort (optional)" style="font-size:13px"></div>`).join('')}<div class="row" style="align-items:center"><button class="add" data-qoadd="${qi}">＋ Antwort</button>${v.length > 1 ? `<button class="add" data-qdel="${qi}">Frage entfernen</button>` : ''}</div></div></fieldset>`).join('')}<button class="add" data-qadd="1">＋ Frage</button>`;
         else if (f.t === 'pairs') h += `<label>${esc(f.l)}</label><div class="list">${v.map((p, i) => `<div class="it"><input type="text" data-pa="${i}" value="${esc(p.a)}" placeholder="Karte"><span>→</span><input type="text" data-pb="${i}" value="${esc(p.b)}" placeholder="passt zu"><button data-pdel="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-padd="1">＋ Paar</button></div>`;
         else if (f.t === 'image') h += `<label>${esc(f.l)}</label><div class="imgprev">${v ? `<img src="${v}" alt="">` : ''}<label class="take" style="display:inline-flex;align-items:center;cursor:pointer">🖼 ${v ? 'Anderes Bild' : 'Bild/GIF wählen'}<input type="file" accept="image/*" data-img="${f.k}" hidden></label>${v ? `<button class="add" data-imgdel="${f.k}">entfernen</button>` : ''}</div><span class="help">Große Fotos werden verkleinert, GIFs bleiben animiert.</span>`;
@@ -866,7 +871,7 @@ export function startPathFinder(opts = {}) {
     el.addEventListener('input', e => {
       const t = e.target, d = t.dataset;
       for (const F of Object.values(FIELDS)) F.input?.(t, b, draw);
-      if (d.k) { const f = fields.find(x => x.k === d.k); let v = t.type === 'checkbox' ? t.checked : t.type === 'number' ? +t.value : t.value; if (f?.t === 'cell') v = v.toUpperCase().replace(/\s/g, ''); setPath(b, d.k, v); if (t.tagName === 'SELECT' || t.type === 'checkbox') draw(); }
+      if (d.k) { const f = fields.find(x => x.k === d.k); let v = t.type === 'checkbox' ? (f?.t === 'shown' ? !t.checked : t.checked) : t.type === 'number' ? +t.value : t.value; if (f?.t === 'cell') v = v.toUpperCase().replace(/\s/g, ''); setPath(b, d.k, v); if (t.tagName === 'SELECT' || t.type === 'checkbox') draw(); }
       if (d.li) getP(b, d.li)[+d.i] = esc(t.value);
       if (d.qq != null) b.qs[+d.qq].q = esc(t.value);
       if (d.qt) { const [qi, i] = d.qt.split('.').map(Number); b.qs[qi].opts[i].t = esc(t.value); }
@@ -888,7 +893,8 @@ export function startPathFinder(opts = {}) {
       if (d.x) { closeDlg(d.x === 'ok'); return; }
       for (const F of Object.values(FIELDS)) F.click?.(d, b, draw, ctx);
       if (d.ladd) { getP(b, d.ladd).push(''); draw(); $$(`[data-li]`, el).pop()?.focus(); }
-      if (d.ldel) { getP(b, d.ldel).splice(+d.i, 1); draw(); }
+      if (d.ldel) { getP(b, d.ldel).splice(+d.i, 1); const F = fields.find(x => x.k === d.ldel); if (F?.vis && b[F.vis]) b[F.vis].splice(+d.i, 1); draw(); }
+      if (d.lvis) { const a = b[d.lvis] = b[d.lvis] || []; a[+d.i] = !a[+d.i]; draw(); }
       if (d.qadd) { b.qs.push({ q: '', opts: [{ t: '', ok: true, fb: '' }, { t: '', ok: false, fb: '' }] }); draw(); }
       if (d.qdel) { b.qs.splice(+d.qdel, 1); draw(); }
       if (d.qoadd) { b.qs[+d.qoadd].opts.push({ t: '', ok: false, fb: '' }); draw(); }
@@ -1253,6 +1259,11 @@ export function startPathFinder(opts = {}) {
   function exportDoc(settings) {
     const d = clone(doc); let converted = 0;
     const env = { doc: d, sheetBefore(st, i) { for (let k = i - 1; k >= 0; k--) { const x = st.blocks[k]; if (x.sheet?.cells) return x.sheet; } for (const s2 of d.stations) { if (s2 === st) break; for (let k = s2.blocks.length - 1; k >= 0; k--) if (s2.blocks[k].sheet?.cells) return s2.blocks[k].sheet; } return null; } };
+    for (const st of d.stations) for (const b of st.blocks) {
+      // was die Lehrkraft verborgen hat, kommt gar nicht erst in die Datei
+      if (b.tipsHide && b.tips) { b.tips = b.tips.filter((t, i) => !b.tipsHide[i]); delete b.tipsHide; }
+      if (b.solHide) { b.solution = ''; delete b.solHide; }
+    }
     for (const st of d.stations) {
       const out = [];
       st.blocks.forEach((b, i) => {

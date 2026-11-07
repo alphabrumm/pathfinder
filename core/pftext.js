@@ -57,6 +57,8 @@ const CORE_SECTIONS = {
   aufgabe: { n: 'Aufgabe', keys: ['antwort', 'tipp', 'loesung', 'xp', 'punkte'], make(S, H) {
     const b = { type: 'task', title: S.title, html: H.md(S.body), xp: S.num('xp', 20), tips: S.all('tipp').map(inline), solution: S.one('loesung') ? inline(S.one('loesung')) : '', img: '' };
     if (S.one('antwort')) b.answer = S.one('antwort');
+    if (S.hid('tipp').some(Boolean)) b.tipsHide = S.hid('tipp');
+    if (S.hid('loesung')[0]) b.solHide = true;
     return b;
   } },
   quiz: { n: 'Quiz', keys: ['xp', 'punkte'], make(S, H) {
@@ -111,10 +113,10 @@ export function parseText(src, env) {
   const closeSec = () => {
     if (!sec) return; const S = sec; sec = null;
     const def = SECS[S.kind]; const keys = new Set(def.keys || []);
-    const kv = {}; const body = [], bodyN = [];
-    for (const [l, n] of S.lines) { const m = l.match(/^\s*([A-Za-zÄÖÜäöüß -]{2,24}):\s*(.*)$/); const k = m && norm(m[1]); if (m && keys.has(k)) (kv[k] = kv[k] || []).push(m[2].trim()); else { body.push(l); bodyN.push([l, n]); } }
+    const kv = {}, kh = {}; const body = [], bodyN = [];
+    for (const [l, n] of S.lines) { const m = l.match(/^\s*([A-Za-zÄÖÜäöüß -]{2,24}?)\s*(\((?:verborgen|versteckt)\))?:\s*(.*)$/i); const k = m && norm(m[1]); if (m && keys.has(k)) { (kv[k] = kv[k] || []).push(m[3].trim()); (kh[k] = kh[k] || []).push(!!m[2]); } else { body.push(l); bodyN.push([l, n]); } }
     while (body.length && !body[body.length - 1].trim()) { body.pop(); bodyN.pop(); }
-    const Sx = { title: S.title, line: S.line, body, bodyN, raw: S.lines.map(x => x[0]), table: S.table, kv, one: k => (kv[k] || [])[0], all: k => kv[k] || [], num: (k, d) => { const v = (kv[k] || kv.punkte || [])[0]; return v != null && !isNaN(parseInt(v)) ? parseInt(v) : d; } };
+    const Sx = { title: S.title, line: S.line, body, bodyN, raw: S.lines.map(x => x[0]), table: S.table, kv, one: k => (kv[k] || [])[0], all: k => kv[k] || [], hid: k => kh[k] || [], num: (k, d) => { const v = (kv[k] || kv.punkte || [])[0]; return v != null && !isNaN(parseInt(v)) ? parseInt(v) : d; } };
     try { const b = def.make(Sx, H, env); if (b) { if (kv.punkte) b.pts = parseInt(kv.punkte[0]) || undefined; push(b, S.line); } } catch (e) { H.err(S.line, `Abschnitt „${S.head}“: ${e.message}`); }
   };
   const lastCheckable = () => { const bl = st ? st.blocks : []; for (let k = bl.length - 1; k >= 0; k--) if (['task', 'quiz', 'gap', 'match'].includes(bl[k].type) || (env.isCheck && env.isCheck(bl[k]))) return bl[k]; return null; };
@@ -221,7 +223,7 @@ export function docToText(doc, env) {
         case 'code': L.push('```' + (b.lang || ''), b.code, '```'); break;
         case 'uml': L.push(`### UML: ${b.name}`, ...b.attrs.map(a => '- ' + a), ...b.methods.map(a => '+ ' + a)); break;
         case 'html': L.push('### HTML', '```html', b.html, '```'); break;
-        case 'task': L.push(`### Aufgabe: ${md(b.title)}`, md(b.html)); if (b.answer) L.push(`Antwort: ${b.answer}`); (b.tips || []).forEach(t => L.push(`Tipp: ${md(t)}`)); if (b.solution) L.push(`Lösung: ${md(b.solution).replace(/\n+/g, ' ')}`); L.push(`XP: ${b.xp}`); break;
+        case 'task': L.push(`### Aufgabe: ${md(b.title)}`, md(b.html)); if (b.answer) L.push(`Antwort: ${b.answer}`); (b.tips || []).forEach((t, i) => L.push(`Tipp${b.tipsHide?.[i] ? ' (verborgen)' : ''}: ${md(t)}`)); if (b.solution) L.push(`Lösung${b.solHide ? ' (verborgen)' : ''}: ${md(b.solution).replace(/\n+/g, ' ')}`); L.push(`XP: ${b.xp}`); break;
         case 'quiz': L.push('### Quiz'); b.qs.forEach(q => { L.push(`? ${md(q.q)}`); q.opts.forEach(o => L.push(`[${o.ok ? 'x' : ' '}] ${md(o.t)}${o.fb ? ' // ' + md(o.fb) : ''}`)); }); break;
         case 'gap': L.push(`### Lückentext${b.title ? ': ' + md(b.title) : ''}`, md(b.html)); if (b.bank) L.push('Wortbank: ja'); if (b.extra?.length) L.push(`Extra: ${b.extra.join(', ')}`); break;
         case 'match': L.push(`### Zuordnen: ${md(b.title)}`, ...b.pairs.map(p => `${p.a} -> ${p.b}`)); break;
@@ -258,6 +260,7 @@ Auftrag für die Schüler.
 Antwort: 12,60          (optional: genaue Antwort → wird automatisch geprüft; Zahl oder kurzes Wort)
 Tipp: erster Tipp       (beliebig viele Tipp-Zeilen, vom kleinen zum großen Tipp)
 Lösung: Musterlösung
+                        („Tipp (verborgen):“ bzw. „Lösung (verborgen):“ = nur für die Lehrkraft, Schüler sehen sie nicht)
 XP: 20
 
 ### Quiz

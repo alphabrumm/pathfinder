@@ -376,3 +376,9 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .ki-res { font-size: 14px; } .ki-res ul { margin: 4px 0 8px; padding-left: 20px; max-height: 160px; overflow: auto; }
 .ki-res .good { color: #2e7d4f; font-weight: 700; } .ki-res .bad { color: #c0392b; font-weight: 700; } .ki-res .warn { color: #a86b00; font-weight: 700; margin-top: 4px; }
 .ki-fmt { margin: 0; padding: 12px; background: #f5f3f8; border-radius: 10px; font: 12px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; max-height: 280px; overflow: auto; }
+
+/* Tipps/Lösung für Schüler verborgen */
+.lp-task details.pf-hidden { opacity: .55; border-style: dashed; }
+.pf-hid { font-size: .8em; font-weight: 600; color: var(--ink-2); background: var(--surface-2); border-radius: 6px; padding: 1px 6px; }
+.ed-form .list .pf-eye { flex: 0 0 auto; width: 38px; border: 1.5px solid #d9d2e4; background: #fff; border-radius: 8px; cursor: pointer; font-size: 16px; }
+.ed-form .list .pf-eye.off { background: #f1eef5; opacity: .8; }
