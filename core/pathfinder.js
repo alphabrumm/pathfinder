@@ -1454,6 +1454,9 @@ ${SC}
     get prog() { return prog; }, get doc() { return doc; }, get mode() { return mode; },
     solve: id => solve(id), render: () => render(),
     openDoc: d => openDoc(d), get current() { return doc; },
+    /** Lernpfad als Datei für die App (Erweiterung eingebaut) – für „Fertig“ im Editor der App */
+    buildForApp: () => { if (pending) commit(); return appHtml({ pass: doc.pass || 80, cert: doc.cert?.on !== false }); },
+    get dirty() { return hist.length > 1; },
   };
   save(); render(); updUndo();
   host.attach?.(ctx);
