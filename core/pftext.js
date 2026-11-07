@@ -228,7 +228,7 @@ export function parseText(src, env) {
     const kv = {}, kh = {}; const body = [], bodyN = [];
     for (const [l, n] of S.lines) { const m = l.match(/^\s*([A-Za-zÄÖÜäöüß -]{2,24}?)\s*(\((?:verborgen|versteckt)\))?:\s*(.*)$/i); const k = m && norm(m[1]); if (m && keys.has(k)) { (kv[k] = kv[k] || []).push(m[3].trim()); (kh[k] = kh[k] || []).push(!!m[2]); } else { body.push(l); bodyN.push([l, n]); } }
     while (body.length && !body[body.length - 1].trim()) { body.pop(); bodyN.pop(); }
-    const Sx = { title: S.title, line: S.line, body, bodyN, raw: S.lines.map(x => x[0]), table: S.table, kv, one: k => (kv[k] || [])[0], all: k => kv[k] || [], hid: k => kh[k] || [], num: (k, d) => { const v = (kv[k] || kv.punkte || [])[0]; return v != null && !isNaN(parseInt(v)) ? parseInt(v) : d; } };
+    const Sx = { title: S.title, line: S.line, body, bodyN, raw: S.lines.map(x => x[0]), table: S.table, code: S.code || [], kv, one: k => (kv[k] || [])[0], all: k => kv[k] || [], hid: k => kh[k] || [], num: (k, d) => { const v = (kv[k] || kv.punkte || [])[0]; return v != null && !isNaN(parseInt(v)) ? parseInt(v) : d; } };
     try { const b = def.make(Sx, H, env); if (b) { if (kv.punkte) b.pts = parseInt(kv.punkte[0]) || undefined; push(b, S.line); } } catch (e) { H.err(S.line, `Abschnitt „${S.head}“: ${e.message}`); }
   };
   const lastCheckable = () => { const bl = st ? st.blocks : []; for (let k = bl.length - 1; k >= 0; k--) if (['task', 'quiz', 'gap', 'match'].includes(bl[k].type) || (env.isCheck && env.isCheck(bl[k]))) return bl[k]; return null; };
@@ -236,11 +236,13 @@ export function parseText(src, env) {
   for (; i < lines.length; i++) {
     const raw = lines[i], n = i + 1, l = raw.trim();
     // Code-Block ```sprache
-    const fence = l.match(/^```\s*([\w+#-]*)\s*$/);
+    const fence = l.match(/^```\s*([\w+#-]*)(?:\s+[\wäöüÄÖÜß-]+)?\s*$/);
     if (fence) {
       const code = []; i++; while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) code.push(lines[i++]);
       if (i >= lines.length) H.warn(n, 'Code-Block ohne schließendes ```.');
       if (sec && sec.kind === 'html') { sec.lines.push(...code.map((c, k) => [c, n + k + 1])); continue; }
+      // Abschnitte mit eigenen Codeblöcken (z. B. Startcode, Musterlösung) – Zusatz nach der Sprache: ```java start
+      if (sec && SECS[sec.kind].fences) { sec.code.push({ lang: (fence[1] || '').toLowerCase(), tag: norm(raw.trim().replace(/^`{3,}\s*[\w+#-]*\s*/, '')), code: code.join('\n') }); continue; }
       closeSec(); flushPara();
       if (/^svg$/i.test(fence[1])) { const src = cleanSvg(code.join('\n')); if (src) { images.push({ n, src }); push({ type: 'image', src, alt: '', caption: '', size: 'voll' }, n); } else H.warn(n, 'SVG-Grafik ist ungültig oder zu groß – weggelassen.'); continue; }
       push({ type: 'code', lang: (fence[1] || 'text').toLowerCase(), code: code.join('\n') }, n); continue;
@@ -277,7 +279,7 @@ export function parseText(src, env) {
       closeSec(); flushPara();
       const [h, ...rest] = m[1].split(':'); const kind = ALIAS[norm(h)];
       if (!kind) { H.warn(n, `Unbekannter Abschnitt „### ${h.trim()}“ – als Text übernommen. Möglich: ${Object.keys(SECS).map(k => SECS[k].n || k).join(', ')}.`); para.push([`**${rest.join(':').trim() || h.trim()}**`, n]); continue; }
-      sec = { kind, head: h.trim(), title: rest.join(':').trim(), line: n, lines: [], table: [] }; continue;
+      sec = { kind, head: h.trim(), title: rest.join(':').trim(), line: n, lines: [], table: [], code: [] }; continue;
     }
     if (/^-{3,}\s*sperre\s*-{0,}$/i.test(l) || /^\[\s*sperre\s*\]$/i.test(l)) {
       closeSec(); flushPara(); const c = lastCheckable();
