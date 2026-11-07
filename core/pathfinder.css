@@ -358,3 +358,11 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .pf-pts input::-webkit-outer-spin-button, .pf-pts input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .lp:not(.editing) .blk { position: relative; }
 @media (max-width: 560px) { .lp.with-pts .lp-main { padding-left: 18px; } .pf-pts { position: static; display: inline-flex; width: auto; margin: 8px 0 -4px; padding: 2px 8px; } }
+
+/* Figuren-Auswahl */
+.ed-figs { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+.ed-figs button { display: grid; justify-items: center; gap: 4px; padding: 8px 4px; border: 2px solid #e3dceb; background: #faf8fc; border-radius: 10px; cursor: pointer; font-size: 12px; }
+.ed-figs button[aria-pressed="true"] { border-color: #1f1b2e; background: #fff; }
+.ed-figs img { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; }
+.lp-figur > img { image-rendering: pixelated; object-fit: contain; background: var(--surface); padding: 6px; }
+.ed-form input[type=range] { width: 100%; accent-color: #5b6fc2; }
