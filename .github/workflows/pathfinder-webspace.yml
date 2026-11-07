@@ -1,0 +1,100 @@
+name: PathFinder auf den Webspace (FTP)
+# Ablauf wie bei FlowPad, JPad und QPad: Bauen & auf GitHub Pages testen → erst nach ausdrücklichem „Go“
+# wird genau der getestete Stand per FTP auf den Webspace übertragen.
+#
+# Ausgelöst durch
+#  - ein Tag „live-…“ auf dem getesteten Commit (z. B. live-2026-10-28-1),
+#  - einen Push auf den Zweig „live“ (git push origin main:live) oder
+#  - von Hand (Actions → diesen Workflow → Run workflow; dann der neueste Pages-Stand von main).
+# Übertragen wird das unveränderte Paket aus dem erfolgreichen Pages-Lauf dieses Commits –
+# also Byte für Byte das, was auf alphabrumm.github.io/pathfinder getestet wurde.
+#
+# Benötigt die Repository-Secrets FTP_SERVER, FTP_USERNAME, FTP_PASSWORD, FTP_DIR
+# (optional die Variable FTP_PROTOCOL, Standard ftps).
+on:
+  workflow_dispatch:
+  push:
+    tags: ['live-*']
+    branches: [live]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: webspace
+  cancel-in-progress: false
+jobs:
+  webspace:
+    runs-on: ubuntu-latest
+    steps:
+      - name: FTP-Zugang vorhanden?
+        env:
+          S: ${{ secrets.FTP_SERVER || vars.FTP_SERVER }}
+          U: ${{ secrets.FTP_USERNAME || vars.FTP_USERNAME }}
+          P: ${{ secrets.FTP_PASSWORD }}
+          D: ${{ secrets.FTP_DIR || vars.FTP_DIR }}
+        run: |
+          missing=""
+          [ -z "$S" ] && missing="$missing FTP_SERVER"
+          [ -z "$U" ] && missing="$missing FTP_USERNAME"
+          [ -z "$P" ] && missing="$missing FTP_PASSWORD"
+          [ -z "$D" ] && missing="$missing FTP_DIR"
+          if [ -n "$missing" ]; then
+            echo "::error::Für diesen Workflow nicht sichtbar:$missing – als Repository-Secret (Settings → Secrets and variables → Actions → Tab „Secrets“, Bereich „Repository secrets“) im Repo alphabrumm/pathfinder anlegen; Environment- oder Dependabot-Secrets sieht dieser Workflow nicht."
+            exit 1
+          fi
+          echo "FTP-Zugang vollständig."
+      - name: Getestetes Paket von GitHub Pages holen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = "push" ]; then
+            # Der Pages-Lauf dieses Commits kann noch laufen (Push auf main und live gleichzeitig): bis 10 Minuten warten
+            for i in $(seq 1 40); do
+              RUN=$(gh run list -R "$REPO" --workflow pages.yml --commit "$SHA" --status success -L 1 --json databaseId -q '.[0].databaseId')
+              [ -n "$RUN" ] && break
+              PENDING=$(gh run list -R "$REPO" --workflow pages.yml --commit "$SHA" -L 1 --json status -q '.[0].status')
+              if [ -z "$PENDING" ] || [ "$PENDING" = "completed" ]; then break; fi
+              echo "Pages-Lauf für $SHA läuft noch ($PENDING) – warte …"; sleep 15
+            done
+          else
+            RUN=$(gh run list -R "$REPO" --workflow pages.yml --branch main --status success -L 1 --json databaseId -q '.[0].databaseId')
+          fi
+          if [ -z "$RUN" ]; then
+            echo "::error::Kein erfolgreicher Pages-Lauf für diesen Stand gefunden – erst auf main pushen, auf GitHub Pages testen, dann live schalten."
+            exit 1
+          fi
+          INFO=$(gh run view "$RUN" -R "$REPO" --json headSha,displayTitle,updatedAt -q '.headSha[0:7]+" – "+.displayTitle+" ("+.updatedAt+")"')
+          echo "Übertrage Pages-Lauf $RUN: $INFO"
+          echo "### Auf den Webspace übertragen" >> "$GITHUB_STEP_SUMMARY"
+          echo "$INFO" >> "$GITHUB_STEP_SUMMARY"
+          gh run download "$RUN" -R "$REPO" -n pathfinder-webspace -D dist-pathfinder
+          test -f dist-pathfinder/index.html && test -f dist-pathfinder/core/pathfinder.js
+      # Übertragung mit lftp (FTPS mit Wiederverwendung der TLS-Sitzung für die Datenverbindung – daran scheiterte
+      # SamKirkland/FTP-Deploy-Action mit „ECONNRESET (data socket)“). Hochgeladen werden nur neuere Dateien,
+      # auf dem Webspace wird nichts gelöscht.
+      - name: lftp installieren
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+      - name: Per FTP(S) übertragen
+        env:
+          S: ${{ secrets.FTP_SERVER || vars.FTP_SERVER }}
+          U: ${{ secrets.FTP_USERNAME || vars.FTP_USERNAME }}
+          P: ${{ secrets.FTP_PASSWORD }}
+          D: ${{ secrets.FTP_DIR || vars.FTP_DIR }}
+          PROTO: ${{ vars.FTP_PROTOCOL || 'ftps' }}
+        run: |
+          HOST="${S#ftp://}"; HOST="${HOST#ftps://}"; HOST="${HOST%/}"
+          if [ "$PROTO" = "ftp" ]; then SSL="set ftp:ssl-allow false;"; else SSL="set ftp:ssl-force true; set ftp:ssl-protect-data true;"; fi
+          lftp -u "$U","$P" "$HOST" <<EOF
+          set cmd:fail-exit true
+          set net:timeout 30
+          set net:max-retries 3
+          set net:reconnect-interval-base 5
+          set ftp:passive-mode true
+          $SSL
+          mirror --reverse --only-newer --no-perms --parallel=3 --verbose=1 ./dist-pathfinder/ "$D"
+          bye
+          EOF
+          echo "Übertragung abgeschlossen." >> "$GITHUB_STEP_SUMMARY"

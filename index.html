@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PathFinder · Lernpfade bauen</title>
+<meta name="description" content="PathFinder – Lernpfade für den Unterricht bauen, direkt im Browser, ohne Anmeldung und ohne Server.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f1b2e">
+<link rel="stylesheet" href="core/pathfinder.css">
+</head>
+<body>
+<div class="app" id="app">
+  <section class="lpwrap" aria-label="Lernpfad">
+    <div class="ed-bar" id="edBar">
+      <span class="pf-brand"><img src="icon.svg" alt=""><span>PathFinder</span></span>
+      <span class="ed-seg" id="modeSeg"><button data-mode="edit" aria-pressed="true">✎ Bearbeiten</button><button data-mode="preview">▶ Vorschau</button></span>
+      <button class="ed-btn" id="bUndo" title="Rückgängig (⌘Z)" aria-label="Rückgängig">↶</button>
+      <button class="ed-btn" id="bRedo" title="Wiederholen (⇧⌘Z)" aria-label="Wiederholen">↷</button>
+      <button class="ed-btn" id="bSingle" title="Nur aktuelle Station zeigen" aria-pressed="false">◧<span class="t"> Station</span></button>
+      <button class="ed-btn" id="bDesign" title="Design">🎨<span class="t"> Design</span></button>
+      <span class="sp"></span>
+      <span class="ed-saved" id="saved"></span>
+      <button class="ed-btn" id="bOpen" title="Lernpfad öffnen oder neu anlegen">📂<span class="t"> Öffnen</span></button>
+      <button class="ed-btn" id="bMore" title="Mehr">⋯</button>
+    </div>
+    <div class="lp-scroll" id="scroll"><div class="lp" id="lp"></div></div>
+  </section>
+</div>
+<script type="module">
+import { startPathFinder } from './core/pathfinder.js';
+
+// Beispiel beim ersten Start: ein kleiner Lernpfad, der PathFinder selbst erklärt
+const sample = () => {
+  const t1 = 'aufg1';
+  return {
+    v: 2, id: 'willkommen', form: 'lernpfad', design: { pal: 0, font: 'pixel', shape: 'eckig', hero: 'logo', heroImg: '' },
+    kicker: 'PathFinder · Lernpfad', title: 'Willkommen bei PathFinder', subtitle: 'So baust du deinen ersten Lernpfad – direkt hier im Browser.',
+    goals: ['Bausteine einfügen, verschieben und einstellen', 'Die Vorschau aus Sicht der Schüler nutzen', 'Design und Zertifikat anpassen'], rank: '', anim: { title: 'tippen' }, typeLines: [],
+    stations: [
+      { title: 'Bearbeiten wie auf der fertigen Seite', sub: 'Los geht’s', check: true, blocks: [
+        { type: 'text', html: 'Alles, was du hier siehst, kannst du <b>direkt antippen und ändern</b>: Titel, Texte, Stationen. Die Seite sieht beim Bearbeiten schon so aus wie später für deine Schüler.' },
+        { type: 'info', kind: 'tipp', title: 'Bausteine', html: 'Zwischen zwei Bausteinen erscheint ein blaues <b>+</b>. Darüber fügst du Text, Infokästen, Bilder, Aufgaben, Quiz, Lückentexte, Zuordnungen und mehr ein. In einem leeren Text öffnet <code>/</code> dieselbe Auswahl.' },
+        { type: 'text', html: 'Tippst du einen Baustein an, erscheint oben eine kleine Leiste: <b>⠿</b> zum Ziehen, ↑ ↓, ⧉ verdoppeln, <b>⚙</b> für Einstellungen und 🗑.' },
+      ] },
+      { title: 'Aufgaben, die sich selbst prüfen', sub: 'Ausprobieren', check: false, blocks: [
+        { type: 'quiz', qs: [{ q: 'Womit siehst du deinen Lernpfad so, wie ihn Schüler sehen?', opts: [{ t: '▶ Vorschau', ok: true, fb: 'Genau – oder kurz ⌘P.' }, { t: '🎨 Design', ok: false, fb: 'Design ändert Farben und Schrift.' }, { t: '📂 Öffnen', ok: false, fb: 'Damit wechselst du zwischen Lernpfaden.' }] }], xp: 10 },
+        { type: 'gap', html: 'Ein Lernpfad besteht aus [[Stationen|Station]]. Jede Station enthält [[Bausteine|Baustein]] wie Text, Quiz oder Aufgabe.', bank: true, extra: ['Kapitel', 'Folien'], heft: false, title: '', sub: '', xp: 10 },
+        { type: 'match', title: 'Was macht welcher Knopf?', pairs: [{ a: '⚙', b: 'Einstellungen des Bausteins' }, { a: '⠿', b: 'Baustein verschieben' }, { a: '🔒', b: 'Sperre bis eine Aufgabe gelöst ist' }], xp: 10 },
+      ] },
+      { title: 'Sperren und Zertifikat', sub: 'Ablauf', check: false, blocks: [
+        { type: 'task', id: t1, title: 'Probier die Vorschau', html: 'Wechsle oben in die <b>▶ Vorschau</b> und hake diese Aufgabe ab. Erst dann wird der Text darunter frei.', xp: 10, tips: ['Der Knopf „Erledigt“ steht direkt unter dem Auftrag.'], solution: '', img: '' },
+        { type: 'lock', after: t1 },
+        { type: 'info', kind: 'abschluss', title: 'Stark!', html: 'Sperren sorgen dafür, dass es erst weitergeht, wenn eine Aufgabe gelöst ist. Ganz unten wartet das <b>Zertifikat</b> mit Name, Bearbeitungszeit und Erfolgsübersicht.', img: '', name: '' },
+      ] },
+    ].map((s, i) => ({ id: 's' + i, ...s, blocks: s.blocks.map((b, j) => ({ id: b.id || `b${i}${j}`, ...b })) })),
+    cert: { on: true, need: 'alle', pct: 80, text: 'hat den Lernpfad erfolgreich bearbeitet.', show: { zeit: true, tipps: true, quiz: true, xp: true } },
+  };
+};
+
+startPathFinder({ appName: 'PathFinder', logo: 'icon.svg', storage: 'pathfinder', sample, examples: 'beispiele/index.json' });
+</script>
+</body></html>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7a5ae0"/>
+      <stop offset=".55" stop-color="#d64ad6"/>
+      <stop offset="1" stop-color="#f6bf3a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- geschwungener Pfad mit Stationen -->
+  <path d="M112 404 C 170 404, 168 318, 236 318 S 300 236, 360 236 S 400 150, 392 118" fill="none" stroke="#fff" stroke-width="30" stroke-linecap="round" stroke-dasharray="2 54" opacity=".95"/>
+  <circle cx="112" cy="404" r="30" fill="#fff"/>
+  <circle cx="236" cy="318" r="26" fill="#fff"/>
+  <circle cx="360" cy="236" r="26" fill="#fff"/>
+  <circle cx="112" cy="404" r="12" fill="#7a5ae0"/>
+  <circle cx="236" cy="318" r="10" fill="#d64ad6"/>
+  <circle cx="360" cy="236" r="10" fill="#e88a2a"/>
+  <!-- Fahne am Ziel -->
+  <path d="M378 140 V 52" stroke="#2b2300" stroke-width="14" stroke-linecap="round"/>
+  <path d="M384 54 L 448 74 L 384 96 Z" fill="#2b2300"/>
+</svg>
