@@ -1246,6 +1246,10 @@ export function startPathFinder(opts = {}) {
   if (scorm) { addEventListener('pagehide', () => scorm.finish(JSON.stringify(prog))); }
 
   /* ---------- Export: HTML-Datei und SCORM-Lernpaket ---------- */
+  async function appHtml(st) {
+    const { d } = exportDoc(st), a = clone(doc); a.cert = { ...a.cert, on: !!st.cert }; a.pass = st.pass;
+    return buildHtml(d, false, { plugin: plugins.find(p => p.bundle), doc: a });
+  }
   function exportDoc(settings) {
     const d = clone(doc); let converted = 0;
     const env = { doc: d, sheetBefore(st, i) { for (let k = i - 1; k >= 0; k--) { const x = st.blocks[k]; if (x.sheet?.cells) return x.sheet; } for (const s2 of d.stations) { if (s2 === st) break; for (let k = s2.blocks.length - 1; k >= 0; k--) if (s2.blocks[k].sheet?.cells) return s2.blocks[k].sheet; } return null; } };
@@ -1265,7 +1269,30 @@ export function startPathFinder(opts = {}) {
   const BASE = new URL('.', import.meta.url);
   async function fetchText(u) { const r = await fetch(new URL(u, BASE), { cache: 'no-cache' }); if (!r.ok) throw new Error(u); return r.text(); }
   async function fetchData(u, type) { const r = await fetch(new URL(u, BASE)); if (!r.ok) throw new Error(u); const buf = new Uint8Array(await r.arrayBuffer()); let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000)); return `data:${type};base64,${btoa(bin)}`; }
-  async function buildHtml(d, scormMode) {
+
+  /** Für Apps (z. B. FlowPad): Erweiterung mit in die Datei packen. Läuft der Lernpfad in der App, prüft die App selbst;
+   *  sonst wird der umgewandelte Lernpfad (Selbstkontrolle) gezeigt. */
+  async function appScripts(app, SC) {
+    const B = app.plugin.bundle, mods = [];
+    for (const m of B.modules) { const r = await fetch(m.url, { cache: 'no-cache' }); if (!r.ok) throw new Error(m.url); mods.push({ name: m.name, map: m.map || {}, code: await r.text() }); }
+    const j = x => JSON.stringify(x).replace(/</g, '\\u003c');
+    return `
+<script type="application/json" id="pf-doc-app">${j(app.doc)}${SC}
+<script type="application/json" id="pf-mods">${j({ mods, entry: B.entry, plugin: B.exportName, host: B.hostExport, inside: B.inside })}${SC}
+<script>
+async function pfLoadApp() {
+  try {
+    const M = JSON.parse(document.getElementById('pf-mods').textContent);
+    if (!new Function('return ' + M.inside)()) return null;
+    const urls = {};
+    for (const m of M.mods) { let c = m.code; for (const [spec, name] of Object.entries(m.map)) c = c.split("'" + spec + "'").join("'" + urls[name] + "'").split('"' + spec + '"').join('"' + urls[name] + '"'); urls[m.name] = URL.createObjectURL(new Blob([c], { type: 'text/javascript' })); }
+    const P = await import(urls[M.entry]);
+    return { doc: JSON.parse(document.getElementById('pf-doc-app').textContent), plugins: [P[M.plugin]], host: P[M.host]() };
+  } catch (e) { console.warn('App-Erweiterung nicht geladen', e); return null; }
+}
+${SC}`;
+  }
+  async function buildHtml(d, scormMode, app) {
     const SC = '<' + '/script>';
     let css = await fetchText('pathfinder.css');
     const fonts = {}; for (const m of css.matchAll(/url\(\.\.\/fonts\/([^)]+)\)/g)) fonts[m[1]] = fonts[m[1]] || await fetchData('../fonts/' + m[1], 'font/ttf');
@@ -1279,10 +1306,11 @@ export function startPathFinder(opts = {}) {
 <title>${esc(d.title || 'Lernpfad')}</title><meta name="generator" content="PathFinder">
 <style>${css}</style></head>
 <body class="pf-player"><div class="app"><section class="lpwrap"><div class="lp-scroll" id="scroll"><div class="lp" id="lp"></div></div></section></div>
-<script type="application/json" id="pf-doc">${json}${SC}
+<script type="application/json" id="pf-doc">${json}${SC}${app ? await appScripts(app, SC) : ''}
 <script type="module">
 ${js}
-startPathFinder({ player: true, scorm: ${scormMode ? 'true' : 'false'}, appName: ${JSON.stringify(appName)}, logo: ${JSON.stringify(logo)}, storage: ${JSON.stringify(opts.storage || 'pathfinder')}, doc: JSON.parse(document.getElementById('pf-doc').textContent) });
+${app ? 'const pfApp = await pfLoadApp();' : 'const pfApp = null;'}
+startPathFinder({ player: true, scorm: ${scormMode ? 'true' : 'false'}, appName: ${JSON.stringify(appName)}, logo: ${JSON.stringify(logo)}, storage: ${JSON.stringify(opts.storage || 'pathfinder')}, doc: pfApp ? pfApp.doc : JSON.parse(document.getElementById('pf-doc').textContent), plugins: pfApp ? pfApp.plugins : [], host: pfApp ? pfApp.host : undefined });
 ${SC}
 </body></html>`;
   }
@@ -1308,14 +1336,16 @@ ${SC}
     if (pending) commit();
     const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
     const appBlocks = doc.stations.flatMap(s => s.blocks.filter(b => def(b)?.exportAs));
-    const st = { fmt: 'html', pass: doc.pass || 80, cert: doc.cert.on };
+    const bundled = plugins.find(p => p.bundle);
+    const st = { fmt: bundled && host.adopt ? 'app' : 'html', pass: doc.pass || 80, cert: doc.cert.on };
     const draw = () => {
       el.innerHTML = `<header><b>⇩ Export</b><button data-x="1">Abbrechen</button><button class="ok" data-go="1">Exportieren</button></header><div class="ed-form">
-        <span class="ed-dseg" data-eseg="fmt"><button data-v="html" aria-pressed="${st.fmt === 'html'}">📄 HTML-Datei</button><button data-v="scorm" aria-pressed="${st.fmt === 'scorm'}">🎓 SCORM-Lernpaket</button></span>
+        <span class="ed-dseg" data-eseg="fmt"><button data-v="html" aria-pressed="${st.fmt === 'html'}">📄 HTML-Datei</button><button data-v="scorm" aria-pressed="${st.fmt === 'scorm'}">🎓 SCORM-Lernpaket</button>${bundled ? `<button data-v="app" aria-pressed="${st.fmt === 'app'}">${esc(bundled.bundle.icon || '📦')} für ${esc(bundled.name)}</button>` : ''}</span>
+        ${st.fmt === 'app' ? `<span class="help">Lernpfad für <b>${esc(bundled.name)}-Projekte</b>: In ${esc(bundled.name)} unter „Lernpfad einbetten“ öffnen – die Aufgaben prüft dann ${esc(bundled.name)} selbst. Im normalen Browser stellt sich die Datei automatisch auf Selbstkontrolle um.${host.adopt ? ` <b>Oder direkt übernehmen:</b> „In dieses ${esc(bundled.name)}-Projekt“.` : ''}</span>${host.adopt ? `<button class="lp-btn" data-adopt="1">⤵ In dieses ${esc(bundled.name)}-Projekt übernehmen</button>` : ''}` : ''}
         <span class="help">${st.fmt === 'html' ? 'Eine einzige Datei mit Schriften und Bildern – läuft offline. In Moodle/ByCS als <b>Datei</b> hochladen. Der Fortschritt bleibt im Browser des Schülers.' : 'ZIP-Datei für die Aktivität <b>„Lernpaket“</b> in Moodle/ByCS. Moodle speichert den Fortschritt (auch beim Gerätewechsel) und trägt Punkte, Bestanden, Zeit und die Ergebnisse der einzelnen Aufgaben ein.'}</span>
         ${st.fmt === 'scorm' ? `<label>Bestanden ab (% der Aufgaben${doc.form === 'challenge' ? ' bzw. XP' : ''})<input type="number" min="0" max="100" id="exPass" value="${st.pass}"></label>` : ''}
         <label class="chk"><input type="checkbox" id="exCert"${st.cert ? ' checked' : ''}>Zertifikat am Ende anbieten</label>
-        ${appBlocks.length ? `<div class="ed-hint" style="font-size:13px">${appBlocks.length} App-Baustein${appBlocks.length > 1 ? 'e werden' : ' wird'} für den Export umgewandelt: Aufgaben werden zur <b>Selbstkontrolle</b> (Schüler tippen das Ergebnis ein, das vorher berechnet wird), Tabellen werden als Tabelle gezeigt.</div>` : ''}
+        ${appBlocks.length && st.fmt !== 'app' ? `<div class="ed-hint" style="font-size:13px">${appBlocks.length} App-Baustein${appBlocks.length > 1 ? 'e werden' : ' wird'} für den Export umgewandelt: Aufgaben werden zur <b>Selbstkontrolle</b> (Schüler tippen das Ergebnis ein, das vorher berechnet wird), Tabellen werden als Tabelle gezeigt.</div>` : ''}
         <span class="help">Alles entsteht hier im Browser; nichts wird hochgeladen.</span></div>`;
     };
     draw();
@@ -1323,15 +1353,22 @@ ${SC}
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.x) { closeDlg(false); return; }
       const sg = t.closest('[data-eseg]'); if (sg) { st.fmt = t.dataset.v; draw(); return; }
+      if (t.dataset.adopt) {
+        st.cert = $('#exCert', el).checked; t.disabled = true; t.textContent = 'übernehme …';
+        try { await host.adopt(await appHtml(st), doc.title); closeDlg(false); toast(`⤵ Lernpfad in ${esc(bundled.name)} übernommen`); }
+        catch (er) { t.disabled = false; toast('Übernehmen fehlgeschlagen: ' + esc(er.message)); }
+        return;
+      }
       if (t.dataset.go) {
         st.pass = Math.max(0, Math.min(100, +($('#exPass', el)?.value ?? st.pass))); st.cert = $('#exCert', el).checked;
         t.disabled = true; t.textContent = 'erstelle …';
         try {
           const { d } = exportDoc(st);
-          const html = await buildHtml(d, st.fmt === 'scorm');
-          if (st.fmt === 'html') download(new Blob([html], { type: 'text/html' }), fileName('.html'));
+          const html = st.fmt === 'app' ? await appHtml(st) : await buildHtml(d, st.fmt === 'scorm');
+          if (st.fmt === 'app') download(new Blob([html], { type: 'text/html' }), fileName(`_${bundled.name}.html`));
+          else if (st.fmt === 'html') download(new Blob([html], { type: 'text/html' }), fileName('.html'));
           else download(new Blob([zip({ 'imsmanifest.xml': manifest(d), 'index.html': html })], { type: 'application/zip' }), fileName('_SCORM.zip'));
-          closeDlg(false); toast(st.fmt === 'html' ? '⇩ HTML-Datei erstellt' : '⇩ SCORM-Lernpaket erstellt – in Moodle als „Lernpaket“ hochladen');
+          closeDlg(false); toast(st.fmt === 'app' ? `⇩ Lernpfad für ${esc(bundled.name)} erstellt` : st.fmt === 'html' ? '⇩ HTML-Datei erstellt' : '⇩ SCORM-Lernpaket erstellt – in Moodle als „Lernpaket“ hochladen');
         } catch (er) { t.disabled = false; t.textContent = 'Exportieren'; toast('Export fehlgeschlagen: ' + esc(er.message)); }
       }
     });
@@ -1382,6 +1419,7 @@ ${SC}
     E, esc, plain, uid, ce, toast, imgHtml, xpTag, taskCard, shuffled, findBlock, blockLabel, host,
     get prog() { return prog; }, get doc() { return doc; }, get mode() { return mode; },
     solve: id => solve(id), render: () => render(),
+    openDoc: d => openDoc(d), get current() { return doc; },
   };
   save(); render(); updUndo();
   return ctx;
