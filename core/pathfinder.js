@@ -65,6 +65,64 @@ const CORE = {
 const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match']);
 
 
+
+/* ---------- Kleiner PDF-Schreiber (für das Zertifikat; alles lokal, keine Bibliothek) ---------- */
+const WIN = { '€': 128, '‚': 130, '„': 132, '…': 133, '‘': 145, '’': 146, '“': 147, '”': 148, '•': 149, '–': 150, '—': 151, '™': 153 };
+function pdfStr(t) {
+  let o = ''; for (const ch of String(t ?? '')) { const c = ch.codePointAt(0); let b = c < 128 || (c >= 160 && c < 256) ? c : WIN[ch]; if (b == null) continue; const x = String.fromCharCode(b); o += x === '(' || x === ')' || x === '\\' ? '\\' + x : x; }
+  return '(' + o + ')';
+}
+function rgb(hex) { const h = hex.replace('#', ''); const n = parseInt(h.length === 3 ? h.replace(/./g, c => c + c) : h, 16); return [(n >> 16) / 255, (n >> 8 & 255) / 255, (n & 255) / 255].map(v => +v.toFixed(3)).join(' '); }
+const measureCtx = (() => { let c; return () => c || (c = document.createElement('canvas').getContext('2d')); })();
+function textW(t, size, bold) { const c = measureCtx(); c.font = `${bold ? 'bold ' : ''}${size}px Helvetica, Arial, sans-serif`; return c.measureText(String(t).replace(/[^\u0000-ɏ€„“”‚‘’…–—•]/gu, '')).width; }
+function fitText(t, size, bold, w) { t = String(t); if (textW(t, size, bold) <= w) return t; while (t.length > 1 && textW(t + '…', size, bold) > w) t = t.slice(0, -1); return t.trim() + '…'; }
+function wrapText(t, size, bold, w) { const out = []; let line = ''; for (const word of String(t).split(/\s+/)) { const tr = line ? line + ' ' + word : word; if (textW(tr, size, bold) > w && line) { out.push(line); line = word; } else line = tr; } if (line) out.push(line); return out; }
+class Pdf {
+  constructor() { this.ops = []; this.img = null; }
+  color(hex, stroke) { this.ops.push(`${rgb(hex)} ${stroke ? 'RG' : 'rg'}`); return this; }
+  rect(x, y, w, h, fill, stroke, lw = 1) { if (fill) this.color(fill); if (stroke) { this.color(stroke, true); this.ops.push(`${lw} w`); } this.ops.push(`${x} ${842 - y - h} ${w} ${h} re ${fill && stroke ? 'B' : fill ? 'f' : 'S'}`); return this; }
+  line(x1, y1, x2, y2, col, lw = 1) { this.color(col, true); this.ops.push(`${lw} w ${x1} ${842 - y1} m ${x2} ${842 - y2} l S`); return this; }
+  text(t, x, y, size, { bold, col = '#222222', align = 'left', spacing = 0 } = {}) {
+    const w = textW(t, size, bold) + spacing * Math.max(0, [...String(t)].length - 1);
+    const xx = align === 'center' ? x - w / 2 : align === 'right' ? x - w : x;
+    this.color(col); this.ops.push(`BT /${bold ? 'F2' : 'F1'} ${size} Tf ${spacing} Tc ${xx.toFixed(2)} ${(842 - y).toFixed(2)} Td ${pdfStr(t)} Tj ET`); return this;
+  }
+  image(jpeg, x, y, w, h) { this.img = jpeg; this.ops.push(`q ${w} 0 0 ${h} ${x} ${842 - y - h} cm /Im1 Do Q`); return this; }
+  bytes() {
+    const objs = [];
+    objs.push('<< /Type /Catalog /Pages 2 0 R >>');
+    objs.push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+    objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >>${this.img ? ' /XObject << /Im1 7 0 R >>' : ''} >> /Contents 6 0 R >>`);
+    objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+    objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+    const cs = this.ops.join('\n'); objs.push(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`);
+    if (this.img) objs.push(`<< /Type /XObject /Subtype /Image /Width ${this.img.w} /Height ${this.img.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${this.img.data.length} >>\nstream\n${this.img.data}\nendstream`);
+    let out = '%PDF-1.4\n%\xe2\xe3\xcf\xd3\n'; const off = [];
+    objs.forEach((o, i) => { off.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+    const xref = out.length;
+    out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + off.map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('');
+    out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R /Info << /Producer (PathFinder) >> >>\nstartxref\n${xref}\n%%EOF`;
+    const b = new Uint8Array(out.length); for (let i = 0; i < out.length; i++) b[i] = out.charCodeAt(i) & 255; return b;
+  }
+}
+/** Bild (auch SVG/GIF) als JPEG auf weißem Grund – für das PDF */
+function jpegOf(src, size = 240) {
+  return new Promise(res => {
+    if (!src) return res(null);
+    const im = new Image(); im.onload = () => {
+      try { const r = Math.min(size / (im.naturalWidth || size), size / (im.naturalHeight || size)); const w = Math.max(1, Math.round((im.naturalWidth || size) * r)), h = Math.max(1, Math.round((im.naturalHeight || size) * r));
+        const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(im, 0, 0, w, h);
+        res({ w, h, data: atob(c.toDataURL('image/jpeg', 0.9).split(',')[1]) }); } catch (e) { res(null); }
+    }; im.onerror = () => res(null); im.src = src;
+  });
+}
+/** kurzer Prüfcode aus den Angaben des Zertifikats (erkennt nachträglich geänderte Werte) */
+function certCode(parts) {
+  let h = 2166136261; for (const ch of parts.join('|')) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = ''; for (let i = 0; i < 6; i++) { c += A[h % 32]; h = Math.floor(h / 32) ^ (i * 2654435761 >>> 0); h >>>= 0; }
+  return c.slice(0, 3) + '-' + c.slice(3);
+}
+
 /* ---------- Standard-Figuren für „Figur sagt“ (Pixel-Stil, passend zur Ente) ---------- */
 const FIGURES = {
   ente: { n: 'Pixel-Ente', name: 'Debbie Debug', src: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFQAAABOCAYAAAC+JjE8AAABGklEQVR42u3bsQ3CMBBGYYNYAInUoWaJjMdKtCxBndRBoqIOC+DCki3HyfcGcODpTr+dc0IAAADb5FDrwZdzv5Rc//2Zqvy3o5oilFBCQehaONVK8/l5LfrcbghLjfRXoYQSSigI3d5ZvnSad8MYcqwfWydX+qtQLU8ooSBUylfjMaftCu7fpF2BCtXyhBIKQsNu3tivjVhqq1AtTygIJXQ/Z/nY2Tx2hk29TVd+Lj8Gc3ktD0IJJVTK53gDn2tuXvwsH/mdIdNdfRWq5QklFIRuL+VzMb3+z837W7eqXYG5vJYnFIQSGszlE9O8lfRXoYQSCkIJ3d4d+2bu0lea46tQLU8ooSB0P1/StYLv5bU8oSCUUAAAgEb4AR5+T9UJMMc5AAAAAElFTkSuQmCC' },
@@ -941,26 +999,103 @@ export function startPathFinder(opts = {}) {
     else formUI(body, what, { live: true });
   }
 
-  /* ---------- Zertifikat (Muster; das PDF folgt mit dem Export) ---------- */
+  /* ---------- Zertifikat: Daten, Vorschau, PDF ---------- */
+  function certData(name) {
+    const c = doc.cert, mins = Math.max(1, Math.round((prog.active || 0) / 60000));
+    const rows = doc.stations.map(s => { const ch = checksOf(s), n = ch.filter(id => prog.solved[id]).length; const tips = s.blocks.reduce((a, b) => a + Object.keys(prog.tips).filter(k => k.startsWith(b.id + ':')).length, 0); const sols = s.blocks.filter(b => prog.sol[b.id]).length;
+      return { title: plain(s.title) || 'Station', done: ch.length ? `${n} / ${ch.length}` : '–', help: tips || sols ? `${tips} Tipp${tips === 1 ? '' : 's'}${sols ? `, ${sols} Lösung${sols === 1 ? '' : 'en'}` : ''}` : (n ? 'ohne Hilfe' : '–') }; });
+    const all = allChecks(), solved = all.filter(id => prog.solved[id]).length;
+    const pct = all.length ? Math.round(100 * solved / all.length) : 100;
+    const pts = doc.pointsOn ? (() => { const bl = xpBlocks(); return `${bl.filter(b => prog.solved[b.id]).reduce((a, b) => a + ptsOf(b), 0)} von ${bl.reduce((a, b) => a + ptsOf(b), 0)} Punkten`; })() : '';
+    const xp = c.show.xp && doc.form === 'challenge' ? `${xpNow()} von ${xpMax()} XP` : '';
+    const from = new Date(prog.start || Date.now()).toLocaleDateString('de-DE'), to = new Date().toLocaleDateString('de-DE');
+    const code = certCode([doc.id, (name || '').trim().toLowerCase(), pct, mins, to]);
+    return { c, name: (name || '').trim(), mins, rows, pct, solved, total: all.length, pts, xp, from, to, code, head: doc.form === 'challenge' ? 'Challenge-Urkunde' : 'Zertifikat' };
+  }
+  function certView(D) {
+    const p = PALETTES[doc.design.pal].l, c = D.c;
+    return `<div class="ed-certprev" style="border-color:${p.a1}"><div style="font-size:12px;letter-spacing:.14em;color:#888">${esc(plain(doc.kicker)).toUpperCase()}</div>
+      <h2 style="color:${p.a1}">${D.head}</h2><div style="font-size:20px;font-weight:700;margin:8px 0">${esc(D.name || '(dein Name)')}</div>
+      <div>${esc(c.text)}</div><div style="font-weight:700;margin-top:4px">„${esc(plain(doc.title))}“</div>
+      ${c.show.zeit ? `<div style="margin-top:8px;font-size:14px">Aktive Bearbeitungszeit: <b>${D.mins} min</b> · ${D.from}${D.from !== D.to ? ' – ' + D.to : ''}</div>` : ''}
+      ${c.show.quiz ? `<table><tr><td><b>Station</b></td><td><b>gelöst</b></td>${c.show.tipps ? '<td><b>Hilfen</b></td>' : ''}</tr>${D.rows.map(r => `<tr><td>${esc(r.title)}</td><td>${r.done}</td>${c.show.tipps ? `<td>${r.help}</td>` : ''}</tr>`).join('')}</table>` : ''}
+      <div style="font-weight:700;margin-top:6px">${D.total ? `${D.solved} von ${D.total} Aufgaben gelöst (${D.pct} %)` : ''}${D.pts ? ' · ' + D.pts : ''}${D.xp ? ' · ⚡ ' + D.xp : ''}</div>
+      <div class="code">Prüfcode ${D.code}</div></div>`;
+  }
+  async function certPdf(D) {
+    const P = PALETTES[doc.design.pal].l, c = D.c, pdf = new Pdf(), W = 595, M = 46;
+    pdf.rect(0, 0, W, 842, P.bg);
+    pdf.rect(M - 18, M - 18, W - 2 * (M - 18), 842 - 2 * (M - 18), null, P.a1, 3);
+    pdf.rect(M - 10, M - 10, W - 2 * (M - 10), 842 - 2 * (M - 10), null, P.a2s || P.a1s, 1);
+    pdf.rect(M - 18, M - 18, W - 2 * (M - 18), 10, P.a1); pdf.rect(M - 18, M - 8, (W - 2 * (M - 18)) / 3, 4, P.a2); pdf.rect(M - 18 + (W - 2 * (M - 18)) / 3, M - 8, (W - 2 * (M - 18)) / 3, 4, P.a3);
+    let y = 92;
+    const d = doc.design, src = (d.hero === 'bild' || d.hero === 'gross') && d.heroImg ? d.heroImg : opts.logo;
+    const img = await jpegOf(src);
+    if (img) { const s = 76 / Math.max(img.w, img.h); pdf.image(img, W / 2 - img.w * s / 2, y, img.w * s, img.h * s); y += img.h * s + 26; } else y += 10;
+    pdf.text(plain(doc.kicker).toUpperCase(), W / 2, y, 9, { col: '#888888', align: 'center', spacing: 1.6 }); y += 40;
+    pdf.text(D.head, W / 2, y, 34, { bold: true, col: P.a1, align: 'center' }); y += 50;
+    pdf.text(fitText(D.name || ' ', 24, true, W - 2 * M - 40), W / 2, y, 24, { bold: true, col: '#1f1b2e', align: 'center' }); y += 10;
+    pdf.line(W / 2 - 120, y, W / 2 + 120, y, P.a3, 1.5); y += 26;
+    for (const l of wrapText(c.text, 13, false, W - 2 * M - 60)) { pdf.text(l, W / 2, y, 13, { col: '#333333', align: 'center' }); y += 18; }
+    for (const l of wrapText('„' + plain(doc.title) + '“', 16, true, W - 2 * M - 60)) { pdf.text(l, W / 2, y + 4, 16, { bold: true, col: '#1f1b2e', align: 'center' }); y += 22; }
+    y += 14;
+    if (c.show.zeit) { pdf.text(`Aktive Bearbeitungszeit: ${D.mins} min   ·   ${D.from}${D.from !== D.to ? ' – ' + D.to : ''}`, W / 2, y, 11, { col: '#555555', align: 'center' }); y += 28; }
+    if (c.show.quiz && D.rows.length) {
+      const x0 = M + 20, x1 = W - M - 20, cw = c.show.tipps ? [x1 - x0 - 200, 70, 130] : [x1 - x0 - 90, 90];
+      pdf.rect(x0, y - 14, x1 - x0, 20, P.a1);
+      const hd = ['Station', 'gelöst'].concat(c.show.tipps ? ['Hilfen'] : []); let xx = x0 + 8;
+      hd.forEach((t, i) => { pdf.text(t, xx, y, 10, { bold: true, col: '#ffffff' }); xx += cw[i]; }); y += 20;
+      const max = Math.min(D.rows.length, 14);
+      D.rows.slice(0, max).forEach((r, k) => {
+        if (k % 2) pdf.rect(x0, y - 14, x1 - x0, 20, P['surface-2'] || '#f3f3f3');
+        let xx = x0 + 8; [r.title, r.done].concat(c.show.tipps ? [r.help] : []).forEach((t, i) => { pdf.text(fitText(t, 10, false, cw[i] - 12), xx, y, 10, { col: '#333333' }); xx += cw[i]; }); y += 20;
+      });
+      if (D.rows.length > max) { pdf.text(`… und ${D.rows.length - max} weitere Stationen`, x0 + 8, y, 9, { col: '#888888' }); y += 16; }
+      pdf.line(x0, y - 14, x1, y - 14, P.line || '#dddddd', 1); y += 14;
+    }
+    const sum = [D.total ? `${D.solved} von ${D.total} Aufgaben gelöst (${D.pct} %)` : '', D.pts, D.xp].filter(Boolean).join('   ·   ');
+    if (sum) { pdf.text(sum, W / 2, y, 12, { bold: true, col: '#1f1b2e', align: 'center' }); y += 20; }
+    pdf.text(`Prüfcode ${D.code}`, W / 2, 842 - M - 24, 10, { bold: true, col: P.a1, align: 'center', spacing: 1 });
+    pdf.text(`Ausgestellt am ${D.to} · erstellt mit ${appName === 'PathFinder' ? 'PathFinder' : appName + ' / PathFinder'}`, W / 2, 842 - M - 10, 8, { col: '#999999', align: 'center' });
+    return new Blob([pdf.bytes()], { type: 'application/pdf' });
+  }
   function certPreview() {
     const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
-    const mins = Math.max(1, Math.round((prog.active || 0) / 60000));
-    const c = doc.cert, p = PALETTES[doc.design.pal].l;
-    const rows = doc.stations.map(s => { const ch = checksOf(s), n = ch.filter(id => prog.solved[id]).length; const tips = s.blocks.reduce((a, b) => a + Object.keys(prog.tips).filter(k => k.startsWith(b.id + ':')).length, 0); const sols = s.blocks.filter(b => prog.sol[b.id]).length; return `<tr><td>${esc(s.title)}</td><td>${ch.length ? `${n} / ${ch.length}` : '–'}</td>${c.show.tipps ? `<td>${tips || sols ? `${tips} Tipp${tips === 1 ? '' : 's'}${sols ? `, ${sols} Lösung` : ''}` : 'ohne Hilfe'}</td>` : ''}</tr>`; }).join('');
+    const NK = `${opts.storage || 'pathfinder'}.certname`;
+    let name = PLAYER ? (LS.get(NK) || '') : 'Max Muster';
     el.classList.add('cert-dlg');
-    el.innerHTML = `<header><b>★ ${PLAYER ? 'Dein Zertifikat' : 'Zertifikat – Muster'}</b>${PLAYER ? '<button data-print="1">🖨 Drucken / als PDF</button>' : ''}<button class="ok" data-x="ok">Schließen</button></header>
-      <div class="ed-form"><label>Dein Name<input type="text" id="certName" value="Max Muster"></label></div>
-      <div class="ed-certprev" style="border-color:${p.a1}"><div style="font-size:12px;letter-spacing:.14em;color:#888">${esc(plain(doc.kicker)).toUpperCase()}</div>
-      <h2 style="color:${p.a1}">${doc.form === 'challenge' ? 'Challenge-Urkunde' : 'Zertifikat'}</h2><div style="font-size:20px;font-weight:700;margin:8px 0" id="certN">Max Muster</div>
-      <div>${esc(c.text)}</div><div style="font-weight:700;margin-top:4px">„${esc(doc.title)}“</div>
-      ${c.show.zeit ? `<div style="margin-top:8px;font-size:14px">Aktive Bearbeitungszeit: <b>${mins} min</b> · ${new Date(prog.start).toLocaleDateString('de-DE')} – ${new Date().toLocaleDateString('de-DE')}</div>` : ''}
-      ${c.show.quiz ? `<table><tr><td><b>Station</b></td><td><b>gelöst</b></td>${c.show.tipps ? '<td><b>Hilfen</b></td>' : ''}</tr>${rows}</table>` : ''}
-      ${c.show.xp && doc.form === 'challenge' ? `<div>⚡ ${xpNow()} von ${xpMax()} XP</div>` : ''}
-      ${doc.pointsOn ? (() => { const all = xpBlocks(); return `<div style="font-weight:700;margin-top:4px">${all.filter(b => prog.solved[b.id]).reduce((a, b) => a + ptsOf(b), 0)} von ${all.reduce((a, b) => a + ptsOf(b), 0)} Punkten</div>`; })() : ''}
-      <div class="code">Prüfcode K7M-2QX</div></div>
-      <div class="ed-form"><span class="help">Mit dem Export entsteht daraus ein PDF zum Speichern oder Hochladen in Moodle. Die Zeit zählt nur, solange der Lernpfad offen ist und benutzt wird.</span></div>`;
-    el.addEventListener('input', e => { if (e.target.id === 'certName') $('#certN', el).textContent = e.target.value; });
-    el.addEventListener('click', e => { if (e.target.closest('[data-x]')) closeDlg(false); if (e.target.closest('[data-print]')) { document.body.classList.add('printing-cert'); setTimeout(() => { print(); document.body.classList.remove('printing-cert'); }, 50); } });
+    const draw = () => { $('.cert-body', el).innerHTML = certView(certData(name)); };
+    el.innerHTML = `<header><b>★ ${PLAYER ? 'Dein Zertifikat' : 'Zertifikat – Muster'}</b><button data-pdf="1">⬇︎ PDF speichern</button><button class="ok" data-x="ok">Schließen</button></header>
+      <div class="ed-form"><label>Dein Name<input type="text" id="certName" value="${esc(name)}" placeholder="Vor- und Nachname" autocomplete="name"></label></div>
+      <div class="cert-body"></div>
+      <div class="ed-form"><span class="help">${PLAYER ? 'Das PDF entsteht direkt hier im Browser. Lade es danach z. B. in Moodle hoch.' : 'So sieht das Zertifikat für Schüler aus (mit Musterwerten). Das PDF entsteht bei ihnen direkt im Browser.'} Die Zeit zählt nur, solange der Lernpfad offen ist und benutzt wird. Der Prüfcode ändert sich, wenn Name, Ergebnis, Zeit oder Datum nachträglich verändert werden – prüfen kannst du ihn im Editor unter ⋯ → „Zertifikat prüfen“.</span></div>`;
+    draw();
+    el.addEventListener('input', e => { if (e.target.id === 'certName') { name = e.target.value; if (PLAYER) LS.set(NK, name); draw(); } });
+    el.addEventListener('click', async e => {
+      if (e.target.closest('[data-x]')) closeDlg(false);
+      if (e.target.closest('[data-pdf]')) {
+        if (!name.trim()) { toast('Bitte zuerst deinen Namen eintragen.'); $('#certName', el).focus(); return; }
+        const D = certData(name); const blob = await certPdf(D);
+        download(blob, `${D.head}_${name.trim().replace(/[^\wäöüÄÖÜß-]+/g, '_')}.pdf`);
+      }
+    });
+  }
+  function certCheck() {
+    const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
+    el.innerHTML = `<header><b>✓ Zertifikat prüfen</b><button class="ok" data-x="ok">Schließen</button></header>
+      <div class="ed-form"><span class="help">Trage die Angaben vom Zertifikat ein. Stimmt der Prüfcode, wurden Name, Ergebnis, Zeit und Datum nicht verändert. (Das Zertifikat muss zu diesem Lernpfad gehören.)</span>
+      <label>Name<input type="text" data-c="n"></label><div class="row"><label>gelöst in %<input type="number" data-c="p" min="0" max="100"></label><label>Zeit in min<input type="number" data-c="m" min="1"></label><label>Ausgestellt am<input type="text" data-c="d" placeholder="TT.MM.JJJJ"></label></div>
+      <label>Prüfcode<input type="text" data-c="c" placeholder="ABC-DEF"></label><div id="ccRes" style="font-weight:700;font-size:17px;min-height:24px"></div></div>`;
+    el.addEventListener('click', e => { if (e.target.closest('[data-x]')) closeDlg(false); });
+    el.addEventListener('input', () => {
+      const v = k => $(`[data-c=${k}]`, el).value.trim();
+      const d = v('d').replace(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/, (m, a, b, c) => `${+a}.${+b}.${c}`);
+      const want = certCode([doc.id, v('n').toLowerCase(), +v('p'), +v('m'), d]);
+      const res = $('#ccRes', el);
+      if (!v('c')) { res.textContent = ''; return; }
+      const ok = v('c').toUpperCase().replace(/\s/g, '') === want;
+      res.innerHTML = ok ? '<span style="color:#2e8b57">✓ Prüfcode stimmt.</span>' : '<span style="color:#c0392b">✗ Prüfcode passt nicht zu diesen Angaben.</span>';
+    });
   }
 
   /* ---------- Knöpfe in Lernpfaden ---------- */
@@ -1034,6 +1169,7 @@ export function startPathFinder(opts = {}) {
     pop.innerHTML = `<h3>Mehr</h3><div class="ed-pal">
       <button data-m="reset"><b>↺ Vorschau-Fortschritt zurücksetzen</b><span>Haken, Quiz, Sperren wieder leer</span></button>
       <button data-m="json"><b>{ } Dokument ansehen</b><span>so wird der Lernpfad gespeichert</span></button>
+      <button data-m="certcheck"><b>✓ Zertifikat prüfen</b><span>Prüfcode eines Schüler-Zertifikats nachrechnen</span></button>
       <button data-m="keys"><b>⌘ Tastenkürzel</b><span>für die iPad-Tastatur</span></button>
       <button data-m="del"><b>🗑 Diesen Lernpfad löschen</b><span>nur in diesem Browser</span></button>
       <button data-m="export"><b>⇩ Export</b><span>HTML-Datei für Moodle · SCORM-Lernpaket</span></button></div>`;
@@ -1044,6 +1180,7 @@ export function startPathFinder(opts = {}) {
       if (m === 'reset') { prog = freshProg(); host.reset?.(); render(); toast('Fortschritt zurückgesetzt'); }
       if (m === 'del') { if (!confirm('„' + (doc.title || 'ohne Titel') + '“ in diesem Browser löschen?')) return; LS.del(DOCKEY(doc.id)); saveDocList(docList().filter(x => x.id !== doc.id)); const next = docList()[0]; openDoc(next ? loadDoc(next.id) : sample()); }
       if (m === 'json') infoDlg('{ } Dokument', `<pre style="margin:0;padding:12px;font:12px/1.4 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all">${esc(JSON.stringify(doc, (k, v) => typeof v === 'string' && v.length > 200 && /^(data:|[A-Za-z0-9+/=]{200})/.test(v) ? v.slice(0, 40) + '…' : v, 2))}</pre>`);
+      if (m === 'certcheck') { certCheck(); return; }
       if (m === 'keys') infoDlg('⌘ Tastenkürzel', `<div class="ed-form"><table style="border-collapse:collapse;font-size:15px">${[['⌘B / ⌘I', 'fett / kursiv'], ['⌘E', 'Code'], ['⌘K', 'Link'], ['⌘Z / ⇧⌘Z', 'rückgängig / wiederholen'], ['⌘↵', 'neuer Textbaustein darunter'], ['⌥↑ / ⌥↓', 'gewählten Baustein verschieben'], ['⌘P', 'Vorschau ein/aus'], ['/', 'in leerem Text: Bausteinauswahl, weitertippen filtert (z. B. /quiz ↵)'], ['Esc', 'Auswahl aufheben']].map(([k, v]) => `<tr><td style="padding:5px 14px 5px 0;font-weight:700;white-space:nowrap">${k}</td><td>${v}</td></tr>`).join('')}</table></div>`);
     };
   };
@@ -1079,6 +1216,7 @@ export function startPathFinder(opts = {}) {
     css += plugins.map(p => p.css || '').join('\n');
     const js = (await fetchText('pathfinder.js')).replace(/<\/script/gi, '<\\/script');
     const json = JSON.stringify(d).replace(/</g, '\\u003c');
+    let logo = ''; if (opts.logo) { try { logo = opts.logo.startsWith('data:') ? opts.logo : await fetchData(new URL(opts.logo, location.href).href, /\.svg(\?|$)/i.test(opts.logo) ? 'image/svg+xml' : 'image/png'); } catch (e) { } }
     return `<!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${esc(d.title || 'Lernpfad')}</title><meta name="generator" content="PathFinder">
@@ -1087,7 +1225,7 @@ export function startPathFinder(opts = {}) {
 <script type="application/json" id="pf-doc">${json}${SC}
 <script type="module">
 ${js}
-startPathFinder({ player: true, scorm: ${scormMode ? 'true' : 'false'}, doc: JSON.parse(document.getElementById('pf-doc').textContent) });
+startPathFinder({ player: true, scorm: ${scormMode ? 'true' : 'false'}, appName: ${JSON.stringify(appName)}, logo: ${JSON.stringify(logo)}, storage: ${JSON.stringify(opts.storage || 'pathfinder')}, doc: JSON.parse(document.getElementById('pf-doc').textContent) });
 ${SC}
 </body></html>`;
   }
