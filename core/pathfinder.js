@@ -1034,7 +1034,7 @@ export function startPathFinder(opts = {}) {
       if (!src.trim()) { res.innerHTML = ''; openB.disabled = true; parsed = null; return; }
       parsed = T.parseText(src, env);
       const { errors, warnings, stats } = parsed;
-      res.innerHTML = (errors.length ? `<div class="bad">✗ ${errors.length} Fehler – bitte korrigieren (oder die KI bitten, es zu korrigieren):</div><ul>${errors.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>` : `<div class="good">✓ Erkannt: „${esc(parsed.doc.title)}“ · ${stats.stations} Station${stats.stations === 1 ? '' : 'en'} · ${stats.blocks} Bausteine · ${stats.tasks} Aufgaben</div>`)
+      res.innerHTML = (errors.length ? `<div class="bad">✗ ${errors.length} Fehler – bitte korrigieren (oder die KI bitten, es zu korrigieren):</div><ul>${errors.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>` : `<div class="good">✓ Erkannt: „${esc(parsed.doc.title)}“ · ${stats.stations} Station${stats.stations === 1 ? '' : 'en'} · ${stats.blocks} Bausteine · ${stats.tasks} Aufgabe${stats.tasks === 1 ? '' : 'n'}</div>`)
         + (warnings.length ? `<div class="warn">Hinweise:</div><ul>${warnings.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>` : '');
       openB.disabled = !!errors.length;
     };

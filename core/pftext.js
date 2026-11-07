@@ -214,7 +214,7 @@ export function docToText(doc, env) {
       const figName = { ente: 'Ente', denken: 'Nachdenken', aha: 'Aha', achtung: 'Achtung' }[key] || 'Ente';
       switch (b.type) {
         case 'text': L.push(md(b.html)); break;
-        case 'info': L.push(b.kind === 'figur' ? `[Figur: ${figName}] ${md(b.html)}` : `[${b.kind[0].toUpperCase() + b.kind.slice(1)}${b.title ? ': ' + md(b.title) : ''}] ${md(b.html)}`); break;
+        case 'info': L.push(b.kind === 'figur' ? `[Figur: ${figName}] ${md(b.html)}` : (K => `[${K}${b.title && md(b.title).toLowerCase() !== K.toLowerCase() ? ': ' + md(b.title) : ''}] ${md(b.html)}`)(b.kind[0].toUpperCase() + b.kind.slice(1))); break;
         case 'image': L.push(`![${b.caption || b.alt || 'Bild'}]()`); break;
         case 'table': L.push(...b.rows.map((r, k) => '| ' + r.map(md).join(' | ') + ' |' + (k === 0 && b.head ? '\n|' + r.map(() => ' --- ').join('|') + '|' : ''))); break;
         case 'reveal': L.push(`### Aufdecken: ${md(b.summary)}`, md(b.html)); break;
