@@ -1422,5 +1422,6 @@ ${SC}
     openDoc: d => openDoc(d), get current() { return doc; },
   };
   save(); render(); updUndo();
+  host.attach?.(ctx);
   return ctx;
 }
