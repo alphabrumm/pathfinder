@@ -312,3 +312,7 @@ button { font: inherit; color: inherit; }
 .app:not(.with-side) .lp-hero, .app:not(.with-side) .lp-trail-in { padding-left: max(18px, calc((100% - 820px) / 2)); padding-right: max(18px, calc((100% - 820px) / 2)); }
 .lp-logo.applogo { background: none; box-shadow: none; }
 .lp-quiz .fb { font-weight: 700; margin-top: 6px; }
+
+/* Beim Ziehen nichts markieren */
+body.pf-dragging, body.pf-dragging * { -webkit-user-select: none !important; user-select: none !important; cursor: grabbing !important; }
+.lp-match .chip, .lp-gap .gchip, .lp-stops a { -webkit-user-drag: none; }

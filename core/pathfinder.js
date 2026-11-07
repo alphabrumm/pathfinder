@@ -556,8 +556,9 @@ export function startPathFinder(opts = {}) {
   lp.addEventListener('pointerdown', e => {
     if (!E()) { chipDown(e); return; }
     const g = e.target.closest('.grip');
-    if (g) { e.preventDefault(); const blk = g.closest('.blk'); selId = blk.dataset.id; markSel(); drag = { kind: 'blk', id: blk.dataset.id, el: blk, line: document.createElement('div') }; drag.line.className = 'ed-drop-line'; blk.classList.add('drag-ghost'); g.setPointerCapture(e.pointerId); return; }
+    if (g) { e.preventDefault(); const blk = g.closest('.blk'); selId = blk.dataset.id; markSel(); drag = { kind: 'blk', id: blk.dataset.id, el: blk, line: document.createElement('div') }; drag.line.className = 'ed-drop-line'; blk.classList.add('drag-ghost'); document.body.classList.add('pf-dragging'); g.setPointerCapture(e.pointerId); return; }
     const stop = e.target.closest('#stops a[data-sid]');
+    if (stop && stop.dataset.sid !== 'cert' && e.pointerType === 'mouse') e.preventDefault();
     if (stop && stop.dataset.sid !== 'cert') drag = { kind: 'st', id: stop.dataset.sid, el: stop, x: e.clientX, moved: false, pid: e.pointerId };
   });
   lp.addEventListener('pointermove', e => {
@@ -582,7 +583,7 @@ export function startPathFinder(opts = {}) {
   function endDrag(e) {
     if (!drag) return;
     if (drag.kind === 'chip') { chipUp(e); return; }
-    const d = drag; drag = null;
+    const d = drag; drag = null; document.body.classList.remove('pf-dragging');
     if (d.kind === 'st') {
       $$('#stops a', lp).forEach(a => a.classList.remove('drop-before', 'drop-after', 'dragging'));
       if (d.moved && d.to) { const i = doc.stations.findIndex(s => s.id === d.id); const [s] = doc.stations.splice(i, 1); let j = doc.stations.findIndex(x => x.id === d.to.sid); if (d.to.after) j++; doc.stations.splice(j, 0, s); commit(); render(); toast('Station verschoben'); }
@@ -602,17 +603,20 @@ export function startPathFinder(opts = {}) {
   }
   function chipDown(e) {
     const c = e.target.closest('[data-chip], [data-gchip]'); if (!c || c.classList.contains('used')) return;
+    if (e.pointerType === 'mouse') e.preventDefault(); // Maus: kein Markieren von Text beim Ziehen
     drag = { kind: 'chip', el: c, x: e.clientX, y: e.clientY, moved: false, pid: e.pointerId, gap: !!c.dataset.gchip };
   }
+  // Während gezogen wird, darf der Browser (v. a. Safari am Mac) keinen Text markieren
+  document.addEventListener('selectstart', e => { if (drag) e.preventDefault(); });
   function chipMove(e) {
     if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
-    if (!drag.moved) { drag.moved = true; try { drag.el.setPointerCapture(drag.pid); } catch (er) { } drag.ghost = drag.el.cloneNode(true); Object.assign(drag.ghost.style, { position: 'fixed', zIndex: 300, pointerEvents: 'none', width: drag.el.offsetWidth + 'px', opacity: .9, boxShadow: '0 8px 20px rgba(0,0,0,.25)' }); document.body.appendChild(drag.ghost); }
+    if (!drag.moved) { drag.moved = true; document.body.classList.add('pf-dragging'); getSelection()?.removeAllRanges(); try { drag.el.setPointerCapture(drag.pid); } catch (er) { } drag.ghost = drag.el.cloneNode(true); Object.assign(drag.ghost.style, { position: 'fixed', zIndex: 300, pointerEvents: 'none', width: drag.el.offsetWidth + 'px', opacity: .9, boxShadow: '0 8px 20px rgba(0,0,0,.25)' }); document.body.appendChild(drag.ghost); }
     drag.ghost.style.left = (e.clientX - drag.el.offsetWidth / 2) + 'px'; drag.ghost.style.top = (e.clientY - 20) + 'px';
     $$('.hover', lp).forEach(s => s.classList.remove('hover'));
     document.elementsFromPoint(e.clientX, e.clientY).find(x => x.matches?.(drag.gap ? '[data-gslot]' : '[data-slot]'))?.classList.add('hover');
   }
   function chipUp(e) {
-    const d = drag; drag = null; if (!d.moved) return;
+    const d = drag; drag = null; document.body.classList.remove('pf-dragging'); if (!d.moved) return;
     d.ghost?.remove(); $$('.hover', lp).forEach(s => s.classList.remove('hover'));
     const s = document.elementsFromPoint(e.clientX, e.clientY).find(x => x.matches?.(d.gap ? '[data-gslot]' : '[data-slot]'));
     if (!s || s.closest('.blk') !== d.el.closest('.blk')) return;
