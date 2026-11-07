@@ -55,7 +55,7 @@ button { font: inherit; color: inherit; }
 .lp .fontsize button { width: 40px; height: 34px; border-radius: 9px; border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent); background: color-mix(in srgb, var(--surface) 70%, transparent); color: var(--ink); font: 700 15px var(--font-body); cursor: pointer; }
 .lp-hero { position: relative; display: flex; align-items: center; gap: 16px; padding: 26px 18px 22px; color: var(--heroink); overflow: hidden;
   background: linear-gradient(120deg, var(--g1) 0%, var(--g2) 55%, var(--g3) 100%); border-bottom: 6px solid var(--a3); }
-.lp-hero::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,.3) 2px, transparent 2px); background-size: 16px 16px; pointer-events: none; }
+.lp-hero::before { content: ""; position: absolute; inset: 0; background-image: var(--hero-pat, radial-gradient(rgba(255,255,255,.3) 2px, transparent 2px)); background-size: var(--hero-pat-size, 16px 16px); pointer-events: none; }
 .lp-hero.has-bg { background-size: cover; background-position: center; }
 .lp-hero.has-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--bg) 85%, transparent), transparent 75%); }
 .lp-hero > * { position: relative; z-index: 1; }
@@ -222,7 +222,7 @@ button { font: inherit; color: inherit; }
 
 /* Design-Fenster links andocken, damit man die Wirkung rechts sieht */
 .ed-backdrop.clear { background: transparent; }
-@media (min-width: 900px) { .ed-dlg.dock { left: 12px; transform: translateY(-50%); width: min(440px, 40vw); } }
+@media (min-width: 600px) { .ed-dlg.dock { left: auto; right: 12px; transform: translateY(-50%); width: min(440px, 46vw); } }
 
 /* Kopfbild im Bearbeiten-Modus antippbar */
 .editing .lp-logo { cursor: pointer; position: relative; }
@@ -332,3 +332,29 @@ body.pf-player { background: var(--bg, #fdf8f3); }
   body.printing-cert .ed-certprev { margin: 0; }
   body.printing-cert { overflow: visible; }
 }
+
+/* ---------- Seitenleiste rechts ---------- */
+.pf-body { flex: 1; min-height: 0; display: flex; }
+.pf-body > .lp-scroll { flex: 1; min-width: 0; }
+.pf-panel { flex: none; width: 340px; display: flex; flex-direction: column; background: #fff; color: #222; border-left: 1px solid #e3dceb; box-shadow: -6px 0 18px rgba(30,20,60,.08); min-height: 0; }
+.pf-panel[hidden] { display: none; }
+.pf-ptabs { flex: none; display: flex; gap: 4px; align-items: center; padding: 8px; border-bottom: 1px solid #eee; }
+.pf-ptabs .sp { flex: 1; }
+.pf-ptabs button { border: 0; background: #f1edf6; color: #333; border-radius: 9px; min-height: 36px; padding: 0 10px; font-weight: 650; cursor: pointer; }
+.pf-ptabs button[aria-pressed="true"] { background: #1f1b2e; color: #fff; }
+.pf-ptabs [data-pt="close"] { background: transparent; font-size: 16px; }
+.pf-pbody { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.pf-ptitle { font-weight: 700; font-size: 15px; padding: 12px 14px 0; }
+.pf-pbody .ed-form { padding-top: 8px; }
+/* Muster-Auswahl */
+.ed-pat { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.ed-pat button { min-width: 40px; height: 38px; border: 2px solid #e3dceb; background: #faf8fc; border-radius: 9px; cursor: pointer; font-size: 16px; padding: 0 6px; }
+.ed-pat button[aria-pressed="true"] { border-color: #1f1b2e; background: #fff; }
+.ed-pat input { width: 5.5em; height: 38px; border: 2px solid #ddd6e6; border-radius: 9px; padding: 0 8px; font-size: 16px; }
+/* Punkte links neben Aufgaben */
+.lp.with-pts .lp-main { padding-left: 70px; }
+.pf-pts { position: absolute; left: -62px; top: 14px; width: 54px; display: flex; align-items: center; justify-content: center; gap: 2px; font: 700 13px var(--font-body); color: var(--a2); background: var(--surface); border: 2px solid var(--a2s); border-radius: 10px; padding: 4px 2px; }
+.pf-pts input { width: 30px; border: 0; background: transparent; font: inherit; color: inherit; text-align: right; padding: 0; -moz-appearance: textfield; }
+.pf-pts input::-webkit-outer-spin-button, .pf-pts input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.lp:not(.editing) .blk { position: relative; }
+@media (max-width: 560px) { .lp.with-pts .lp-main { padding-left: 18px; } .pf-pts { position: static; display: inline-flex; width: auto; margin: 8px 0 -4px; padding: 2px 8px; } }

@@ -167,12 +167,13 @@ export function startPathFinder(opts = {}) {
     clearTimeout(pending); pending = null;
     const s = JSON.stringify(doc); if (s === hist[hist.length - 1]) return;
     hist.push(s); if (hist.length > 200) hist.shift(); fut = []; save(); updUndo();
+    if (panelOpen && !panelEl.contains(document.activeElement)) drawPanel(); // im Lernpfad Geändertes auch rechts zeigen
   }
   function softCommit() { $('#saved').textContent = '…'; clearTimeout(pending); pending = setTimeout(commit, 500); }
-  function undo() { if (pending) commit(); if (hist.length < 2) return; fut.push(hist.pop()); doc = JSON.parse(hist[hist.length - 1]); save(); render(); updUndo(); }
-  function redo() { if (!fut.length) return; const s = fut.pop(); hist.push(s); doc = JSON.parse(s); save(); render(); updUndo(); }
+  function undo() { if (pending) commit(); if (hist.length < 2) return; fut.push(hist.pop()); doc = JSON.parse(hist[hist.length - 1]); save(); render(); updUndo(); drawPanel?.(); }
+  function redo() { if (!fut.length) return; const s = fut.pop(); hist.push(s); doc = JSON.parse(s); save(); render(); updUndo(); drawPanel?.(); }
   function updUndo() { if (!$('#bUndo')) return; $('#bUndo').disabled = hist.length < 2; $('#bRedo').disabled = !fut.length; }
-  function openDoc(d) { if (pending) commit(); doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); selId = null; curSid = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; }
+  function openDoc(d) { if (pending) commit(); if (panelOpen) panelWhat = 'design'; doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); selId = null; curSid = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; drawPanel(); }
 
   function findBlock(id) {
     for (const st of doc.stations) { const i = st.blocks.findIndex(b => b.id === id); if (i >= 0) return { st, i, b: st.blocks[i] }; }
@@ -245,6 +246,15 @@ export function startPathFinder(opts = {}) {
     for (const k in p.l) st.setProperty('--' + k, p.l[k]);
     st.setProperty('--font-display', f.d); st.setProperty('--display-weight', f.w); st.setProperty('--display-ls', f.ls); st.setProperty('--fz', fz);
     lp.dataset.shape = doc.design.shape; lp.dataset.form = doc.form;
+    const pat = doc.design.pattern || 'punkte';
+    if (pat === 'punkte') { st.setProperty('--hero-pat', 'radial-gradient(rgba(255,255,255,.3) 2px, transparent 2px)'); st.setProperty('--hero-pat-size', '16px 16px'); }
+    else if (pat === 'raster') { st.setProperty('--hero-pat', 'linear-gradient(rgba(255,255,255,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.3) 1px, transparent 1px)'); st.setProperty('--hero-pat-size', '22px 22px'); }
+    else if (pat === 'keins') st.setProperty('--hero-pat', 'none');
+    else { // Zeichen oder Emoji als Muster, versetzt angeordnet
+      const g = esc(pat), svg = `<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><g font-family='sans-serif' font-size='17' text-anchor='middle' fill='white' opacity='.42'><text x='16' y='22'>${g}</text><text x='48' y='54'>${g}</text></g></svg>`;
+      st.setProperty('--hero-pat', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`); st.setProperty('--hero-pat-size', '64px 64px');
+    }
+    lp.classList.toggle('with-pts', !!doc.pointsOn);
     $('.lpwrap').style.background = p.l.bg;
   }
   function render() {
@@ -312,7 +322,9 @@ export function startPathFinder(opts = {}) {
       + `<button data-bact="up" title="Nach oben (⌥↑)">↑</button><button data-bact="down" title="Nach unten (⌥↓)">↓</button>`
       + `<button data-bact="dup" title="Verdoppeln">⧉</button>${form ? '<button data-bact="cfg" title="Einstellungen">⚙</button>' : ''}<button class="del" data-bact="del" title="Löschen">🗑</button></div>`;
   }
-  const wrap = (b, inner, cls = '') => `<div class="blk ${cls}" data-id="${b.id}">${E() ? tools(b) : ''}${inner}</div>`;
+  const ptsOf = b => Math.max(0, +(b.pts ?? 1) || 0);
+  const ptsTag = b => !doc.pointsOn || !isCheck(b) ? '' : E() ? `<label class="pf-pts" title="Punkte für diese Aufgabe"><input type="number" min="0" step="1" inputmode="numeric" data-pts value="${ptsOf(b)}"><span>P.</span></label>` : `<span class="pf-pts">${ptsOf(b)} P.</span>`;
+  const wrap = (b, inner, cls = '') => `<div class="blk ${cls}" data-id="${b.id}">${E() ? tools(b) : ''}${ptsTag(b)}${inner}</div>`;
   const imgHtml = (src, cap, size) => src ? `<figure class="lp-img"${size === 'klein' ? ' style="max-width:45%"' : ''}><img src="${src}" alt="">${cap ? `<figcaption>${esc(cap)}</figcaption>` : ''}</figure>` : '';
   const xpTag = b => doc.form === 'challenge' && b.xp ? `<span class="xp">+${b.xp} XP</span>` : '';
   /** Aufgabenkarte (auch für Aufgaben der Apps): Kopf, Bild, Auftrag, eigene Knöpfe, Tipps, Lösung */
@@ -428,6 +440,7 @@ export function startPathFinder(opts = {}) {
   /* ---------- Eingaben im Bearbeiten-Modus ---------- */
   function setPath(obj, path, val) { const ks = path.split('.'); let o = obj; while (ks.length > 1) { const k = ks.shift(); if (o[k] == null) o[k] = {}; o = o[k]; } o[ks[0]] = val; }
   lp.addEventListener('input', ev => {
+    if (ev.target.matches?.('[data-pts]') && E()) { const r = findBlock(ev.target.closest('.blk').dataset.id); if (r) { r.b.pts = Math.max(0, +ev.target.value || 0); softCommit(); } return; }
     const el = ev.target.closest('[data-f]'); if (!el || !E()) return;
     const f = el.dataset.f, val = el.dataset.rich ? clean(el.innerHTML) : el.textContent.replace(/\s+/g, ' ').trim();
     if (f === 'code') { const r = findBlock(el.closest('.blk').dataset.id); r.b.code = el.innerText.replace(/\n$/, ''); softCommit(); return; }
@@ -473,7 +486,7 @@ export function startPathFinder(opts = {}) {
     if (qok && E()) { const r = findBlock(qok.closest('.blk').dataset.id); const [qi, i] = qok.dataset.qok.split('.').map(Number); r.b.qs[qi].opts.forEach((o, k) => o.ok = k === i); commit(); render(); return; }
     const run = t.closest('[data-run]');
     if (run) { runAction(run.closest('.blk').dataset.id, run.dataset.run); return; }
-    if (E()) { const blk = t.closest('.blk'); selId = blk ? blk.dataset.id : null; markSel(); if (blk) curSid = blk.closest('.lp-station')?.dataset.sid || curSid; return; }
+    if (E()) { const blk = t.closest('.blk'); selId = blk ? blk.dataset.id : null; markSel(); if (blk) curSid = blk.closest('.lp-station')?.dataset.sid || curSid; if (panelOpen && blk && panelWhat !== selId) { panelWhat = selId; drawPanel(); } return; }
     const opt = t.closest('[data-opt]');
     if (opt) { const id = opt.closest('.blk').dataset.id, r = findBlock(id), [qi, i] = opt.dataset.opt.split('.').map(Number); const st = prog.quiz[id] || (prog.quiz[id] = {}); st[qi] = i; if (r.b.qs.every((q, k) => q.opts[st[k]]?.ok)) solve(id); else render(); return; }
     const chip = t.closest('[data-chip], [data-gchip]');
@@ -725,7 +738,15 @@ export function startPathFinder(opts = {}) {
     const el = document.createElement('div'); el.className = 'ed-dlg ' + cls; el.setAttribute('role', 'dialog');
     document.body.append(bd, el); return { el, bd };
   }
+  /** Einstellungen als Dialog – oder, auf breiten Bildschirmen, in der Seitenleiste rechts */
   function openForm(id) {
+    if (id !== 'cert' && panelFits()) { showPanel(id); return; }
+    const { el, bd } = dialog(id === 'cert' ? '' : 'dock'); bd.onclick = () => closeDlg(true);
+    dlg = { el, bd, apply: () => { } };
+    dlg.apply = formUI(el, id, { live: false });
+  }
+  /** Formular für Baustein, Station oder Zertifikat. live: Änderungen wirken sofort (Seitenleiste), sonst erst mit „Fertig“. */
+  function formUI(el, id, { live }) {
     let fields, b, title, apply;
     if (id === 'cert') {
       b = clone(doc.cert); title = '★ Zertifikat';
@@ -737,20 +758,20 @@ export function startPathFinder(opts = {}) {
         { k: 'show.quiz', l: 'Ergebnis je Station zeigen', t: 'check' }, { k: 'show.xp', l: 'XP zeigen (Challenge)', t: 'check' }];
       apply = () => { doc.cert = b; commit(); render(); };
     } else if (id.startsWith('st:')) {
-      const s = doc.stations.find(x => x.id === id.slice(3)); b = { title: s.title, sub: s.sub, nr: s.nr || '', check: s.check, anim: s.anim || '' }; title = '⚙ Station';
+      const s = doc.stations.find(x => x.id === id.slice(3)); b = live ? s : { title: s.title, sub: s.sub, nr: s.nr || '', check: s.check, anim: s.anim || '' }; title = '⚙ Station';
       fields = [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'sub', l: 'Untertitel', t: 'text' }, { k: 'nr', l: 'Eigenes Zeichen statt Nummer (z. B. ✂)', t: 'text', help: 'leer = automatische Nummer' }, { k: 'check', l: 'Haken „Station erledigt“ am Ende', t: 'check' }, { k: 'anim', l: 'Animation des Stationstitels', t: 'select', o: ANIM_OPTS }];
       apply = () => { Object.assign(s, b); commit(); render(); };
     } else {
-      const r = findBlock(id); b = clone(r.b); const t = def(b);
+      const r = findBlock(id); b = live ? r.b : clone(r.b); const t = def(b);
       fields = t?.form || FORMS[b.type] || [];
       title = b.type === 'info' ? (INFO_KINDS[b.kind]?.[0] + ' ' + INFO_KINDS[b.kind]?.[1]) : (t?.ic || '') + ' ' + (t?.n || b.type);
       apply = () => { const rr = findBlock(id); if (rr) rr.st.blocks[rr.i] = b; commit(); render(); };
     }
-    const { el, bd } = dialog(); bd.onclick = () => closeDlg(true);
-    dlg = { el, bd, apply };
+    if (live) apply = () => { softCommit(); render(); };
+    const changed = () => { if (live) apply(); };
     const takeBtn = (kind, k) => host.selectedCell ? `<button class="take" data-take="${kind}" data-tk="${k}">${kind === 'cell' ? '▦ gewählte Zelle' : 'fx aus ' + esc(host.name || 'App')}</button>` : '';
     const draw = () => {
-      let h = `<header><b>${esc(title)}</b><button data-x="cancel">Abbrechen</button><button class="ok" data-x="ok">Fertig</button></header><div class="ed-form">`;
+      let h = live ? `<div class="pf-ptitle">${esc(title)}</div><div class="ed-form">` : `<header><b>${esc(title)}</b><button data-x="cancel">Abbrechen</button><button class="ok" data-x="ok">Fertig</button></header><div class="ed-form">`;
       fields.forEach(f => {
         if (f.show && !f.show(b)) return;
         const v = getP(b, f.k), help = f.help ? `<span class="help">${esc(f.help)}</span>` : '';
@@ -784,11 +805,13 @@ export function startPathFinder(opts = {}) {
       if (d.qok2) { const [qi, i] = d.qok2.split('.').map(Number); b.qs[qi].opts.forEach((o, k) => o.ok = k === i); }
       if (d.pa != null) b.pairs[+d.pa].a = t.value;
       if (d.pb != null) b.pairs[+d.pb].b = t.value;
+      changed();
     });
     el.addEventListener('change', async e => {
       const t = e.target;
       if (t.dataset.img && t.files[0]) { const url = await loadImage(t.files[0]); if (url) { setPath(b, t.dataset.img, url); draw(); } }
       if (t.dataset.file && t.files[0]) { const f = t.files[0]; if (f.size > 5e6) toast('⚠ Die Datei ist größer als 5 MB.'); const url = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); }); b.data = String(url).split(',')[1]; if (!b.name) b.name = f.name; draw(); }
+      if (t.dataset.img || t.dataset.file) changed(); // „change“ kommt auch beim Verlassen eines Textfelds – dann nicht neu zeichnen
     });
     el.addEventListener('click', e => {
       const t = e.target.closest('button'); if (!t) return;
@@ -807,7 +830,9 @@ export function startPathFinder(opts = {}) {
       if (d.g) { const R = b.rows, C = R[0]?.length || 1; if (d.g === 'r+') R.push(Array(C).fill('')); if (d.g === 'r-' && R.length > 1) R.pop(); if (d.g === 'c+') R.forEach(r => r.push('')); if (d.g === 'c-' && C > 1) R.forEach(r => r.pop()); draw(); }
       if (d.take === 'cell') { const a = host.selectedCell(); setPath(b, d.tk, a); draw(); toast(`Zelle ${a} übernommen`); }
       if (d.take === 'formula') { const a = host.selectedCell(), f = host.cellFormula?.(a); if (!f || !String(f).startsWith('=')) { toast(`In ${a} steht keine Formel – erst eine Formel eintragen.`); return; } setPath(b, d.tk, f); const ck = d.tk.replace(/target$/, 'cell'); if (ck !== d.tk) setPath(b, ck, a); draw(); toast(`${a}: ${esc(f)} übernommen`); }
+      changed();
     });
+    return apply;
   }
   async function loadImage(file) {
     if (file.type === 'image/gif' || file.type === 'image/svg+xml') { if (file.size > 3e6) toast(`⚠ Das Bild ist ${(file.size / 1e6).toFixed(1)} MB groß – das macht den Lernpfad schwer.`, 3500); return await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(file); }); }
@@ -821,18 +846,26 @@ export function startPathFinder(opts = {}) {
 
   /* ---------- Design-Fenster ---------- */
   function openDesign() {
+    if (panelFits()) { panelOpen && panelWhat === 'design' ? hidePanel() : showPanel('design'); return; }
     const { el, bd } = dialog('dock'); bd.onclick = () => closeDlg(true);
     dlg = { el, bd, apply: () => commit() };
-    const seg = (k, o, cur) => `<span class="ed-dseg" data-seg="${k}">${o.map(([v, n]) => `<button data-v="${v}" aria-pressed="${v === cur}">${n}</button>`).join('')}</span>`;
+    designUI(el, false);
+  }
+  const PATTERNS = [['punkte', '• •', 'Punkte'], ['raster', '▦', 'Raster'], ['keins', '–', 'kein Muster'], ...['✦', '★', '♥', '⚡', '💡', '🧪', '⚛', '✏️', '🐾', '{ }', '01', '＋'].map(c => [c, c, c])];
+  function designUI(el, live) {    const seg = (k, o, cur) => `<span class="ed-dseg" data-seg="${k}">${o.map(([v, n]) => `<button data-v="${v}" aria-pressed="${v === cur}">${n}</button>`).join('')}</span>`;
     const sel = (k, cur) => `<select data-anim-k="${k}">${ANIM_OPTS.map(([v, n]) => `<option value="${v}"${(cur || '') === v ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
     const draw = () => {
       const d = doc.design;
-      el.innerHTML = `<header><b>🎨 Design</b><button class="ok" data-x="ok">Fertig</button></header><div class="ed-form">
+      const pat = d.pattern || 'punkte', custom = !PATTERNS.some(x => x[0] === pat);
+      el.innerHTML = `${live ? '<div class="pf-ptitle">🎨 Design</div>' : '<header><b>🎨 Design</b><button class="ok" data-x="ok">Fertig</button></header>'}<div class="ed-form">
         <label>Form</label>${seg('form', [['lernpfad', 'Lernpfad'], ['challenge', 'Challenge']], doc.form)}
         <label>Farbpalette <span class="help">${esc(PALETTES[d.pal].n)}</span></label><div class="ed-sw">${PALETTES.map((p, i) => `<button data-pal="${i}" title="${esc(p.n)}" aria-pressed="${i === d.pal}"><span style="background:${p.l.a1}"></span><span style="background:${p.l.a2}"></span><span style="background:${p.l.a3}"></span></button>`).join('')}</div>
         <label>Schrift</label>${seg('font', Object.entries(FONTS).map(([k, f]) => [k, f.n]), d.font)}
         <label>Stationen</label>${seg('shape', [['eckig', '▢ eckig'], ['rund', '◯ rund']], d.shape)}
-        <fieldset><legend>Kopf</legend>${seg('hero', [['logo', 'App-Logo'], ['bild', 'eigenes Bild'], ['gross', 'großes Bild rechts'], ['hintergrund', 'Bild als Hintergrund']], d.hero)}
+        <label class="chk"><input type="checkbox" id="ptsIn"${doc.pointsOn ? ' checked' : ''}>Punkte anpassen <span class="help">– Punkte stehen links neben den Aufgaben und zählen im SCORM-Lernpaket</span></label>
+        <fieldset><legend>Kopf</legend>
+        <label>Muster im Hintergrund</label><div class="ed-pat">${PATTERNS.map(([v, n, t]) => `<button data-pat="${esc(v)}" title="${esc(t)}" aria-pressed="${v === pat}">${esc(n)}</button>`).join('')}<input type="text" id="patIn" maxlength="2" placeholder="eigenes" value="${custom ? esc(pat) : ''}" aria-label="eigenes Zeichen oder Emoji"></div>
+        ${seg('hero', [['logo', 'App-Logo'], ['bild', 'eigenes Bild'], ['gross', 'großes Bild rechts'], ['hintergrund', 'Bild als Hintergrund']], d.hero)}
         ${d.hero !== 'logo' ? `<div class="imgprev">${d.heroImg ? `<img src="${d.heroImg}" alt="">` : ''}<label class="take" style="display:inline-flex;align-items:center;cursor:pointer">🖼 ${d.heroImg ? 'Anderes Bild' : 'Bild/GIF wählen'}<input type="file" accept="image/*" id="heroFile" hidden></label></div>` : ''}
         <label>Lernziele</label><div class="list">${(doc.goals || []).map((g, i) => `<div class="it"><input type="text" data-goal="${i}" value="${esc(plain(g))}" placeholder="Lernziel ${i + 1}"><button data-gdel="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-gadd="1">＋ Lernziel</button></div>
         <label>Rang / Abzeichen (optional)<input type="text" id="rankIn" value="${esc(plain(doc.rank))}" placeholder="z. B. Dein Rang: HACKER NEWBIE"></label>
@@ -845,10 +878,11 @@ export function startPathFinder(opts = {}) {
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.x) { closeDlg(true); return; }
       if (t.dataset.pal) doc.design.pal = +t.dataset.pal;
+      if (t.dataset.pat) doc.design.pattern = t.dataset.pat;
       if (t.dataset.gadd) doc.goals.push('');
       if (t.dataset.gdel) doc.goals.splice(+t.dataset.gdel, 1);
       const sg = t.closest('[data-seg]'); if (sg) { const k = sg.dataset.seg; if (k === 'form') doc.form = t.dataset.v; else doc.design[k] = t.dataset.v; }
-      draw(); render(); if (t.dataset.gadd) $$('[data-goal]', el).pop()?.focus();
+      draw(); render(); if (live) softCommit(); if (t.dataset.gadd) $$('[data-goal]', el).pop()?.focus();
     });
     el.addEventListener('input', e => {
       const t = e.target;
@@ -856,8 +890,40 @@ export function startPathFinder(opts = {}) {
       if (t.id === 'rankIn') { doc.rank = esc(t.value); render(); }
       if (t.dataset.animK) { doc.anim = { ...(doc.anim || {}), [t.dataset.animK]: t.value }; animDone.clear(); render(); }
       if (t.id === 'linesIn') { doc.typeLines = t.value.split('\n').filter(x => x.trim()); animDone.delete('$lines'); render(); }
+      if (t.id === 'patIn') { if (t.value.trim()) { doc.design.pattern = t.value.trim(); render(); $$('[data-pat]', el).forEach(x => x.setAttribute('aria-pressed', 'false')); } }
+      if (t.id === 'ptsIn') { doc.pointsOn = t.checked; render(); }
+      if (live) softCommit();
     });
-    el.addEventListener('change', async e => { if (e.target.id === 'heroFile' && e.target.files[0]) { doc.design.heroImg = await loadImage(e.target.files[0]); draw(); render(); } });
+    el.addEventListener('change', async e => { if (e.target.id === 'heroFile' && e.target.files[0]) { doc.design.heroImg = await loadImage(e.target.files[0]); draw(); render(); if (live) softCommit(); } });
+  }
+
+  /* ---------- Seitenleiste rechts (wie am iPad): Design und Einstellungen des gewählten Bausteins ---------- */
+  let panelOpen = false, panelWhat = 'design', panelEl = null, panelBack = false;
+  const wrapEl = $('.lpwrap');
+  if (!PLAYER) {
+    const body = document.createElement('div'); body.className = 'pf-body';
+    scroller.parentNode.insertBefore(body, scroller); body.appendChild(scroller);
+    panelEl = document.createElement('aside'); panelEl.className = 'pf-panel'; panelEl.hidden = true; panelEl.setAttribute('aria-label', 'Einstellungen');
+    body.appendChild(panelEl);
+    panelEl.addEventListener('click', e => {
+      const t = e.target.closest('[data-pt]'); if (!t) return;
+      if (t.dataset.pt === 'close') { hidePanel(); return; }
+      panelWhat = t.dataset.pt === 'design' ? 'design' : (selId || 'none'); drawPanel();
+    });
+    addEventListener('resize', () => { if (panelOpen && !panelFits()) hidePanel(); });
+  }
+  function panelFits() { return !!panelEl && wrapEl.clientWidth >= 760; }
+  function showPanel(what) { panelWhat = what || panelWhat; panelOpen = true; panelEl.hidden = false; wrapEl.classList.add('panel-open'); $('#bDesign')?.classList.add('on'); drawPanel(); }
+  function hidePanel() { panelOpen = false; if (panelEl) panelEl.hidden = true; wrapEl.classList.remove('panel-open'); $('#bDesign')?.classList.remove('on'); }
+  function drawPanel() {
+    if (!panelOpen) return;
+    let what = panelWhat;
+    if (what.startsWith('st:') ? !doc.stations.some(x => 'st:' + x.id === what) : what !== 'design' && !findBlock(what)) what = 'none';
+    panelEl.innerHTML = `<div class="pf-ptabs"><button data-pt="design" aria-pressed="${what === 'design'}">🎨 Design</button><button data-pt="sel" aria-pressed="${what !== 'design'}">⚙ Auswahl</button><span class="sp"></span><button data-pt="close" aria-label="Seitenleiste schließen" title="schließen">✕</button></div>`;
+    const body = document.createElement('div'); body.className = 'pf-pbody'; panelEl.appendChild(body);
+    if (what === 'design') designUI(body, true);
+    else if (what === 'none') body.innerHTML = '<div class="ed-form"><span class="help">Tippe im Lernpfad einen Baustein an – hier erscheinen seine Einstellungen. Für eine Station: ⚙ neben dem Stationstitel.</span></div>';
+    else formUI(body, what, { live: true });
   }
 
   /* ---------- Zertifikat (Muster; das PDF folgt mit dem Export) ---------- */
@@ -875,6 +941,7 @@ export function startPathFinder(opts = {}) {
       ${c.show.zeit ? `<div style="margin-top:8px;font-size:14px">Aktive Bearbeitungszeit: <b>${mins} min</b> · ${new Date(prog.start).toLocaleDateString('de-DE')} – ${new Date().toLocaleDateString('de-DE')}</div>` : ''}
       ${c.show.quiz ? `<table><tr><td><b>Station</b></td><td><b>gelöst</b></td>${c.show.tipps ? '<td><b>Hilfen</b></td>' : ''}</tr>${rows}</table>` : ''}
       ${c.show.xp && doc.form === 'challenge' ? `<div>⚡ ${xpNow()} von ${xpMax()} XP</div>` : ''}
+      ${doc.pointsOn ? (() => { const all = xpBlocks(); return `<div style="font-weight:700;margin-top:4px">${all.filter(b => prog.solved[b.id]).reduce((a, b) => a + ptsOf(b), 0)} von ${all.reduce((a, b) => a + ptsOf(b), 0)} Punkten</div>`; })() : ''}
       <div class="code">Prüfcode K7M-2QX</div></div>
       <div class="ed-form"><span class="help">Mit dem Export entsteht daraus ein PDF zum Speichern oder Hochladen in Moodle. Die Zeit zählt nur, solange der Lernpfad offen ist und benutzt wird.</span></div>`;
     el.addEventListener('input', e => { if (e.target.id === 'certName') $('#certN', el).textContent = e.target.value; });
@@ -934,7 +1001,8 @@ export function startPathFinder(opts = {}) {
     if (pending) commit();
     mode = m; selId = null; closePop();
     $$('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
-    if (m === 'preview') { prog.visited[curSid] = 1; animDone.clear(); }
+    if (m === 'preview') { prog.visited[curSid] = 1; animDone.clear(); panelBack = panelOpen; hidePanel(); }
+    else if (panelBack && panelFits()) showPanel();
     render();
     toast(m === 'preview' ? '▶ Vorschau – so sehen es die Schüler. Fortschritt wird hier nur probeweise gezählt.' : '✎ Bearbeiten');
   }
@@ -1074,7 +1142,7 @@ ${SC}
       ok: true,
       get: k => API.LMSGetValue(k),
       report(txt) {
-        const checks = doc.stations.flatMap(s => { const c = s.blocks.filter(isCheck); return c.map(b => ({ id: b.id, w: doc.form === 'challenge' ? (+b.xp || 1) : 1 })).concat(s.check ? [{ id: 'st:' + s.id, w: doc.form === 'challenge' ? 0 : 1 }] : []); });
+        const checks = doc.stations.flatMap(s => { const c = s.blocks.filter(isCheck); return c.map(b => ({ id: b.id, w: doc.pointsOn ? ptsOf(b) : doc.form === 'challenge' ? (+b.xp || 1) : 1 })).concat(s.check ? [{ id: 'st:' + s.id, w: doc.form === 'challenge' || doc.pointsOn ? 0 : 1 }] : []); });
         const max = checks.reduce((a, c) => a + c.w, 0) || 1, got = checks.filter(c => prog.solved[c.id]).reduce((a, c) => a + c.w, 0);
         const pct = Math.round(100 * got / max);
         API.LMSSetValue('cmi.core.score.min', '0'); API.LMSSetValue('cmi.core.score.max', '100'); API.LMSSetValue('cmi.core.score.raw', String(pct));
