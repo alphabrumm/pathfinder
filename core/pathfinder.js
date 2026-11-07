@@ -1020,7 +1020,7 @@ export function startPathFinder(opts = {}) {
     const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
     const KK = (opts.storage || 'pathfinder') + '.ki';
     let info = {}; try { info = JSON.parse(LS.get(KK)) || {}; } catch (e) { }
-    let parsed = null, lastAtt = {}, tok = 0;
+    let parsed = null, lastAtt = {}, fileAtt = {}, tok = 0;
     el.innerHTML = `<header><b>🤖 Vorlage für KI</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
         <div class="ki-step"><span class="n">1</span><b>Anleitung für die KI</b></div>
@@ -1031,6 +1031,8 @@ export function startPathFinder(opts = {}) {
         <div class="ki-btns"><button class="lp-btn" data-copy="prompt">📋 Anleitung kopieren</button><button class="lp-btn alt" data-copy="doc" title="Den geöffneten Lernpfad als Text – z. B. um ihn von der KI überarbeiten zu lassen">📋 Aktuellen Lernpfad als Text</button><button class="lp-btn alt" data-copy="show">Format ansehen</button></div>
         <div class="ki-step"><span class="n">2</span><b>Antwort der KI hier einfügen</b></div>
         <textarea id="kiIn" rows="10" spellcheck="false" placeholder="# Titel des Lernpfads&#10;&#10;## Station: …"></textarea>
+        <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Bilder-Dateien der KI hinzufügen<input type="file" id="kiFiles" multiple accept=".txt,.md,.svg,.png,.gif,.jpg,.jpeg,.webp,.zip" hidden></label><span class="help" style="align-self:center">anhang.txt, einzelne .svg/.png/.gif oder ZIP</span></div>
+        <div id="kiFileList" class="ki-res"></div>
         <div id="kiRes" class="ki-res"></div>
         <div class="ki-btns"><button class="lp-btn" id="kiOpen" disabled>＋ Als neuen Lernpfad öffnen</button></div>
       </div>`;
@@ -1038,7 +1040,11 @@ export function startPathFinder(opts = {}) {
     const check = () => {
       const src = $('#kiIn', el).value;
       if (!src.trim()) { res.innerHTML = ''; openB.disabled = true; parsed = null; return; }
-      parsed = T.parseText(src, { ...env, attachments: lastAtt });
+      if (!/^\s*(```[\w-]*\s*)?#\s/.test(src) && /```\s*svg/i.test(src) && !/^##\s/m.test(src.replace(/^##\s+(anhang|bilder)\s*$/gim, ''))) {
+        // nur ein Anhang eingefügt? Dann wie eine Anhang-Datei behandeln
+        Object.assign(fileAtt, T.readAttachments(src)); $('#kiIn', el).value = ''; res.innerHTML = `<div class="good">✓ ${Object.keys(fileAtt).length} Bild${Object.keys(fileAtt).length === 1 ? '' : 'er'} als Anhang übernommen – jetzt den Lernpfad-Text einfügen.</div>`; return;
+      }
+      parsed = T.parseText(src, { ...env, attachments: lastAtt, files: fileAtt });
       const { errors, warnings, stats } = parsed;
       res.innerHTML = (errors.length ? `<div class="bad">✗ ${errors.length} Fehler – bitte korrigieren (oder die KI bitten, es zu korrigieren):</div><ul>${errors.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>` : `<div class="good">✓ Erkannt: „${esc(parsed.doc.title)}“ · ${stats.stations} Station${stats.stations === 1 ? '' : 'en'} · ${stats.blocks} Bausteine · ${stats.tasks} Aufgabe${stats.tasks === 1 ? '' : 'n'}${stats.images ? ` · ${stats.images} Bild${stats.images === 1 ? '' : 'er'}` : ''}</div>`)
         + (warnings.length ? `<div class="warn">Hinweise:</div><ul>${warnings.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>` : '');
@@ -1053,6 +1059,12 @@ export function startPathFinder(opts = {}) {
         res.insertAdjacentHTML('beforeend', `<div class="warn">${bad.length} Bild${bad.length === 1 ? ' lässt' : 'er lassen'} sich nicht anzeigen und ${bad.length === 1 ? 'wird' : 'werden'} weggelassen:</div><ul>${bad.map(x => `<li>Zeile ${x.n}</li>`).join('')}</ul>`);
       });
     };
+    el.addEventListener('change', async e => {
+      if (e.target.id !== 'kiFiles' || !e.target.files.length) return;
+      const { att, notes } = await T.readFiles([...e.target.files]); Object.assign(fileAtt, att); e.target.value = '';
+      $('#kiFileList', el).innerHTML = `<div class="${Object.keys(fileAtt).length ? 'good' : 'warn'}">${Object.keys(fileAtt).length} Bild${Object.keys(fileAtt).length === 1 ? '' : 'er'} aus Dateien</div><ul>${notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>`;
+      check();
+    });
     el.addEventListener('input', e => {
       const k = e.target.dataset.k; if (k) { info[k] = e.target.value; LS.set(KK, JSON.stringify(info)); }
       if (e.target.id === 'kiIn') check();

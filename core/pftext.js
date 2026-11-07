@@ -86,6 +86,56 @@ export function checkData(url) {
   return { src: m[0] };
 }
 
+/** Anhang lesen: Zeilen mit ```svg name … ``` oder name: data:… → { name: src } */
+export function readAttachments(lines, warn = () => { }) {
+  const att = {}; if (typeof lines === 'string') lines = lines.replace(/\r\n?/g, '\n').split('\n');
+  for (let j = 0; j < lines.length; j++) {
+    const l = lines[j].trim(); let m;
+    if (/^#{1,3}\s/.test(l) || /^```\s*(text|markdown|md)?\s*$/i.test(l)) continue;
+    if ((m = l.match(/^```\s*svg\s+([\w äöüÄÖÜß.-]+)\s*$/i))) { const code = []; const n0 = j + 1; j++; while (j < lines.length && !/^\s*```\s*$/.test(lines[j])) code.push(lines[j++]); const src = cleanSvg(code.join('\n')); if (src) att[norm(m[1].replace(/\.svg$/i, ''))] = src; else warn(n0, `SVG „${m[1]}“ ist ungültig oder zu groß.`); continue; }
+    if ((m = l.match(/^([\w äöüÄÖÜß.-]{1,40}):\s*(data:\S+)$/i))) { const r = checkData(m[2]); if (r.err) warn(j + 1, `Bild „${m[1]}“: ${r.err}.`); else att[norm(m[1])] = r.src; continue; }
+    if (l && !/^%%/.test(l)) warn(j + 1, `Im Anhang nicht verstanden: „${l.slice(0, 40)}“`);
+  }
+  return att;
+}
+/** ZIP lesen (gespeichert oder deflate) – nur im Browser, ohne Bibliothek */
+async function unzip(buf) {
+  const u = new Uint8Array(buf), dv = new DataView(u.buffer, u.byteOffset, u.byteLength), out = [];
+  let e = u.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error('kein ZIP');
+  let p = dv.getUint32(e + 16, true); const n = dv.getUint16(e + 10, true);
+  for (let i = 0; i < n; i++) {
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), fl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), lo = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(u.subarray(p + 46, p + 46 + fl)); p += 46 + fl + xl + cl;
+    const start = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true), raw = u.subarray(start, start + csize);
+    if (name.endsWith('/') || /(^|\/)(__MACOSX|\.)/.test(name)) continue;
+    let data = raw;
+    if (method === 8) data = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+    else if (method !== 0) continue;
+    out.push({ name, data });
+  }
+  return out;
+}
+const RASTER = { png: 'image/png', gif: 'image/gif', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' };
+function b64(bytes) { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
+/** Von der KI gelieferte Dateien (anhang.txt, einzelne .svg/.png/.gif, ZIP) → { att, notes } */
+export async function readFiles(files) {
+  const att = {}, notes = [];
+  const one = async (name, bytes) => {
+    const base = name.split('/').pop(), ext = (base.split('.').pop() || '').toLowerCase(), key = norm(base.replace(/\.[^.]+$/, ''));
+    if (ext === 'zip') { try { for (const f of await unzip(bytes)) await one(f.name, f.data); } catch (e) { notes.push(`${base}: ZIP ließ sich nicht öffnen.`); } return; }
+    if (ext === 'svg') { const src = cleanSvg(new TextDecoder().decode(bytes)); if (src) { att[key] = src; notes.push(`✓ ${base} → anhang:${key}`); } else notes.push(`${base}: kein gültiges SVG.`); return; }
+    if (RASTER[ext]) { const r = checkData(`data:${RASTER[ext]};base64,${b64(bytes)}`); if (r.src) { att[key] = r.src; notes.push(`✓ ${base} → anhang:${key}`); } else notes.push(`${base}: ${r.err}.`); return; }
+    if (['txt', 'md', 'text', 'markdown'].includes(ext)) {
+      const t = new TextDecoder().decode(bytes), w = []; const a = readAttachments(t, (n, m) => w.push(`${base} Zeile ${n}: ${m}`));
+      Object.assign(att, a); notes.push(...Object.keys(a).map(k => `✓ ${base} → anhang:${k}`), ...w); if (!Object.keys(a).length && !w.length) notes.push(`${base}: keine Bilder gefunden.`); return;
+    }
+    notes.push(`${base}: Dateityp wird nicht unterstützt.`);
+  };
+  for (const f of files) await one(f.name, new Uint8Array(await f.arrayBuffer()));
+  return { att, notes };
+}
+
 /* ---------- Aufbau der Bausteine aus Abschnitten ---------- */
 const CORE_SECTIONS = {
   aufgabe: { n: 'Aufgabe', keys: ['antwort', 'tipp', 'loesung', 'xp', 'punkte', 'bild'], make(S, H) {
@@ -153,14 +203,11 @@ export function parseText(src, env) {
   // Anhang (## Anhang / ## Bilder): name: data:… oder ```svg name … ``` – wird vorab eingesammelt und aus dem Text genommen
   { const k = lines.findIndex(l => /^##\s+(anhang|anhänge|bilder|material)\s*$/i.test(l.trim()));
     if (k >= 0) {
-      for (let j = k + 1; j < lines.length; j++) {
-        const l = lines[j].trim(); let m;
-        if ((m = l.match(/^```\s*svg\s+([\w äöüÄÖÜß.-]+)\s*$/i))) { const code = []; const n0 = j + 1; j++; while (j < lines.length && !/^\s*```\s*$/.test(lines[j])) code.push(lines[j++]); const src = cleanSvg(code.join('\n')); if (src) att[norm(m[1])] = src; else H.warn(n0, `SVG „${m[1]}“ ist ungültig oder zu groß.`); continue; }
-        if ((m = l.match(/^([\w äöüÄÖÜß.-]{1,40}):\s*(data:\S+)$/i))) { const r = checkData(m[2]); if (r.err) H.warn(j + 1, `Bild „${m[1]}“: ${r.err}.`); else att[norm(m[1])] = r.src; continue; }
-        if (l && !/^%%/.test(l)) H.warn(j + 1, `Im Anhang nicht verstanden: „${l.slice(0, 40)}“`);
-      }
+      Object.assign(att, readAttachments(lines.slice(k + 1), (n, m) => H.warn(n + k + 1, m)));
       lines = lines.slice(0, k);
+      while (lines.length && /^(```[\w-]*)?$/.test(lines[lines.length - 1].trim())) lines.pop(); // Codeblock-Grenzen zwischen Lernpfad und Anhang
     } }
+  Object.assign(att, env.files || {}); // mitgelieferte Dateien haben Vorrang
   let st = null, sec = null, para = [], i = 0, inHead = true, goalsMode = false, pendAnim = '';
   const uid = env.uid;
   const station = (n) => { if (!st) { H.warn(n, 'Inhalt vor der ersten Station – eine Station „Start“ wurde angelegt.'); st = { id: uid(), title: 'Start', sub: '', check: false, blocks: [] }; doc.stations.push(st); } return st; };
@@ -420,6 +467,7 @@ REGELN
 - Tipps bauen aufeinander auf: zuerst ein kleiner Denkanstoß, zuletzt fast die Lösung.
 - Beim Quiz: 3–4 Antworten, genau eine oder mehrere mit [x], zu falschen Antworten eine kurze Rückmeldung.
 - Bilder und Animationen: Zeichne passende Abbildungen selbst als SVG (im Anhang als \`\`\`svg name … \`\`\`, oben mit anhang:name einbinden). SVG darf animiert sein (<animate>, <animateTransform>, <animateMotion> oder CSS-@keyframes in <style> innerhalb des SVG). Immer viewBox angeben, gut lesbare Schrift (font-family="sans-serif"), keine Skripte, keine externen Links, Schriften oder Bilder. Lieber wenige, aussagekräftige Grafiken (z. B. Schaubild, Ablauf, Beispiel-Tabelle) als Deko.
+- Gib ALLE SVG-Grafiken zusätzlich gesammelt in einer eigenen Datei „anhang.txt“ aus (Inhalt: alle \`\`\`svg name … \`\`\`-Blöcke genau wie im Abschnitt ## Anhang). Wenn du Dateien zum Herunterladen erzeugen kannst, liefere außerdem jede Grafik als einzelne Datei name.svg (Dateiname = Name aus anhang:name) oder alles zusammen als ZIP. Kannst du keine Dateien erzeugen, schreibe den Inhalt von anhang.txt in einen eigenen, zweiten Codeblock nach dem Lernpfad.
 - Rasterbilder (PNG, GIF, JPG) nur als data:image/…;base64,…, und nur wenn du die Datei wirklich erzeugt hast (z. B. mit einem Code-Werkzeug) – niemals Base64 ausdenken. Sonst ein Bild-Platzhalter: ![Beschreibung]()
 - Keine Bilder aus dem Internet.
 
