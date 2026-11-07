@@ -1024,14 +1024,14 @@ export function startPathFinder(opts = {}) {
     el.innerHTML = `<header><b>🤖 Vorlage für KI</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
         <div class="ki-step"><span class="n">1</span><b>Anleitung für die KI</b></div>
-        <span class="help">Fülle die Felder aus und kopiere die Anleitung in eine KI deiner Wahl (z. B. die, die deine Schule erlaubt). Sie beschreibt das Textformat – die KI muss PathFinder nicht kennen.</span>
+        <span class="help">Fülle die Felder aus und kopiere die Anleitung in eine KI deiner Wahl (z. B. die, die deine Schule erlaubt). Sie beschreibt das Textformat – die KI muss PathFinder nicht kennen. Die KI liefert alles (auch Grafiken) in <b>einem</b> Textblock: einmal „Kopieren“ in der KI, unten einfügen, fertig.</span>
         <label>Thema<input type="text" data-k="thema" value="${esc(info.thema || '')}" placeholder="z. B. Relative Zellbezüge in der Tabellenkalkulation"></label>
         <div class="row"><label>Zielgruppe<input type="text" data-k="klasse" value="${esc(info.klasse || '')}" placeholder="z. B. Gymnasium, 9. Klasse"></label><label>Umfang<input type="text" data-k="umfang" value="${esc(info.umfang || '')}" placeholder="z. B. 4 Stationen, 45 min"></label></div>
         <label>Besondere Wünsche<textarea data-k="extra" rows="2" placeholder="z. B. mit Alltagsbeispiel Pausenverkauf, eine Station als Challenge">${esc(info.extra || '')}</textarea></label>
         <div class="ki-btns"><button class="lp-btn" data-copy="prompt">📋 Anleitung kopieren</button><button class="lp-btn alt" data-copy="doc" title="Den geöffneten Lernpfad als Text – z. B. um ihn von der KI überarbeiten zu lassen">📋 Aktuellen Lernpfad als Text</button><button class="lp-btn alt" data-copy="show">Format ansehen</button></div>
         <div class="ki-step"><span class="n">2</span><b>Antwort der KI hier einfügen</b></div>
         <textarea id="kiIn" rows="10" spellcheck="false" placeholder="# Titel des Lernpfads&#10;&#10;## Station: …"></textarea>
-        <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Bilder-Dateien der KI hinzufügen<input type="file" id="kiFiles" multiple accept=".txt,.md,.svg,.png,.gif,.jpg,.jpeg,.webp,.zip" hidden></label><span class="help" style="align-self:center">anhang.txt, einzelne .svg/.png/.gif oder ZIP</span></div>
+        <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Datei der KI laden<input type="file" id="kiFiles" multiple accept=".txt,.md,.svg,.png,.gif,.jpg,.jpeg,.webp,.zip" hidden></label><span class="help" style="align-self:center">statt Einfügen: lernpfad.txt – auch zusätzliche Bilder (.svg, .png, .gif, ZIP)</span></div>
         <div id="kiFileList" class="ki-res"></div>
         <div id="kiRes" class="ki-res"></div>
         <div class="ki-btns"><button class="lp-btn" id="kiOpen" disabled>＋ Als neuen Lernpfad öffnen</button></div>
@@ -1061,8 +1061,9 @@ export function startPathFinder(opts = {}) {
     };
     el.addEventListener('change', async e => {
       if (e.target.id !== 'kiFiles' || !e.target.files.length) return;
-      const { att, notes } = await T.readFiles([...e.target.files]); Object.assign(fileAtt, att); e.target.value = '';
-      $('#kiFileList', el).innerHTML = `<div class="${Object.keys(fileAtt).length ? 'good' : 'warn'}">${Object.keys(fileAtt).length} Bild${Object.keys(fileAtt).length === 1 ? '' : 'er'} aus Dateien</div><ul>${notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>`;
+      const { att, notes, text } = await T.readFiles([...e.target.files]); Object.assign(fileAtt, att); e.target.value = '';
+      if (text) $('#kiIn', el).value = text;
+      $('#kiFileList', el).innerHTML = `${Object.keys(fileAtt).length ? `<div class="good">${Object.keys(fileAtt).length} Bild${Object.keys(fileAtt).length === 1 ? '' : 'er'} aus Dateien</div>` : ''}<ul>${notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>`;
       check();
     });
     el.addEventListener('input', e => {

@@ -91,8 +91,12 @@ export function readAttachments(lines, warn = () => { }) {
   const att = {}; if (typeof lines === 'string') lines = lines.replace(/\r\n?/g, '\n').split('\n');
   for (let j = 0; j < lines.length; j++) {
     const l = lines[j].trim(); let m;
-    if (/^#{1,3}\s/.test(l) || /^```\s*(text|markdown|md)?\s*$/i.test(l)) continue;
+    if (/^#{1,3}\s/.test(l) || /^(`{3,}|~{3,})\s*(text|markdown|md|txt)?\s*$/i.test(l)) continue;
     if ((m = l.match(/^```\s*svg\s+([\w äöüÄÖÜß.-]+)\s*$/i))) { const code = []; const n0 = j + 1; j++; while (j < lines.length && !/^\s*```\s*$/.test(lines[j])) code.push(lines[j++]); const src = cleanSvg(code.join('\n')); if (src) att[norm(m[1].replace(/\.svg$/i, ''))] = src; else warn(n0, `SVG „${m[1]}“ ist ungültig oder zu groß.`); continue; }
+    if ((m = l.match(/^([\w äöüÄÖÜß.-]{1,40}):\s*(<svg[\s\S]*)$/i))) {
+      const code = [m[2]], n0 = j + 1; while (!/<\/svg\s*>/i.test(code[code.length - 1]) && j + 1 < lines.length) code.push(lines[++j]);
+      const src = cleanSvg(code.join('\n')); if (src) att[norm(m[1].replace(/\.svg$/i, ''))] = src; else warn(n0, `SVG „${m[1]}“ ist ungültig, unvollständig oder zu groß.`); continue;
+    }
     if ((m = l.match(/^([\w äöüÄÖÜß.-]{1,40}):\s*(data:\S+)$/i))) { const r = checkData(m[2]); if (r.err) warn(j + 1, `Bild „${m[1]}“: ${r.err}.`); else att[norm(m[1])] = r.src; continue; }
     if (l && !/^%%/.test(l)) warn(j + 1, `Im Anhang nicht verstanden: „${l.slice(0, 40)}“`);
   }
@@ -120,20 +124,22 @@ const RASTER = { png: 'image/png', gif: 'image/gif', jpg: 'image/jpeg', jpeg: 'i
 function b64(bytes) { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
 /** Von der KI gelieferte Dateien (anhang.txt, einzelne .svg/.png/.gif, ZIP) → { att, notes } */
 export async function readFiles(files) {
-  const att = {}, notes = [];
+  const att = {}, notes = []; let text = '';
   const one = async (name, bytes) => {
     const base = name.split('/').pop(), ext = (base.split('.').pop() || '').toLowerCase(), key = norm(base.replace(/\.[^.]+$/, ''));
     if (ext === 'zip') { try { for (const f of await unzip(bytes)) await one(f.name, f.data); } catch (e) { notes.push(`${base}: ZIP ließ sich nicht öffnen.`); } return; }
     if (ext === 'svg') { const src = cleanSvg(new TextDecoder().decode(bytes)); if (src) { att[key] = src; notes.push(`✓ ${base} → anhang:${key}`); } else notes.push(`${base}: kein gültiges SVG.`); return; }
     if (RASTER[ext]) { const r = checkData(`data:${RASTER[ext]};base64,${b64(bytes)}`); if (r.src) { att[key] = r.src; notes.push(`✓ ${base} → anhang:${key}`); } else notes.push(`${base}: ${r.err}.`); return; }
     if (['txt', 'md', 'text', 'markdown'].includes(ext)) {
-      const t = new TextDecoder().decode(bytes), w = []; const a = readAttachments(t, (n, m) => w.push(`${base} Zeile ${n}: ${m}`));
+      const t = new TextDecoder().decode(bytes), w = [];
+      if (/^\s*(`{3,}\w*\s*)?#\s/.test(t) || /^##\s+station/im.test(t)) { text = t; notes.push(`✓ ${base} → Lernpfad-Text übernommen`); return; }
+      const a = readAttachments(t, (n, m) => w.push(`${base} Zeile ${n}: ${m}`));
       Object.assign(att, a); notes.push(...Object.keys(a).map(k => `✓ ${base} → anhang:${k}`), ...w); if (!Object.keys(a).length && !w.length) notes.push(`${base}: keine Bilder gefunden.`); return;
     }
     notes.push(`${base}: Dateityp wird nicht unterstützt.`);
   };
   for (const f of files) await one(f.name, new Uint8Array(await f.arrayBuffer()));
-  return { att, notes };
+  return { att, notes, text };
 }
 
 /* ---------- Aufbau der Bausteine aus Abschnitten ---------- */
@@ -198,14 +204,17 @@ export function parseText(src, env) {
   let lines = String(src || '').replace(/\r\n?/g, '\n').split('\n');
   // Antwort der KI steckt oft in einem äußeren ```text … ``` – den entfernen
   { const f = lines.findIndex(l => l.trim()), e = lines.length - 1 - [...lines].reverse().findIndex(l => l.trim());
-    if (f >= 0 && /^```\s*(text|markdown|md|txt)?\s*$/i.test(lines[f].trim()) && e > f && /^```\s*$/.test(lines[e].trim())) lines = [...lines.slice(0, f), '', ...lines.slice(f + 1, e), ''];
-    else { const g = lines.findIndex(l => /^#\s/.test(l)); if (g > 0) { lines = lines.map((l, k) => k < g ? '' : l); const h = lines.length - 1 - [...lines].reverse().findIndex(l => l.trim()); if (/^```\s*$/.test(lines[h]?.trim())) lines[h] = ''; } } }
+    const of = f >= 0 && lines[f].trim().match(/^(`{3,}|~{3,})\s*(text|markdown|md|txt|plaintext)?\s*$/i);
+    if (of && e > f && lines[e].trim() === of[1]) lines = [...lines.slice(0, f), '', ...lines.slice(f + 1, e), ''];
+    else { const g = lines.findIndex(l => /^#\s/.test(l)); if (g > 0) { lines = lines.map((l, k) => k < g ? '' : l); const h = lines.length - 1 - [...lines].reverse().findIndex(l => l.trim()); if (/^(`{3,}|~{3,})\s*$/.test(lines[h]?.trim())) lines[h] = ''; } } }
   // Anhang (## Anhang / ## Bilder): name: data:… oder ```svg name … ``` – wird vorab eingesammelt und aus dem Text genommen
   { const k = lines.findIndex(l => /^##\s+(anhang|anhänge|bilder|material)\s*$/i.test(l.trim()));
     if (k >= 0) {
       Object.assign(att, readAttachments(lines.slice(k + 1), (n, m) => H.warn(n + k + 1, m)));
       lines = lines.slice(0, k);
-      while (lines.length && /^(```[\w-]*)?$/.test(lines[lines.length - 1].trim())) lines.pop(); // Codeblock-Grenzen zwischen Lernpfad und Anhang
+      // übrig gebliebene Codeblock-Grenzen zwischen Lernpfad und Anhang weg – aber nicht das Ende eines echten Code-Beispiels
+      const isF = l => /^(`{3,}|~{3,})[\w-]*$/.test(l.trim());
+      for (;;) { const t = lines.length ? lines[lines.length - 1].trim() : null; if (t === '') { lines.pop(); continue; } if (t !== null && /^(`{3,}|~{3,})(text|markdown|md|txt)$/i.test(t)) { lines.pop(); continue; } if (t !== null && isF(t) && lines.filter(isF).length % 2 === 1) { lines.pop(); continue; } break; }
     } }
   Object.assign(att, env.files || {}); // mitgelieferte Dateien haben Vorrang
   let st = null, sec = null, para = [], i = 0, inHead = true, goalsMode = false, pendAnim = '';
@@ -368,7 +377,7 @@ export function docToText(doc, env, out = {}) {
   }
   if (att.length) {
     L.push('', '## Anhang');
-    for (const a of att) { if (a.svg) L.push('', '```svg ' + a.name, a.svg.trim(), '```'); else L.push(`%% ${a.name}: Rasterbild – bleibt im Editor gespeichert, Verweis „anhang:${a.name}“ einfach stehen lassen`); }
+    for (const a of att) { if (a.svg) L.push('', `${a.name}: ${a.svg.trim()}`); else L.push(`%% ${a.name}: Rasterbild – bleibt im Editor gespeichert, Verweis „anhang:${a.name}“ einfach stehen lassen`); }
   }
   return L.join('\n').replace(/\n{3,}/g, '\n\n') + '\n';
 }
@@ -399,9 +408,6 @@ Normaler Text. Leerzeile = neuer Absatz. **fett**, *kursiv*, \`Code\`, Listen mi
 {tippen} Text mit Animation (vor einem Absatz oder Infokasten: {tippen}, {einblenden}, {glitch}, {leuchten})
 
 ![Bildunterschrift](anhang:diagramm)        Bild aus dem Anhang (mit „| klein“ nach der Unterschrift kleiner)
-\`\`\`svg
-<svg viewBox="0 0 200 100">…</svg>           SVG-Grafik direkt an dieser Stelle
-\`\`\`
 
 ### Aufgabe: Titel
 Auftrag für die Schüler.
@@ -444,10 +450,10 @@ Programmcode (Sprache nach den drei Backticks)
 
 --- Sperre ---          (alles danach in der Station erst frei, wenn die Aufgabe davor gelöst ist)
 
-## Anhang               (immer ganz am Ende: Bilder, auf die oben mit anhang:name verwiesen wird)
-\`\`\`svg diagramm
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 160"> … </svg>
-\`\`\`
+## Anhang               (immer ganz am Ende, im selben Textblock: Bilder, auf die oben mit anhang:name verwiesen wird)
+diagramm: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 160">
+  …  (SVG darf über mehrere Zeilen gehen, endet mit </svg>)
+</svg>
 foto: data:image/png;base64,iVBORw0KGgo…
 ${extra.length ? '\nZUSÄTZLICH IN DIESER APP:\n' + extra.join('\n\n') + '\n' : ''}`;
 }
@@ -460,14 +466,14 @@ ZIELGRUPPE: ${f('klasse', '[Jahrgangsstufe / Schulart]')}
 UMFANG: ${f('umfang', 'etwa 4 Stationen, ca. 45 Minuten')}
 ${info.extra?.trim() ? 'BESONDERE WÜNSCHE: ' + info.extra.trim() + '\n' : ''}
 REGELN
-- Antworte NUR mit dem Lernpfad im unten beschriebenen Format, in einem einzigen Codeblock (\`\`\`text … \`\`\`), ohne Erklärungen davor oder danach.
+- WICHTIG – alles in EINEN kopierbaren Textblock: Der komplette Lernpfad samt Anhang mit allen Grafiken steht in einem einzigen Codeblock, damit die Lehrkraft nur einmal kopieren und einfügen muss. Beginne den Block mit vier Backticks und „text“ (\`\`\`\`text) und beende ihn mit vier Backticks (\`\`\`\`), damit Code-Beispiele darin den Block nicht vorzeitig schließen. Kein Text davor oder danach, nichts auf mehrere Blöcke oder Nachrichten verteilen.
+- Wenn du Dateien zum Herunterladen erzeugen kannst, liefere denselben Inhalt zusätzlich als eine Textdatei „lernpfad.txt“.
 - Sprache: Deutsch, Schüler werden mit „du“ angesprochen, kurze Sätze.
 - Jede Station: kurzer Einstieg, dann Erklärung, dann mindestens eine Übung (Aufgabe, Quiz, Lückentext oder Zuordnen).
 - Aufgaben mit eindeutiger Lösung bekommen eine „Antwort:“-Zeile, damit sie automatisch geprüft werden.
 - Tipps bauen aufeinander auf: zuerst ein kleiner Denkanstoß, zuletzt fast die Lösung.
 - Beim Quiz: 3–4 Antworten, genau eine oder mehrere mit [x], zu falschen Antworten eine kurze Rückmeldung.
-- Bilder und Animationen: Zeichne passende Abbildungen selbst als SVG (im Anhang als \`\`\`svg name … \`\`\`, oben mit anhang:name einbinden). SVG darf animiert sein (<animate>, <animateTransform>, <animateMotion> oder CSS-@keyframes in <style> innerhalb des SVG). Immer viewBox angeben, gut lesbare Schrift (font-family="sans-serif"), keine Skripte, keine externen Links, Schriften oder Bilder. Lieber wenige, aussagekräftige Grafiken (z. B. Schaubild, Ablauf, Beispiel-Tabelle) als Deko.
-- Gib ALLE SVG-Grafiken zusätzlich gesammelt in einer eigenen Datei „anhang.txt“ aus (Inhalt: alle \`\`\`svg name … \`\`\`-Blöcke genau wie im Abschnitt ## Anhang). Wenn du Dateien zum Herunterladen erzeugen kannst, liefere außerdem jede Grafik als einzelne Datei name.svg (Dateiname = Name aus anhang:name) oder alles zusammen als ZIP. Kannst du keine Dateien erzeugen, schreibe den Inhalt von anhang.txt in einen eigenen, zweiten Codeblock nach dem Lernpfad.
+- Bilder und Animationen: Zeichne passende Abbildungen selbst als SVG – im Abschnitt ## Anhang am Ende als „name: <svg …> … </svg>“, oben mit anhang:name einbinden. SVG darf animiert sein (<animate>, <animateTransform>, <animateMotion> oder CSS-@keyframes in <style> innerhalb des SVG). Immer viewBox angeben, gut lesbare Schrift (font-family="sans-serif"), keine Skripte, keine externen Links, Schriften oder Bilder. Lieber wenige, aussagekräftige Grafiken (z. B. Schaubild, Ablauf, Beispiel-Tabelle) als Deko.
 - Rasterbilder (PNG, GIF, JPG) nur als data:image/…;base64,…, und nur wenn du die Datei wirklich erzeugt hast (z. B. mit einem Code-Werkzeug) – niemals Base64 ausdenken. Sonst ein Bild-Platzhalter: ![Beschreibung]()
 - Keine Bilder aus dem Internet.
 
