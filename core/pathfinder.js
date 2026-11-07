@@ -47,6 +47,7 @@ const ANIM_OPTS = [['', 'keine'], ...Object.entries(ANIMS)];
 /* ---------- Bausteine des Kerns ---------- */
 const CORE = {
   text: { n: 'Text', ic: '¶', g: 'Grundbausteine', h: 'Absatz mit fett, kursiv, Code, Link', make: () => ({ html: '' }) },
+  heading: { n: 'Zwischenüberschrift', ic: 'H', g: 'Grundbausteine', h: 'Überschrift innerhalb einer Station', alias: 'text', skinOnly: true, make: () => ({ html: '', tag: 'h3' }) },
   info: { n: 'Infokasten', ic: '💡', g: 'Grundbausteine', h: 'Merke, Tipp, Regel, Figur sagt …', make: () => ({ kind: 'merke', title: '', html: '', img: '', name: '' }) },
   figur: { n: 'Figur sagt', ic: '🗨', g: 'Grundbausteine', h: 'Figur mit Bild und Sprechblase', alias: 'info', make: () => ({ kind: 'figur', title: '', html: '', img: FIGURES.ente.src, name: 'Debbie Debug' }) },
   image: { n: 'Bild / GIF', ic: '🖼', g: 'Grundbausteine', h: 'mit Bildunterschrift', make: () => ({ src: '', alt: '', caption: '', size: 'voll' }) },
@@ -233,7 +234,7 @@ export function startPathFinder(opts = {}) {
   function commit() {
     clearTimeout(pending); pending = null;
     const s = JSON.stringify(doc); if (s === hist[hist.length - 1]) return;
-    hist.push(s); if (hist.length > 200) hist.shift(); fut = []; save(); updUndo();
+    hist.push(s); if (hist.length > (s.length > 300000 ? 25 : 200)) hist.shift(); fut = []; save(); updUndo();
     if (panelOpen && !panelEl.contains(document.activeElement)) drawPanel(); // im Lernpfad Geändertes auch rechts zeigen
   }
   function softCommit() { $('#saved').textContent = '…'; clearTimeout(pending); pending = setTimeout(commit, 500); }
@@ -251,7 +252,8 @@ export function startPathFinder(opts = {}) {
   /* ---------- Text säubern ---------- */
   const OK_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'CODE', 'A', 'BR', 'UL', 'OL', 'LI', 'SUB', 'SUP', 'KBD']);
   function clean(html) {
-    const d = new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html').body.firstChild;
+    if (doc?.skin && SK) return SK.cleanRich(html); // Originaldesign: Auszeichnung der Vorlage behalten
+    const d =new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html').body.firstChild;
     const walk = n => {
       for (const c of [...n.childNodes]) {
         if (c.nodeType === 3) continue;
@@ -327,6 +329,8 @@ export function startPathFinder(opts = {}) {
   }
   function render() {
     const sc = scroller.scrollTop;
+    if (doc.skin) { skinRender(sc); return; }
+    if (lp.classList.contains('pf-skin')) { lp.classList.remove('pf-skin'); $('#pf-skin-css')?.remove(); }
     applyDesign();
     lp.classList.toggle('editing', E());
     lp.classList.toggle('single-station', single);
@@ -376,6 +380,83 @@ export function startPathFinder(opts = {}) {
     if (selId && !findBlock(selId)) selId = null;
     markSel();
   }
+  /* ---------- Originaldesign: Lernpfad im Aussehen der Vorlage bearbeiten ---------- */
+  let SK = null, skinCssFor = null;
+  const loadSkin = async () => SK || (SK = await import(new URL('pfskin.js' + new URL(import.meta.url).search, BASE).href));
+  function skinRender(sc) {
+    if (!SK) { lp.innerHTML = '<div class="ed-hint" style="padding:40px">lädt …</div>'; loadSkin().then(() => render()).catch(e => toast('Originaldesign nicht geladen: ' + esc(e.message))); return; }
+    const sk = doc.skin;
+    lp.removeAttribute('style'); lp.classList.add('pf-skin'); lp.classList.toggle('editing', E()); lp.classList.remove('single-station');
+    if (skinCssFor !== sk.head) { // Stile der Vorlage nur im Lernpfad wirken lassen
+      let st = $('#pf-skin-css'); if (!st) { st = document.createElement('style'); st.id = 'pf-skin-css'; document.head.appendChild(st); }
+      st.textContent = SK.scopedCss(sk.head, '#lp.pf-skin') + editorUiCss(); skinCssFor = sk.head;
+    }
+    if (!curSid || !doc.stations.some(s => s.id === curSid)) curSid = doc.stations[0]?.id;
+    if (!E()) { // Vorschau: genau die Seite, die Schüler bekommen
+      lp.innerHTML = '<iframe class="pf-skin-frame" title="Vorschau des Lernpfads"></iframe>';
+      const f = lp.firstChild; f.style.cssText = `display:block;width:100%;border:0;height:${scroller.clientHeight}px`;
+      f.srcdoc = SK.pageHtml(exportDoc({ pass: doc.pass || 80, cert: false }).d);
+      $('.lpwrap').style.background = '';
+      return;
+    }
+    const noScript = s => s.replace(/<script\b[\s\S]*?<\/script>/gi, '');
+    const hm = SK.headMap(doc);
+    let h = noScript(sk.before).replace(/\{\{pf:(\w+)\}\}/g, (m, k) => hm[k] ?? m);
+    doc.stations.forEach((s, si) => {
+      const n = si + 1, cls = (s.skin?.cls || '').replace(/\bis-locked\b/, '').trim();
+      h += `<section class="station lp-station${cls ? ' ' + esc(cls) : ''}${s.id === curSid ? ' cur' : ''}" id="st-${s.id}" data-sid="${s.id}">`;
+      h += SK.stationHead(doc, s, n).replace(/<\/div>\s*$/, `<span class="ed-station-tools"><button data-sact="cfg" title="Station einstellen">⚙</button><button data-sact="up" title="Station nach oben">↑</button><button data-sact="down" title="Station nach unten">↓</button><button data-sact="del" title="Station löschen">🗑</button></span></div>`);
+      if (s.skin?.unlock) { const k = doc.stations.findIndex(x => x.id === s.skin.unlock); h += `<div class="ed-hint">🔒 Bonus-Station: Schüler sehen sie erst, wenn Station ${k + 1} abgehakt ist.</div>`; }
+      s.blocks.forEach((b, i) => { h += plus(s.id, i) + skinBlockEdit(b); });
+      h += plus(s.id, s.blocks.length);
+      if (s.check) h += SK.doneRow(doc, n).replace(/<input\b/, '<input disabled');
+      h += '</section>';
+    });
+    h += `<button class="ed-add-station" data-act="addStation">＋ Neue Station</button>` + noScript(sk.after);
+    lp.innerHTML = h;
+    // Kopf und Stationstitel direkt bearbeiten
+    for (const el of $$('[data-pf]', lp)) {
+      const k = el.dataset.pf; if (k === 'nr') continue;
+      el.contentEditable = 'true'; el.spellcheck = true;
+      if (el.closest('[data-sid]')) { el.dataset.f = '$st.' + k; el.dataset.ph = k === 'title' ? 'Titel der Station' : 'Untertitel'; }
+      else { el.dataset.f = k === 'goals' ? '$goalsList' : '$' + k; el.dataset.ph = { title: 'Titel des Lernpfads', kicker: 'Kopfzeile', subtitle: 'Untertitel', goals: 'Lernziele' }[k] || ''; if (k !== 'title') el.dataset.rich = '1'; }
+    }
+    // Code-Kästen innerhalb von HTML-Bausteinen (z. B. zwei nebeneinander) zeigen und bearbeitbar machen
+    for (const c of $$('.pf-skin-html .code[data-src]', lp)) { const k = c.dataset.src; if (!(k in (sk.src || {}))) continue; c.innerHTML = `<div class="code-head"><span class="fname">${esc(c.dataset.file || '')}</span></div><pre contenteditable="true" data-f="$skin.src.${esc(k)}" data-ph="Code …" spellcheck="false">${esc(sk.src[k])}</pre>`; }
+    const ts = $('#trailStops', lp); if (ts) ts.innerHTML = doc.stations.map((s, i) => `<a data-skst="${s.id}" title="${esc(s.title)}" style="cursor:pointer">${esc(s.nr || i + 1)}</a>`).join('');
+    const tc = $('#trailCount', lp); if (tc) tc.textContent = doc.stations.length + ' Stationen';
+    $('.lpwrap').style.background = getComputedStyle(lp).backgroundColor;
+    scroller.scrollTop = sc;
+    if (selId && !findBlock(selId)) selId = null;
+    markSel();
+  }
+  /** Werkzeuge des Editors (Bausteinleiste, +, Stationsknöpfe) gegen die Stile der Vorlage behaupten */
+  function editorUiCss() {
+    let out = '';
+    const pre = p => p.startsWith('.editing') ? '#lp.pf-skin' + p : p.startsWith('.lp') && !/^\.lp-/.test(p) ? '#lp.pf-skin' + p.slice(3) : '#lp.pf-skin ' + p;
+    const walk = rules => { for (const r of rules) { if (r.cssRules && r.media) { const inner = (() => { const o = out; out = ''; walk(r.cssRules); const x = out; out = o; return x; })(); if (inner) out += `@media ${r.media.mediaText} {\n${inner}}\n`; continue; }
+      if (r.selectorText && /\.ed-|\[contenteditable\]|\.blk|\.pf-hid/.test(r.selectorText)) out += r.selectorText.split(',').map(x => pre(x.trim())).join(', ') + ` { ${r.style.cssText} }\n`; } };
+    for (const sh of document.styleSheets) { if (sh.ownerNode?.id === 'pf-skin-css') continue; try { walk(sh.cssRules); } catch (e) { } }
+    return out;
+  }
+  /** Baustein im Originaldesign, mit Feldern zum Bearbeiten */
+  function skinBlockEdit(b) {
+    switch (b.type) {
+      case 'text': return wrap(b, ce('html', b.html, b.tag === 'h3' || b.tag === 'h4' ? 'Zwischenüberschrift' : 'Text schreiben … ( / für Bausteine)', { rich: true, tag: /^(p|h3|h4|ul|ol)$/.test(b.tag || '') ? b.tag : 'p', cls: esc(b.cls || '') }));
+      case 'info': return wrap(b, `<div class="${esc(SK.noteCls(b))}">${ce('title', b.title, 'Überschrift', { rich: true, tag: 'span', cls: 'note-title' })}${ce('html', b.html, 'Inhalt', { rich: true })}</div>`);
+      case 'task': {
+        let t = (b.tips || []).map((x, i) => `<details class="reveal${b.tipsHide?.[i] ? ' pf-hidden' : ''}"><summary>Tipp${b.tips.length > 1 ? ' ' + (i + 1) : ''}${b.tipsHide?.[i] ? ' · <span class="pf-hid">für Schüler verborgen</span>' : ''}</summary><div class="answer">${x}</div></details>`).join('');
+        if (b.solution) t += `<details class="reveal${b.solHide ? ' pf-hidden' : ''}"><summary>Lösung anzeigen${b.solHide ? ' · <span class="pf-hid">für Schüler verborgen</span>' : ''}</summary><div class="answer">${b.solution}</div></details>`;
+        return wrap(b, `<div class="task">${ce('title', b.title, 'Aufgabe', { rich: true, cls: 'task-head' })}<div class="task-body">${ce('html', b.html, 'Arbeitsauftrag …', { rich: true })}${t}</div></div>`);
+      }
+      case 'code': return wrap(b, `<div class="code"><div class="code-head">${ce('file', b.file, 'Datei.java', { tag: 'span', cls: 'fname' })}</div><pre contenteditable="true" data-f="code" data-ph="Code …" spellcheck="false">${esc(b.code)}</pre></div>`);
+      case 'quiz': return wrap(b, `<div class="quiz">${(b.qs || []).map((q, qi) => `<div class="q">${ce(`qs.${qi}.q`, q.q, 'Frage …', { rich: true, cls: 'q-text' })}<div class="q-opts">${q.opts.map((o, i) => `<div class="q-opt${o.ok ? ' is-right' : ''}" style="display:flex;gap:8px;align-items:center;cursor:auto"><button data-qok="${qi}.${i}" title="richtig/falsch" style="border:0;background:none;font-size:18px;cursor:pointer;padding:0">${o.ok ? '✅' : '⬜'}</button>${ce(`qs.${qi}.opts.${i}.t`, o.t, 'Antwort ' + (i + 1), { tag: 'span', rich: true })}</div>`).join('')}</div></div>`).join('')}<div class="ed-hint">✅ markiert die richtige Antwort · Fragen und Rückmeldungen über ⚙ · die Antworten werden für Schüler gemischt</div></div>`);
+      case 'image': return wrap(b, b.src ? `<figure${b.cls ? ` class="${esc(b.cls)}"` : ''}><img${b.imgAttrs || ' class="shot"'} src="${esc(b.src)}" alt="${esc(b.alt)}">${ce('caption', b.caption, 'Bildunterschrift (optional)', { tag: 'figcaption', rich: true })}</figure>` : `<div class="lp-card" style="text-align:center"><button class="lp-btn alt" data-bact="cfg">🖼 Bild oder GIF wählen</button></div>`);
+      case 'html': return wrap(b, b.html ? `<div class="pf-skin-html">${b.html.replace(/<script\b[\s\S]*?<\/script>/gi, '')}</div>` : `<div class="lp-card" style="text-align:center"><button class="lp-btn alt" data-bact="cfg">&lt;/&gt; HTML eingeben</button></div>`);
+    }
+    return blockHtml(b);
+  }
+  const SKIN_TYPES = new Set(['text', 'heading', 'info', 'task', 'quiz', 'code', 'image', 'html']);
   const plus = (sid, at) => `<div class="ed-plus" data-sid="${sid}" data-at="${at}"><button title="Baustein einfügen" aria-label="Baustein einfügen">+</button></div>`;
   function blockLabel(b) {
     const dl = def(b)?.label?.(b); if (dl) return dl;
@@ -516,6 +597,8 @@ export function startPathFinder(opts = {}) {
     const el = ev.target.closest('[data-f]'); if (!el || !E()) return;
     const f = el.dataset.f, val = el.dataset.rich ? clean(el.innerHTML) : el.textContent.replace(/\s+/g, ' ').trim();
     if (f === 'code') { const r = findBlock(el.closest('.blk').dataset.id); r.b.code = el.innerText.replace(/\n$/, ''); softCommit(); return; }
+    if (f.startsWith('$skin.src.')) { doc.skin.src[f.slice(10)] = el.innerText.replace(/\n$/, ''); softCommit(); return; }
+    if (f === '$goalsList') { doc.goals = $$('li', el).map(li => clean(li.innerHTML)).filter(g => plain(g).trim()); softCommit(); return; }
     if (f.startsWith('$st.')) { const s = doc.stations.find(x => x.id === el.closest('.lp-station').dataset.sid); s[f.slice(4)] = val; softCommit(); refreshTrail(); return; }
     if (f.startsWith('$')) { setPath(doc, f.slice(1), val); softCommit(); return; }
     const r = findBlock(el.closest('.blk').dataset.id); if (!r) return;
@@ -532,14 +615,16 @@ export function startPathFinder(opts = {}) {
   /* ---------- Klicks ---------- */
   lp.addEventListener('click', ev => {
     const t = ev.target;
+    if (E() && doc.skin && t.closest('a[href], label') && !t.closest('[data-f], .ed-tools')) ev.preventDefault(); // Links und Haken der Vorlage nicht auslösen
     if (E() && t.closest('.lp-logo, .lp-hero.has-bg') && !t.closest('[data-f]')) { openDesign(); return; }
+    const skst = t.closest('[data-skst]'); if (skst) { goStation(skst.dataset.skst, true); return; }
     const fzb = t.closest('[data-fz]'); if (fzb) { fz = Math.min(1.5, Math.max(.8, +(fz + (fzb.dataset.fz === '+' ? .1 : -.1)).toFixed(2))); lp.style.setProperty('--fz', fz); return; }
     const stop = t.closest('#stops a'); if (stop) { if (stop.dataset.sid === 'cert') { $('#st-cert')?.scrollIntoView({ behavior: 'smooth' }); return; } goStation(stop.dataset.sid, true); return; }
     const sd = t.closest('[data-sdone]'); if (sd && !E()) { prog.solved['st:' + sd.dataset.sdone] = sd.checked; render(); return; }
     const act = t.closest('[data-act]');
     if (act) {
       const a = act.dataset.act;
-      if (a === 'addStation') { const s = { id: uid(), title: '', sub: '', check: false, blocks: [{ id: uid(), type: 'text', html: '' }] }; doc.stations.push(s); curSid = s.id; commit(); render(); goStation(s.id, true); setTimeout(() => $(`#st-${s.id} h2[data-f]`)?.focus(), 350); return; }
+      if (a === 'addStation') { const s = { id: uid(), title: '', sub: '', check: !!doc.skin, blocks: [{ id: uid(), type: 'text', html: '' }] }; doc.stations.push(s); curSid = s.id; commit(); render(); goStation(s.id, true); setTimeout(() => $(`#st-${s.id} h2[data-f]`)?.focus(), 350); return; }
       if (a === 'certcfg') { openForm('cert'); return; }
       if (a === 'certprev') { certPreview(); return; }
     }
@@ -637,7 +722,7 @@ export function startPathFinder(opts = {}) {
     pop = document.createElement('div'); pop.className = 'ed-pop';
     let filter = '', hi = 0;
     const draw = () => {
-      const items = Object.entries(T).filter(([k, t]) => !filter || (t.n + ' ' + t.h + ' ' + k).toLowerCase().includes(filter));
+      const items = Object.entries(T).filter(([k, t]) => (doc.skin ? SKIN_TYPES.has(k) : !t.skinOnly)).filter(([k, t]) => !filter ||(t.n + ' ' + t.h + ' ' + k).toLowerCase().includes(filter));
       let g = '', h = `<h3>${c.slash ? `Baustein: „/${esc(filter)}“` : 'Baustein einfügen'}</h3><div class="ed-pal">`;
       items.forEach(([k, t], i) => { if (t.g !== g) { g = t.g; h += `<div class="grp">${g}</div>`; } h += `<button data-type="${k}" class="${i === hi ? 'hi' : ''}"><b>${t.ic} ${esc(t.n)}</b><span>${esc(t.h)}</span></button>`; });
       if (!items.length) h += '<div class="grp">nichts gefunden</div>';
@@ -774,11 +859,11 @@ export function startPathFinder(opts = {}) {
     if (single) { render(); scroller.scrollTop = 0; return; }
     $$('.lp-station', lp).forEach(s => s.classList.toggle('cur', s.dataset.sid === sid));
     $$('#stops a', lp).forEach(a => a.classList.toggle('cur', a.dataset.sid === sid));
-    const el = $(`#st-${sid}`, lp); if (el) scroller.scrollTo({ top: el.offsetTop - ($('.lp-trail', lp)?.offsetHeight || 0) - 4, behavior: smooth ? 'smooth' : 'auto' });
+    const el = $(`#st-${sid}`, lp); if (el) scroller.scrollTo({ top: el.offsetTop - ($('.lp-trail, .pf-skin.editing .trail', lp)?.offsetHeight || 0) - 4, behavior: smooth ? 'smooth' : 'auto' });
   }
   scroller.addEventListener('scroll', () => {
     if (single) return;
-    const top = scroller.getBoundingClientRect().top + ($('.lp-trail', lp)?.offsetHeight || 0) + 40;
+    const top = scroller.getBoundingClientRect().top + ($('.lp-trail, .pf-skin.editing .trail', lp)?.offsetHeight || 0) + 40;
     let cur = null; for (const s of $$('.lp-station', lp)) { if (s.getBoundingClientRect().top <= top) cur = s.dataset.sid; }
     cur = cur || doc.stations[0]?.id;
     if (cur && cur !== curSid) { curSid = cur; if (mode === 'preview') prog.visited[cur] = 1; $$('.lp-station', lp).forEach(s => s.classList.toggle('cur', s.dataset.sid === cur)); $$('#stops a', lp).forEach(a => a.classList.toggle('cur', a.dataset.sid === cur)); $('#stops a.cur', lp)?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
@@ -787,19 +872,19 @@ export function startPathFinder(opts = {}) {
   /* ---------- Einstellungen (⚙) ---------- */
   const XP = { k: 'xp', l: 'XP (Challenge)', t: 'number', show: () => doc.form === 'challenge' };
   const FORMS = {
-    text: [{ k: 'anim', l: 'Textanimation', t: 'select', o: ANIM_OPTS, help: 'Läuft einmal, sobald der Text ins Bild scrollt (nur in Vorschau und für Schüler).' }],
+    text: [{ k: 'tag', l: 'Art', t: 'select', o: [['p', 'Absatz'], ['h3', 'Zwischenüberschrift'], ['ul', 'Liste'], ['ol', 'nummerierte Liste']], show: () => !!doc.skin }, { k: 'anim', l: 'Textanimation', t: 'select', o: ANIM_OPTS, help: 'Läuft einmal, sobald der Text ins Bild scrollt (nur in Vorschau und für Schüler).', show: () => !doc.skin }],
     info: [{ k: 'kind', l: 'Art', t: 'select', o: Object.entries(INFO_KINDS).map(([k, v]) => [k, v[0] + ' ' + v[1]]) }, { k: 'title', l: 'Überschrift', t: 'text', help: 'leer = Name der Art', show: b => b.kind !== 'figur' }, { k: 'img', l: 'Figur', t: 'figure', show: b => b.kind === 'figur' }, { k: 'name', l: 'Name der Figur', t: 'text', show: b => b.kind === 'figur' }, { k: 'img', l: 'Eigenes Bild', t: 'image', show: b => b.kind === 'figur' || b.kind === 'abschluss' }, { k: 'anim', l: 'Textanimation', t: 'select', o: ANIM_OPTS }],
     image: [{ k: 'src', l: 'Bild oder GIF', t: 'image' }, { k: 'caption', l: 'Bildunterschrift', t: 'text' }, { k: 'alt', l: 'Alternativtext (für Vorlese-Programme)', t: 'text' }, { k: 'size', l: 'Größe', t: 'select', o: [['voll', 'volle Breite'], ['klein', 'klein']] }],
     table: [{ k: 'head', l: 'Erste Zeile ist Kopfzeile', t: 'check' }, { k: 'rows', l: 'Größe', t: 'grid' }],
     reveal: [{ k: 'summary', l: 'Überschrift der Klappbox', t: 'text' }],
     file: [{ k: 'data', l: 'Datei', t: 'file' }, { k: 'name', l: 'Dateiname', t: 'text' }],
     html: [{ k: 'html', l: 'HTML', t: 'code', help: 'Wird für Schüler so angezeigt. Skripte laufen erst im exportierten Lernpfad.' }],
-    task: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'answer', l: 'Ergebnis zur Selbstkontrolle (optional)', t: 'text', help: 'Leer = Schüler hakt „Erledigt“ ab. Sonst tippen sie das Ergebnis ein; mehrere richtige mit | trennen. Zahlen werden mit Komma oder Punkt erkannt.' }, { k: 'tips', l: 'Tipps (werden nacheinander aufgedeckt)', t: 'list', ph: 'Tipp', vis: 'tipsHide' }, { k: 'solution', l: 'Lösung zum Aufdecken (leer = keine)', t: 'text' }, { k: 'solHide', l: 'Lösung für Schüler sichtbar', t: 'shown', show: b => !!b.solution }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }, XP],
+    task: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'answer', l: 'Ergebnis zur Selbstkontrolle (optional)', t: 'text', help: 'Leer = Schüler hakt „Erledigt“ ab. Sonst tippen sie das Ergebnis ein; mehrere richtige mit | trennen. Zahlen werden mit Komma oder Punkt erkannt.', show: () => !doc.skin }, { k: 'tips', l: 'Tipps (werden nacheinander aufgedeckt)', t: 'list', ph: 'Tipp', vis: 'tipsHide' }, { k: 'solution', l: 'Lösung zum Aufdecken (leer = keine)', t: 'text' }, { k: 'solHide', l: 'Lösung für Schüler sichtbar', t: 'shown', show: b => !!b.solution }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }, XP],
     quiz: [{ k: 'qs', l: 'Fragen', t: 'qs' }, XP],
     gap: [{ k: 'bank', l: 'Begriffe zum Ziehen anbieten (statt Tippen)', t: 'check' }, { k: 'extra', l: 'Zusätzliche falsche Begriffe (Ablenker)', t: 'list', ph: 'Begriff', show: b => b.bank }, { k: 'heft', l: 'Als Hefteintrag gestalten (mit Titel)', t: 'check' }, XP],
     match: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'pairs', l: 'Paare', t: 'pairs' }, XP],
     lock: [{ k: 'after', l: 'Frei, sobald gelöst ist:', t: 'target' }],
-    code: [{ k: 'lang', l: 'Sprache', t: 'select', o: [['java', 'Java'], ['python', 'Python'], ['sql', 'SQL'], ['text', 'Text']] }],
+    code: [{ k: 'lang', l: 'Sprache', t: 'select', o: [['java', 'Java'], ['python', 'Python'], ['sql', 'SQL'], ['text', 'Text']] }, { k: 'file', l: 'Dateiname über dem Code', t: 'text', show: () => !!doc.skin }, { k: 'mark', l: 'Zeilen hervorheben (z. B. 3-5)', t: 'text', show: () => !!doc.skin }, { k: 'nocopy', l: 'ohne Kopieren-Knopf', t: 'check', show: () => !!doc.skin }],
     uml: [{ k: 'name', l: 'Klassenname', t: 'text' }, { k: 'attrs', l: 'Attribute', t: 'list', ph: 'Attribut' }, { k: 'methods', l: 'Methoden', t: 'list', ph: 'Methode' }],
   };
   const getP = (o, p) => p.split('.').reduce((a, k) => a?.[k], o);
@@ -928,7 +1013,34 @@ export function startPathFinder(opts = {}) {
     designUI(el, false);
   }
   const PATTERNS = [['punkte', '• •', 'Punkte'], ['raster', '▦', 'Raster'], ['keins', '–', 'kein Muster'], ...['✦', '★', '♥', '⚡', '💡', '🧪', '⚛', '✏️', '🐾', '{ }', '01', '＋'].map(c => [c, c, c])];
-  function designUI(el, live) {    const seg = (k, o, cur) => `<span class="ed-dseg" data-seg="${k}">${o.map(([v, n]) => `<button data-v="${v}" aria-pressed="${v === cur}">${n}</button>`).join('')}</span>`;
+  /** Design-Fenster bei Originaldesign: Aussehen kommt aus der Vorlage; Kopf, Skript und Stile als HTML */
+  function skinDesignUI(el, live) {
+    el.innerHTML = `${live ? '<div class="pf-ptitle">🎨 Design</div>' : '<header><b>🎨 Design</b><button class="ok" data-x="ok">Fertig</button></header>'}<div class="ed-form">
+      <span class="help">Dieser Lernpfad behält sein <b>Originaldesign</b>: Farben, Schriften, Bilder und Animationen kommen aus der ursprünglichen Seite. Kopfzeile, Titel, Untertitel, Lernziele, Stationen und Bausteine bearbeitest du direkt im Lernpfad. <b>▶ Vorschau</b> zeigt ihn genau so, wie ihn Schüler sehen.</span>
+      <label>Für Fortgeschrittene</label>
+      <div class="ki-btns" style="flex-direction:column;align-items:stretch">
+        <button class="lp-btn alt" data-sked="before">Kopfbereich (HTML)</button>
+        <button class="lp-btn alt" data-sked="after">Fußzeile und Skript</button>
+        <button class="lp-btn alt" data-sked="head">Seitenkopf mit Stilen (CSS)</button>
+      </div>
+      <span class="help">Eingebettete Bilder stehen dort als [[bild1]], [[bild2]] … und bleiben erhalten. Die Platzhalter {{pf:title}}, {{pf:kicker}} … nicht löschen.</span>
+    </div>`;
+    el.onclick = e => {
+      const t = e.target.closest('button'); if (!t) return;
+      if (t.dataset.x) { closeDlg(true); return; }
+      const k = t.dataset.sked; if (!k) return;
+      const box = SK.shrinkData(doc.skin[k] || ''), { el: d, bd } = dialog(); bd.onclick = () => closeDlg(false);
+      const prev = dlg; dlg = { el: d, bd, apply: () => { } };
+      d.innerHTML = `<header><b>${esc(t.textContent)}</b><button data-c="1">Abbrechen</button><button class="ok" data-s="1">Übernehmen</button></header><div class="ed-form"><textarea class="mono" rows="18" spellcheck="false" style="min-height:50vh">${esc(box.text)}</textarea><span class="help">Änderungen hier wirken sich auf die ganze Seite aus. ⌘Z macht sie rückgängig.</span></div>`;
+      d.onclick = ev => {
+        if (ev.target.closest('[data-c]')) closeDlg(false);
+        if (ev.target.closest('[data-s]')) { doc.skin[k] = box.back($('textarea', d).value); closeDlg(false); commit(); render(); toast('übernommen'); }
+        if (!dlg) dlg = prev;
+      };
+    };
+  }
+  function designUI(el, live) {    if (doc.skin) { skinDesignUI(el, live); return; }
+    const seg = (k, o, cur) => `<span class="ed-dseg" data-seg="${k}">${o.map(([v, n]) => `<button data-v="${v}" aria-pressed="${v === cur}">${n}</button>`).join('')}</span>`;
     const sel = (k, cur) => `<select data-anim-k="${k}">${ANIM_OPTS.map(([v, n]) => `<option value="${v}"${(cur || '') === v ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
     const draw = () => {
       const d = doc.design;
@@ -1210,13 +1322,17 @@ export function startPathFinder(opts = {}) {
     const mine = docList();
     let h = '<div class="grp">Meine Lernpfade (in diesem Browser)</div>';
     h += mine.map(d => `<button data-open="${esc(d.id)}" class="${d.id === doc.id ? 'hi' : ''}"><b>${d.form === 'challenge' ? '⚡' : '📘'} ${esc(d.title)}</b><span>zuletzt ${new Date(d.t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</span></button>`).join('') || '<div class="grp" style="text-transform:none;letter-spacing:0">noch keine</div>';
-    h += '<button data-new="lernpfad"><b>＋ Neuer Lernpfad</b><span>leer beginnen</span></button><button data-new="challenge"><b>＋ Neue Challenge</b><span>leer beginnen</span></button>';
+    h += '<button data-new="lernpfad"><b>＋ Neuer Lernpfad</b><span>leer beginnen</span></button><button data-new="challenge"><b>＋ Neue Challenge</b><span>leer beginnen</span></button><button data-imp="1"><b>⤒ HTML-Lernpfad importieren</b><span>vorhandene Lernpfad-Seite · Design bleibt wie im Original</span></button>';
     if (ex.length) h += `<div class="grp">${esc(opts.examplesTitle || 'Beispiele')}</div>` + ex.map(e => `<button data-ex="${esc(e.file)}"><b>${esc(e.title)}</b><span>${esc(e.note || '')}</span></button>`).join('');
     $('#openList', pop).innerHTML = h; placePop(anchor);
     pop.onclick = async ev => {
       const b = ev.target.closest('button'); if (!b) return;
       if (b.dataset.open) { const d = loadDoc(b.dataset.open); closePop(); if (d) openDoc(d); }
       if (b.dataset.new) { closePop(); openDoc(emptyDoc(b.dataset.new)); }
+      if (b.dataset.imp) {
+        closePop(); const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.html,.htm,text/html';
+        inp.onchange = async () => { const f = inp.files[0]; if (f) importPage(await f.text()); }; inp.click();
+      }
       if (b.dataset.ex) {
         closePop(); toast('lädt …');
         try {
@@ -1227,6 +1343,15 @@ export function startPathFinder(opts = {}) {
         } catch (e) { toast('Konnte nicht geladen werden.'); }
       }
     };
+  }
+  /** Vorhandene HTML-Lernpfad-Seite übernehmen: Inhalte werden Bausteine, das Design bleibt */
+  async function importPage(html) {
+    try {
+      await loadSkin();
+      const d = await SK.importHtml(html, { uid, appName });
+      if (!d) { toast('Keine Stationen gefunden – erwartet werden Abschnitte &lt;section class="station"&gt;.', 4000); return null; }
+      openDoc(d); toast(`„${esc(d.title)}“ übernommen – das Design bleibt wie im Original`); return d;
+    } catch (e) { toast('Import fehlgeschlagen: ' + esc(e.message)); return null; }
   }
   function placePop(anchor) { const r = anchor.getBoundingClientRect(); pop.style.left = Math.max(10, Math.min(innerWidth - pop.offsetWidth - 10, r.right - pop.offsetWidth)) + 'px'; pop.style.top = (r.bottom + 6) + 'px'; }
 
@@ -1328,6 +1453,11 @@ ${SC}`;
   }
   async function buildHtml(d, scormMode, app) {
     const SC = '<' + '/script>';
+    if (d.skin) { // Originaldesign: die Seite der Vorlage, dazu das Dokument zum späteren Bearbeiten
+      await loadSkin();
+      const keep = app?.doc || d;
+      return SK.pageHtml(d, { json: JSON.stringify(keep).replace(/</g, '\\u003c') });
+    }
     let css = await fetchText('pathfinder.css');
     const fonts = {}; for (const m of css.matchAll(/url\(\.\.\/fonts\/([^)]+)\)/g)) fonts[m[1]] = fonts[m[1]] || await fetchData('../fonts/' + m[1], 'font/ttf');
     css = css.replace(/url\(\.\.\/fonts\/([^)]+)\)/g, (m, f) => `url(${fonts[f]})`);
@@ -1374,11 +1504,11 @@ ${SC}
     const st = { fmt: bundled && host.adopt ? 'app' : 'html', pass: doc.pass || 80, cert: doc.cert.on };
     const draw = () => {
       el.innerHTML = `<header><b>⇩ Export</b><button data-x="1">Abbrechen</button><button class="ok" data-go="1">Exportieren</button></header><div class="ed-form">
-        <span class="ed-dseg" data-eseg="fmt"><button data-v="html" aria-pressed="${st.fmt === 'html'}">📄 HTML-Datei</button><button data-v="scorm" aria-pressed="${st.fmt === 'scorm'}">🎓 SCORM-Lernpaket</button>${bundled ? `<button data-v="app" aria-pressed="${st.fmt === 'app'}">${esc(bundled.bundle.icon || '📦')} für ${esc(bundled.name)}</button>` : ''}</span>
+        <span class="ed-dseg" data-eseg="fmt"><button data-v="html" aria-pressed="${st.fmt === 'html'}">📄 HTML-Datei</button>${doc.skin ? '' : `<button data-v="scorm" aria-pressed="${st.fmt === 'scorm'}">🎓 SCORM-Lernpaket</button>`}${bundled ? `<button data-v="app" aria-pressed="${st.fmt === 'app'}">${esc(bundled.bundle.icon || '📦')} für ${esc(bundled.name)}</button>` : ''}</span>
         ${st.fmt === 'app' ? `<span class="help">Lernpfad für <b>${esc(bundled.name)}-Projekte</b>: In ${esc(bundled.name)} unter „Lernpfad einbetten“ öffnen – die Aufgaben prüft dann ${esc(bundled.name)} selbst. Im normalen Browser stellt sich die Datei automatisch auf Selbstkontrolle um.</span>${host.adopt ? `<button class="lp-btn" data-adopt="1">⤵ In dieses ${esc(bundled.name)}-Projekt übernehmen</button>` : ''}` : ''}
         ${st.fmt === 'app' ? '' : `<span class="help">`}${st.fmt === 'app' ? '' : st.fmt === 'html' ? 'Eine einzige Datei mit Schriften und Bildern – läuft offline. In Moodle/ByCS als <b>Datei</b> hochladen. Der Fortschritt bleibt im Browser des Schülers.' : 'ZIP-Datei für die Aktivität <b>„Lernpaket“</b> in Moodle/ByCS. Moodle speichert den Fortschritt (auch beim Gerätewechsel) und trägt Punkte, Bestanden, Zeit und die Ergebnisse der einzelnen Aufgaben ein.'}${st.fmt === 'app' ? '' : '</span>'}
         ${st.fmt === 'scorm' ? `<label>Bestanden ab (% der Aufgaben${doc.form === 'challenge' ? ' bzw. XP' : ''})<input type="number" min="0" max="100" id="exPass" value="${st.pass}"></label>` : ''}
-        <label class="chk"><input type="checkbox" id="exCert"${st.cert ? ' checked' : ''}>Zertifikat am Ende anbieten</label>
+        ${doc.skin ? '<span class="help">Originaldesign: Die Datei ist die ursprüngliche Seite mit deinen Änderungen. Sie lässt sich später wieder in PathFinder öffnen und bearbeiten.</span><input type="checkbox" id="exCert" hidden>' : `<label class="chk"><input type="checkbox" id="exCert"${st.cert ? ' checked' : ''}>Zertifikat am Ende anbieten</label>`}
         ${appBlocks.length && st.fmt !== 'app' ? `<div class="ed-hint" style="font-size:13px">${appBlocks.length} App-Baustein${appBlocks.length > 1 ? 'e werden' : ' wird'} für den Export umgewandelt: Aufgaben werden zur <b>Selbstkontrolle</b> (Schüler tippen das Ergebnis ein, das vorher berechnet wird), Tabellen werden als Tabelle gezeigt.</div>` : ''}
         <span class="help">Alles entsteht hier im Browser; nichts wird hochgeladen.</span></div>`;
     };
@@ -1457,6 +1587,8 @@ ${SC}
     /** Lernpfad als Datei für die App (Erweiterung eingebaut) – für „Fertig“ im Editor der App */
     buildForApp: () => { if (pending) commit(); return appHtml({ pass: doc.pass || 80, cert: doc.cert?.on !== false }); },
     get dirty() { return hist.length > 1; },
+    /** vorhandene HTML-Lernpfad-Seite öffnen (Originaldesign); liefert das Dokument oder null */
+    importHtml: html => importPage(html),
   };
   save(); render(); updUndo();
   host.attach?.(ctx);

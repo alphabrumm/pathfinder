@@ -25,6 +25,19 @@ startPathFinder({ plugins: [flowpadPlugin], host: { /* Verbindung zur App */ }, 
 Eine Erweiterung ist ein Objekt `{ id, name, blocks, fields, migrate, css }` – Details stehen oben in `core/pathfinder.js`.
 Bausteine einer App, die gerade nicht geladen ist, zeigt PathFinder als Kasten „braucht FlowPad“ an; nichts geht verloren.
 
+## Vorhandene Lernpfade übernehmen (Originaldesign)
+
+📂 Öffnen → **HTML-Lernpfad importieren** übernimmt eine fertige Lernpfad-Seite. Das Aussehen bleibt genau wie im
+Original (Farben, Schriften, Bilder, Animationen, eigene Skripte), die Inhalte werden Bausteine: Absätze, Listen und
+Zwischenüberschriften als Text, `.note` als Infokasten, `.task` als Aufgabe, `.code[data-src]` als Code,
+`.quiz[data-quiz]` als Quiz, Bilder mit Bildunterschrift als Bild. Interaktive Teile mit eigener Logik (z. B. Labore)
+bleiben HTML-Bausteine. Quelltexte und Quizfragen stehen in der Seite als `const SRC = {…}` und `const QUIZ = {…}`;
+PathFinder liest sie dort und schreibt sie beim Export zurück.
+
+Erwartet wird der Aufbau `<section class="station">` mit `.station-head` (Nummer, `<small>`, `<h2>`) und `.done-row`.
+Die exportierte Datei ist wieder die ursprüngliche Seite und enthält das Dokument (`#pf-doc`), damit sie sich später
+erneut in PathFinder öffnen lässt. Code: `core/pfskin.js`.
+
 ## Bauen und veröffentlichen
 
 ```

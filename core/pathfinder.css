@@ -385,3 +385,12 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 
 /* „Fertig“ im Editor einer App (Lernpfad ins Projekt übernehmen) */
 .ed-btn.pf-done { background: #f6c434; color: #1f1b2e; font-weight: 700; border-color: #f6c434; }
+
+/* Originaldesign (Vorlage einer vorhandenen Seite) */
+.pf-skin.editing .fontsize { display: none; }
+.pf-skin .ed-station-tools { margin-left: auto; align-self: center; }
+.pf-skin.editing .blk > .pf-skin-html { cursor: default; }
+.pf-skin.editing .ed-add-station { display: block; margin: 18px auto; }
+.pf-skin .ed-hint { font-family: -apple-system, system-ui, sans-serif; }
+.pf-skin-frame { background: #fff; }
+.pf-skin.editing .code pre[contenteditable] { padding: 12px 16px; margin: 0; white-space: pre; overflow-x: auto; }
