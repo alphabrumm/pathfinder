@@ -366,3 +366,13 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .ed-figs img { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; }
 .lp-figur > img { image-rendering: pixelated; object-fit: contain; background: var(--surface); padding: 6px; }
 .ed-form input[type=range] { width: 100%; accent-color: #5b6fc2; }
+
+/* Vorlage für KI */
+.ki-dlg { width: min(720px, calc(100vw - 24px)); }
+.ki-step { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 16px; }
+.ki-step .n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #1f1b2e; color: #fff; font-weight: 700; font-size: 14px; }
+.ki-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+#kiIn { font: 13px/1.45 ui-monospace, Menlo, monospace; width: 100%; box-sizing: border-box; }
+.ki-res { font-size: 14px; } .ki-res ul { margin: 4px 0 8px; padding-left: 20px; max-height: 160px; overflow: auto; }
+.ki-res .good { color: #2e7d4f; font-weight: 700; } .ki-res .bad { color: #c0392b; font-weight: 700; } .ki-res .warn { color: #a86b00; font-weight: 700; margin-top: 4px; }
+.ki-fmt { margin: 0; padding: 12px; background: #f5f3f8; border-radius: 10px; font: 12px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; max-height: 280px; overflow: auto; }

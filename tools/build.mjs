@@ -15,7 +15,7 @@ fs.mkdirSync(out, { recursive: true });
 for (const f of APP) { const s = path.join(root, f), d = path.join(out, f); if (!fs.existsSync(s)) continue; if (fs.statSync(s).isDirectory()) copy(s, d); else fs.copyFileSync(s, d); }
 
 const hash = crypto.createHash('sha256');
-for (const f of ['core/pathfinder.js', 'core/pathfinder.css']) hash.update(fs.readFileSync(path.join(out, f)));
+for (const f of ['core/pathfinder.js', 'core/pathfinder.css', 'core/pftext.js']) hash.update(fs.readFileSync(path.join(out, f)));
 const v = hash.digest('hex').slice(0, 10);
 const ip = path.join(out, 'index.html');
 fs.writeFileSync(ip, fs.readFileSync(ip, 'utf8').replace('core/pathfinder.css"', `core/pathfinder.css?v=${v}"`).replace("'./core/pathfinder.js'", `'./core/pathfinder.js?v=${v}'`));

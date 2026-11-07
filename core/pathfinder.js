@@ -999,6 +999,61 @@ export function startPathFinder(opts = {}) {
     else formUI(body, what, { live: true });
   }
 
+
+  /* ---------- Vorlage für KI (Textformat) ---------- */
+  let pftext = null;
+  const loadText = async () => pftext || (pftext = await import(new URL('pftext.js' + new URL(import.meta.url).search, BASE).href));
+  const textEnv = () => ({ emptyDoc, palettes: PALETTES, figures: FIGURES, uid, plugins, isCheck, appName });
+  async function copyText(t) {
+    try { await navigator.clipboard.writeText(t); return true; } catch (e) {
+      const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (er) { } ta.remove(); return ok;
+    }
+  }
+  async function openKI() {
+    const T = await loadText(); const env = textEnv();
+    const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
+    const KK = (opts.storage || 'pathfinder') + '.ki';
+    let info = {}; try { info = JSON.parse(LS.get(KK)) || {}; } catch (e) { }
+    let parsed = null;
+    el.innerHTML = `<header><b>🤖 Vorlage für KI</b><button class="ok" data-x="1">Schließen</button></header>
+      <div class="ed-form">
+        <div class="ki-step"><span class="n">1</span><b>Anleitung für die KI</b></div>
+        <span class="help">Fülle die Felder aus und kopiere die Anleitung in eine KI deiner Wahl (z. B. die, die deine Schule erlaubt). Sie beschreibt das Textformat – die KI muss PathFinder nicht kennen.</span>
+        <label>Thema<input type="text" data-k="thema" value="${esc(info.thema || '')}" placeholder="z. B. Relative Zellbezüge in der Tabellenkalkulation"></label>
+        <div class="row"><label>Zielgruppe<input type="text" data-k="klasse" value="${esc(info.klasse || '')}" placeholder="z. B. Gymnasium, 9. Klasse"></label><label>Umfang<input type="text" data-k="umfang" value="${esc(info.umfang || '')}" placeholder="z. B. 4 Stationen, 45 min"></label></div>
+        <label>Besondere Wünsche<textarea data-k="extra" rows="2" placeholder="z. B. mit Alltagsbeispiel Pausenverkauf, eine Station als Challenge">${esc(info.extra || '')}</textarea></label>
+        <div class="ki-btns"><button class="lp-btn" data-copy="prompt">📋 Anleitung kopieren</button><button class="lp-btn alt" data-copy="doc" title="Den geöffneten Lernpfad als Text – z. B. um ihn von der KI überarbeiten zu lassen">📋 Aktuellen Lernpfad als Text</button><button class="lp-btn alt" data-copy="show">Format ansehen</button></div>
+        <div class="ki-step"><span class="n">2</span><b>Antwort der KI hier einfügen</b></div>
+        <textarea id="kiIn" rows="10" spellcheck="false" placeholder="# Titel des Lernpfads&#10;&#10;## Station: …"></textarea>
+        <div id="kiRes" class="ki-res"></div>
+        <div class="ki-btns"><button class="lp-btn" id="kiOpen" disabled>＋ Als neuen Lernpfad öffnen</button></div>
+      </div>`;
+    const res = $('#kiRes', el), openB = $('#kiOpen', el);
+    const check = () => {
+      const src = $('#kiIn', el).value;
+      if (!src.trim()) { res.innerHTML = ''; openB.disabled = true; parsed = null; return; }
+      parsed = T.parseText(src, env);
+      const { errors, warnings, stats } = parsed;
+      res.innerHTML = (errors.length ? `<div class="bad">✗ ${errors.length} Fehler – bitte korrigieren (oder die KI bitten, es zu korrigieren):</div><ul>${errors.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>` : `<div class="good">✓ Erkannt: „${esc(parsed.doc.title)}“ · ${stats.stations} Station${stats.stations === 1 ? '' : 'en'} · ${stats.blocks} Bausteine · ${stats.tasks} Aufgaben</div>`)
+        + (warnings.length ? `<div class="warn">Hinweise:</div><ul>${warnings.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>` : '');
+      openB.disabled = !!errors.length;
+    };
+    el.addEventListener('input', e => {
+      const k = e.target.dataset.k; if (k) { info[k] = e.target.value; LS.set(KK, JSON.stringify(info)); }
+      if (e.target.id === 'kiIn') check();
+    });
+    el.addEventListener('click', async e => {
+      const t = e.target.closest('button'); if (!t) return;
+      if (t.dataset.x) { closeDlg(false); return; }
+      if (t.dataset.copy === 'prompt') toast(await copyText(T.promptFor(info, env)) ? '📋 Anleitung kopiert – jetzt in die KI einfügen' : 'Kopieren ging nicht');
+      if (t.dataset.copy === 'doc') toast(await copyText('Überarbeite diesen Lernpfad. Behalte das Format genau bei und antworte nur mit dem vollständigen Lernpfad in einem Codeblock.\n\n' + T.formatHelp(env) + '\nLERNPFAD:\n' + T.docToText(doc, env)) ? '📋 Lernpfad als Text kopiert (mit Formatbeschreibung)' : 'Kopieren ging nicht');
+      if (t.dataset.copy === 'show') { const pre = document.createElement('pre'); pre.className = 'ki-fmt'; pre.textContent = T.formatHelp(env); t.closest('.ki-btns').after(pre); t.remove(); }
+      if (t.id === 'kiOpen' && parsed && !parsed.errors.length) {
+        const d = parsed.doc; closeDlg(false); openDoc(d); toast(`„${esc(d.title)}“ angelegt – jetzt kannst du alles im Editor anpassen.`);
+      }
+    });
+  }
+
   /* ---------- Zertifikat: Daten, Vorschau, PDF ---------- */
   function certData(name) {
     const c = doc.cert, mins = Math.max(1, Math.round((prog.active || 0) / 60000));
@@ -1169,6 +1224,7 @@ export function startPathFinder(opts = {}) {
     pop.innerHTML = `<h3>Mehr</h3><div class="ed-pal">
       <button data-m="reset"><b>↺ Vorschau-Fortschritt zurücksetzen</b><span>Haken, Quiz, Sperren wieder leer</span></button>
       <button data-m="json"><b>{ } Dokument ansehen</b><span>so wird der Lernpfad gespeichert</span></button>
+      <button data-m="ki"><b>🤖 Vorlage für KI</b><span>Lernpfad von einer KI schreiben lassen und einfügen</span></button>
       <button data-m="certcheck"><b>✓ Zertifikat prüfen</b><span>Prüfcode eines Schüler-Zertifikats nachrechnen</span></button>
       <button data-m="keys"><b>⌘ Tastenkürzel</b><span>für die iPad-Tastatur</span></button>
       <button data-m="del"><b>🗑 Diesen Lernpfad löschen</b><span>nur in diesem Browser</span></button>
@@ -1181,6 +1237,7 @@ export function startPathFinder(opts = {}) {
       if (m === 'del') { if (!confirm('„' + (doc.title || 'ohne Titel') + '“ in diesem Browser löschen?')) return; LS.del(DOCKEY(doc.id)); saveDocList(docList().filter(x => x.id !== doc.id)); const next = docList()[0]; openDoc(next ? loadDoc(next.id) : sample()); }
       if (m === 'json') infoDlg('{ } Dokument', `<pre style="margin:0;padding:12px;font:12px/1.4 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all">${esc(JSON.stringify(doc, (k, v) => typeof v === 'string' && v.length > 200 && /^(data:|[A-Za-z0-9+/=]{200})/.test(v) ? v.slice(0, 40) + '…' : v, 2))}</pre>`);
       if (m === 'certcheck') { certCheck(); return; }
+      if (m === 'ki') { openKI(); return; }
       if (m === 'keys') infoDlg('⌘ Tastenkürzel', `<div class="ed-form"><table style="border-collapse:collapse;font-size:15px">${[['⌘B / ⌘I', 'fett / kursiv'], ['⌘E', 'Code'], ['⌘K', 'Link'], ['⌘Z / ⇧⌘Z', 'rückgängig / wiederholen'], ['⌘↵', 'neuer Textbaustein darunter'], ['⌥↑ / ⌥↓', 'gewählten Baustein verschieben'], ['⌘P', 'Vorschau ein/aus'], ['/', 'in leerem Text: Bausteinauswahl, weitertippen filtert (z. B. /quiz ↵)'], ['Esc', 'Auswahl aufheben']].map(([k, v]) => `<tr><td style="padding:5px 14px 5px 0;font-weight:700;white-space:nowrap">${k}</td><td>${v}</td></tr>`).join('')}</table></div>`);
     };
   };
