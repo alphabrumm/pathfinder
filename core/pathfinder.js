@@ -1020,7 +1020,7 @@ export function startPathFinder(opts = {}) {
     const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
     const KK = (opts.storage || 'pathfinder') + '.ki';
     let info = {}; try { info = JSON.parse(LS.get(KK)) || {}; } catch (e) { }
-    let parsed = null;
+    let parsed = null, lastAtt = {}, tok = 0;
     el.innerHTML = `<header><b>🤖 Vorlage für KI</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
         <div class="ki-step"><span class="n">1</span><b>Anleitung für die KI</b></div>
@@ -1038,11 +1038,20 @@ export function startPathFinder(opts = {}) {
     const check = () => {
       const src = $('#kiIn', el).value;
       if (!src.trim()) { res.innerHTML = ''; openB.disabled = true; parsed = null; return; }
-      parsed = T.parseText(src, env);
+      parsed = T.parseText(src, { ...env, attachments: lastAtt });
       const { errors, warnings, stats } = parsed;
-      res.innerHTML = (errors.length ? `<div class="bad">✗ ${errors.length} Fehler – bitte korrigieren (oder die KI bitten, es zu korrigieren):</div><ul>${errors.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>` : `<div class="good">✓ Erkannt: „${esc(parsed.doc.title)}“ · ${stats.stations} Station${stats.stations === 1 ? '' : 'en'} · ${stats.blocks} Bausteine · ${stats.tasks} Aufgabe${stats.tasks === 1 ? '' : 'n'}</div>`)
+      res.innerHTML = (errors.length ? `<div class="bad">✗ ${errors.length} Fehler – bitte korrigieren (oder die KI bitten, es zu korrigieren):</div><ul>${errors.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>` : `<div class="good">✓ Erkannt: „${esc(parsed.doc.title)}“ · ${stats.stations} Station${stats.stations === 1 ? '' : 'en'} · ${stats.blocks} Bausteine · ${stats.tasks} Aufgabe${stats.tasks === 1 ? '' : 'n'}${stats.images ? ` · ${stats.images} Bild${stats.images === 1 ? '' : 'er'}` : ''}</div>`)
         + (warnings.length ? `<div class="warn">Hinweise:</div><ul>${warnings.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>` : '');
       openB.disabled = !!errors.length;
+      // Bilder wirklich laden – erfundenes Base64 fällt erst hier auf
+      const my = ++tok, bad = [];
+      Promise.all((parsed.images || []).map(im => new Promise(ok => { const x = new Image(); x.onload = () => ok(); x.onerror = () => { bad.push(im); ok(); }; x.src = im.src; }))).then(() => {
+        if (my !== tok || !bad.length) return;
+        const all = new Set(bad.map(x => x.src));
+        for (const st of parsed.doc.stations) for (const b of st.blocks) for (const k of ['src', 'img']) if (all.has(b[k])) b[k] = '';
+        if (all.has(parsed.doc.design.heroImg)) { parsed.doc.design.heroImg = ''; parsed.doc.design.hero = 'logo'; }
+        res.insertAdjacentHTML('beforeend', `<div class="warn">${bad.length} Bild${bad.length === 1 ? ' lässt' : 'er lassen'} sich nicht anzeigen und ${bad.length === 1 ? 'wird' : 'werden'} weggelassen:</div><ul>${bad.map(x => `<li>Zeile ${x.n}</li>`).join('')}</ul>`);
+      });
     };
     el.addEventListener('input', e => {
       const k = e.target.dataset.k; if (k) { info[k] = e.target.value; LS.set(KK, JSON.stringify(info)); }
@@ -1052,7 +1061,8 @@ export function startPathFinder(opts = {}) {
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.x) { closeDlg(false); return; }
       if (t.dataset.copy === 'prompt') toast(await copyText(T.promptFor(info, env)) ? '📋 Anleitung kopiert – jetzt in die KI einfügen' : 'Kopieren ging nicht');
-      if (t.dataset.copy === 'doc') toast(await copyText('Überarbeite diesen Lernpfad. Behalte das Format genau bei und antworte nur mit dem vollständigen Lernpfad in einem Codeblock.\n\n' + T.formatHelp(env) + '\nLERNPFAD:\n' + T.docToText(doc, env)) ? '📋 Lernpfad als Text kopiert (mit Formatbeschreibung)' : 'Kopieren ging nicht');
+      if (t.dataset.copy === 'doc') { const o = {}; const txt = T.docToText(doc, env, o); lastAtt = Object.fromEntries(Object.entries(o.attachments).map(([k, v]) => [k.toLowerCase(), v])); }
+      if (t.dataset.copy === 'doc') toast(await copyText('Überarbeite diesen Lernpfad. Behalte das Format genau bei und antworte nur mit dem vollständigen Lernpfad in einem Codeblock. Verweise wie anhang:bild1 ohne Eintrag im Anhang einfach stehen lassen.\n\n' + T.formatHelp(env) + '\nLERNPFAD:\n' + T.docToText(doc, env)) ? '📋 Lernpfad als Text kopiert (mit Formatbeschreibung)' : 'Kopieren ging nicht');
       if (t.dataset.copy === 'show') { const pre = document.createElement('pre'); pre.className = 'ki-fmt'; pre.textContent = T.formatHelp(env); t.closest('.ki-btns').after(pre); t.remove(); }
       if (t.id === 'kiOpen' && parsed && !parsed.errors.length) {
         const d = parsed.doc; closeDlg(false); openDoc(d); toast(`„${esc(d.title)}“ angelegt – jetzt kannst du alles im Editor anpassen.`);
