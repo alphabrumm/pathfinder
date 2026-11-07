@@ -329,7 +329,7 @@ export function startPathFinder(opts = {}) {
   }
   function render() {
     const sc = scroller.scrollTop;
-    if (doc.skin) { skinRender(sc); return; }
+    if (doc.skin) { try { skinRender(sc); } catch (e) { console.error(e); lp.innerHTML = `<div class="ed-hint" style="padding:40px">⚠ Originaldesign konnte nicht angezeigt werden: ${esc(e.message)}</div>`; } return; }
     if (lp.classList.contains('pf-skin')) { lp.classList.remove('pf-skin'); $('#pf-skin-css')?.remove(); }
     applyDesign();
     lp.classList.toggle('editing', E());
