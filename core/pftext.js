@@ -94,7 +94,7 @@ const SEC_ALIAS = { aufgabe: 'aufgabe', auftrag: 'aufgabe', quiz: 'quiz', test: 
 
 export function parseText(src, env) {
   const errors = [], warnings = [];
-  const H = { err: (n, m) => errors.push({ n, m }), warn: (n, m) => warnings.push({ n, m }), md: mdToHtml };
+  const H = { err: (n, m) => errors.push({ n, m }), warn: (n, m) => warnings.push({ n, m }), md: mdToHtml, inline };
   const doc = env.emptyDoc('lernpfad'); doc.stations = []; doc.goals = [];
   const SECS = { ...CORE_SECTIONS }, ALIAS = { ...SEC_ALIAS };
   for (const p of env.plugins || []) for (const [k, t] of Object.entries(p.text || {})) { SECS[k] = t; ALIAS[k] = k; for (const a of t.alias || []) ALIAS[norm(a)] = k; }
