@@ -311,3 +311,4 @@ button { font: inherit; color: inherit; }
 /* Eigenständig auf breiten Bildschirmen: Kopf und Stationsleiste an der Inhaltsspalte ausrichten */
 .app:not(.with-side) .lp-hero, .app:not(.with-side) .lp-trail-in { padding-left: max(18px, calc((100% - 820px) / 2)); padding-right: max(18px, calc((100% - 820px) / 2)); }
 .lp-logo.applogo { background: none; box-shadow: none; }
+.lp-quiz .fb { font-weight: 700; margin-top: 6px; }
