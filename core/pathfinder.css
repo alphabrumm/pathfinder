@@ -130,6 +130,7 @@ button { font: inherit; color: inherit; }
 .lp-lock.locked > .lp-lock-body { opacity: .4; pointer-events: none; filter: grayscale(.6); }
 .lp-lock-note { font-size: .9em; color: var(--ink-2); margin: 4px 0; }
 .lp-lock:not(.locked) > .lp-lock-note { display: none; }
+.lp-code pre .hl-kw { color: #c792ea; font-weight: 600; } .lp-code pre .hl-ty { color: #7fd1c7; } .lp-code pre .hl-str { color: #c3e88d; } .lp-code pre .hl-num { color: #f9a26c; } .lp-code pre .hl-fn { color: #82aaff; } .lp-code pre .hl-com { color: #8b8fa7; font-style: italic; }
 .lp-code pre { margin: 6px 0; background: #1f1b2e; color: #f4f1fa; padding: 10px 12px; border-radius: 9px; overflow: auto; font: 14px/1.45 ui-monospace, Menlo, monospace; }
 .lp-cert { display: flex; gap: 14px; align-items: center; background: linear-gradient(120deg, var(--g1), var(--g2)); color: var(--heroink); border-radius: 14px; padding: 14px 16px; margin: 22px 0 8px; }
 .lp-cert .seal { flex: none; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; background: var(--a3); color: var(--a3ink); font: 700 26px var(--font-display); box-shadow: 0 0 0 4px var(--surface), 0 0 0 7px var(--a3d); }

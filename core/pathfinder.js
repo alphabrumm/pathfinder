@@ -18,6 +18,7 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const plain = h => { const d = document.createElement('div'); d.innerHTML = h || ''; return d.textContent; };
+const QUIZ_SALT = String(Math.random()).slice(2, 8); // Quiz-Antworten je Seitenaufruf anders gemischt
 const uid = () => Math.random().toString(36).slice(2, 9);
 const clone = o => JSON.parse(JSON.stringify(o));
 const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }, del(k) { try { localStorage.removeItem(k); } catch (e) { } } };
@@ -66,6 +67,39 @@ const CORE = {
 const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match']);
 
 
+
+/* ---------- Syntaxhervorhebung für Code-Bausteine (Schüleransicht) ---------- */
+const HL_KW = {
+  java: 'abstract boolean break byte case catch char class continue default do double else enum extends final finally float for if implements import instanceof int interface long new null package private protected public return short static super switch this throw throws true false try void while var',
+  python: 'and as assert break class continue def del elif else except False finally for from global if import in is lambda None nonlocal not or pass raise return True try while with yield print',
+  sql: 'select from where and or not insert into values update set delete create table drop alter join inner left right outer on group by order having as distinct count sum avg min max like in is null between limit asc desc primary key',
+};
+const HL_SETS = {};
+export function highlightCode(code, lang) {
+  const L = String(lang || '').toLowerCase(), kw = HL_KW[L];
+  if (!kw) return esc(code);
+  const set = HL_SETS[L] || (HL_SETS[L] = new Set(kw.split(' ')));
+  const sql = L === 'sql', py = L === 'python';
+  const re = py ? /(#.*$)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|(\b\d+(?:\.\d+)?\b)|([A-Za-z_äöüÄÖÜß]\w*)/gm
+    : sql ? /(--.*$)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|(\b\d+(?:\.\d+)?\b)|([A-Za-z_äöüÄÖÜß]\w*)/gm
+      : /(\/\/.*$|\/\*[\s\S]*?\*\/)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)')|(\b\d+(?:\.\d+)?\b)|([A-Za-z_äöüÄÖÜß][\wäöüÄÖÜß]*)/gm;
+  let out = '', last = 0, m;
+  while ((m = re.exec(code))) {
+    out += esc(code.slice(last, m.index)); last = re.lastIndex;
+    const t = esc(m[0]);
+    if (m[1]) out += `<span class="hl-com">${t}</span>`;
+    else if (m[2]) out += `<span class="hl-str">${t}</span>`;
+    else if (m[3]) out += `<span class="hl-num">${t}</span>`;
+    else {
+      const w = m[0];
+      if (set.has(sql ? w.toLowerCase() : w)) out += `<span class="hl-kw">${t}</span>`;
+      else if (!sql && /^\s*\(/.test(code.slice(re.lastIndex)) && !/^[A-Z]/.test(w)) out += `<span class="hl-fn">${t}</span>`;
+      else if (!sql && /^[A-Z]/.test(w)) out += `<span class="hl-ty">${t}</span>`;
+      else out += t;
+    }
+  }
+  return out + esc(code.slice(last));
+}
 
 /* ---------- Kleiner PDF-Schreiber (für das Zertifikat; alles lokal, keine Bibliothek) ---------- */
 const WIN = { '€': 128, '‚': 130, '„': 132, '…': 133, '‘': 145, '’': 146, '“': 147, '”': 148, '•': 149, '–': 150, '—': 151, '™': 153 };
@@ -528,7 +562,8 @@ export function startPathFinder(opts = {}) {
         let h = `<div class="lp-card lp-quiz"><div class="hd"><b class="lp-ctitle">${b.qs.length > 1 ? `Quiz · ${b.qs.length} Fragen` : 'Quiz'}</b>${xpTag(b)}<span class="lp-state">${ok ? '✓ alles richtig' : ''}</span></div>`;
         b.qs.forEach((q, qi) => {
           h += `<div class="qq">${b.qs.length > 1 ? `<span class="qn">${qi + 1}</span>` : ''}${ce(`qs.${qi}.q`, q.q, 'Frage …', { rich: true, cls: 'qt' })}`;
-          q.opts.forEach((o, i) => {
+          // Schüleransicht: Antworten bei jedem Laden neu gemischt (sonst steht die richtige oft vorn); beim Neuzeichnen bleibt die Reihenfolge
+          (E() ? q.opts.map((_, i) => i) : shuffled(q.opts.map((_, i) => i), b.id + '.' + qi + QUIZ_SALT)).forEach(i => { const o = q.opts[i];
             if (E()) h += `<div class="opt" style="display:flex;gap:8px;align-items:center"><button data-qok="${qi}.${i}" title="richtig/falsch" style="border:0;background:none;font-size:18px;cursor:pointer">${o.ok ? '✅' : '⬜'}</button>${ce(`qs.${qi}.opts.${i}.t`, o.t, 'Antwort ' + (i + 1), { tag: 'span', rich: true })}</div>`;
             else h += `<button class="opt${st[qi] === i ? (o.ok ? ' ok' : ' no') : ''}" data-opt="${qi}.${i}">${o.t}</button>`;
           });
@@ -559,7 +594,7 @@ export function startPathFinder(opts = {}) {
           + `</div><div class="lp-state" style="margin-top:6px">${ok ? '✓ alles richtig zugeordnet' : 'Karte antippen, dann das Passende – oder ziehen.'}</div></div>`);
       }
       case 'lock': { const ref = findBlock(b.after); return wrap(b, `<div class="lp-card" style="border-style:dashed;text-align:center;color:var(--ink-2)">🔒 <b>Sperre</b> – alles darunter in dieser Station wird erst frei, wenn <b>${ref ? esc(blockLabel(ref.b)) : '<i>(noch keine Aufgabe gewählt – ⚙)</i>'}</b> gelöst ist.</div>`); }
-      case 'code': return wrap(b, `<div class="lp-card lp-code"><b class="lp-ctitle">Code</b> <span style="color:var(--ink-2);font-size:.85em">${esc(b.lang)}</span>${E() ? `<pre contenteditable="true" data-f="code" data-ph="Code …" spellcheck="false">${esc(b.code)}</pre>` : `<pre>${esc(b.code)}</pre>`}<button class="lp-btn alt" data-run="copy">⧉ ${esc(host.copyLabel || 'Kopieren')}</button></div>`);
+      case 'code': return wrap(b, `<div class="lp-card lp-code"><b class="lp-ctitle">Code</b> <span style="color:var(--ink-2);font-size:.85em">${esc(b.lang)}</span>${E() ? `<pre contenteditable="true" data-f="code" data-ph="Code …" spellcheck="false">${esc(b.code)}</pre>` : `<pre class="hl">${highlightCode(b.code || '', b.lang)}</pre>`}${b.nocopy ? (E() ? '<div class="ed-hint">ohne Knopf – nur zum Anschauen (⚙)</div>' : '') : `<button class="lp-btn alt" data-run="copy">⧉ ${esc(host.copyLabel || 'Kopieren')}</button>`}</div>`);
       case 'uml': return wrap(b, `<div class="lp-uml">${ce('name', b.name, 'Klassenname', { tag: 'div', cls: 'un' })}<div class="us">${(b.attrs || []).map(a => `<div>${esc(a)}</div>`).join('') || '<div>&nbsp;</div>'}</div><div class="us">${(b.methods || []).map(a => `<div>${esc(a)}</div>`).join('') || '<div>&nbsp;</div>'}</div></div>${E() ? '<div class="ed-hint">Attribute und Methoden über ⚙</div>' : ''}`);
     }
     if (t?.render) return wrap(b, t.render(b, ctx));
@@ -884,7 +919,7 @@ export function startPathFinder(opts = {}) {
     gap: [{ k: 'bank', l: 'Begriffe zum Ziehen anbieten (statt Tippen)', t: 'check' }, { k: 'extra', l: 'Zusätzliche falsche Begriffe (Ablenker)', t: 'list', ph: 'Begriff', show: b => b.bank }, { k: 'heft', l: 'Als Hefteintrag gestalten (mit Titel)', t: 'check' }, XP],
     match: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'pairs', l: 'Paare', t: 'pairs' }, XP],
     lock: [{ k: 'after', l: 'Frei, sobald gelöst ist:', t: 'target' }],
-    code: [{ k: 'lang', l: 'Sprache', t: 'select', o: [['java', 'Java'], ['python', 'Python'], ['sql', 'SQL'], ['text', 'Text']] }, { k: 'file', l: 'Dateiname über dem Code', t: 'text', show: () => !!doc.skin }, { k: 'mark', l: 'Zeilen hervorheben (z. B. 3-5)', t: 'text', show: () => !!doc.skin }, { k: 'nocopy', l: 'ohne Kopieren-Knopf', t: 'check', show: () => !!doc.skin }],
+    code: [{ k: 'lang', l: 'Sprache', t: 'select', o: [['java', 'Java'], ['python', 'Python'], ['sql', 'SQL'], ['text', 'Text']] }, { k: 'file', l: 'Dateiname über dem Code', t: 'text', show: () => !!doc.skin }, { k: 'mark', l: 'Zeilen hervorheben (z. B. 3-5)', t: 'text', show: () => !!doc.skin }, { k: 'nocopy', l: 'ohne Knopf (nur zum Anschauen, z. B. wenn der Code schon im Projekt steht oder eine Aufgabe verraten würde)', t: 'check' }],
     uml: [{ k: 'name', l: 'Klassenname', t: 'text' }, { k: 'attrs', l: 'Attribute', t: 'list', ph: 'Attribut' }, { k: 'methods', l: 'Methoden', t: 'list', ph: 'Methode' }],
   };
   const getP = (o, p) => p.split('.').reduce((a, k) => a?.[k], o);

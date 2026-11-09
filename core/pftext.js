@@ -245,7 +245,7 @@ export function parseText(src, env) {
       if (sec && SECS[sec.kind].fences) { sec.code.push({ lang: (fence[1] || '').toLowerCase(), tag: norm(raw.trim().replace(/^`{3,}\s*[\w+#-]*\s*/, '')), code: code.join('\n') }); continue; }
       closeSec(); flushPara();
       if (/^svg$/i.test(fence[1])) { const src = cleanSvg(code.join('\n')); if (src) { images.push({ n, src }); push({ type: 'image', src, alt: '', caption: '', size: 'voll' }, n); } else H.warn(n, 'SVG-Grafik ist ungültig oder zu groß – weggelassen.'); continue; }
-      push({ type: 'code', lang: (fence[1] || 'text').toLowerCase(), code: code.join('\n') }, n); continue;
+      push({ type: 'code', lang: (fence[1] || 'text').toLowerCase(), code: code.join('\n'), ...(/\s(ohne-knopf|nocopy)\s*$/i.test(l) ? { nocopy: true } : {}) }, n); continue;
     }
     if (/^%%/.test(l)) continue; // Kommentar
     let m;
@@ -364,7 +364,7 @@ export function docToText(doc, env, out = {}) {
         case 'image': L.push(`![${b.caption || b.alt || 'Bild'}${b.size === 'klein' ? ' | klein' : ''}](${ref(b.src, 'bild')})`); break;
         case 'table': L.push(...b.rows.map((r, k) => '| ' + r.map(md).join(' | ') + ' |' + (k === 0 && b.head ? '\n|' + r.map(() => ' --- ').join('|') + '|' : ''))); break;
         case 'reveal': L.push(`### Aufdecken: ${md(b.summary)}`, md(b.html)); break;
-        case 'code': L.push('```' + (b.lang || ''), b.code, '```'); break;
+        case 'code': L.push('```' + (b.lang || '') + (b.nocopy ? ' ohne-knopf' : ''), b.code, '```'); break;
         case 'uml': L.push(`### UML: ${b.name}`, ...b.attrs.map(a => '- ' + a), ...b.methods.map(a => '+ ' + a)); break;
         case 'html': L.push('### HTML', '```html', b.html, '```'); break;
         case 'task': L.push(`### Aufgabe: ${md(b.title)}`, md(b.html)); if (b.answer) L.push(`Antwort: ${b.answer}`); if (b.img) L.push(`Bild: ${ref(b.img, 'bild')}`); (b.tips || []).forEach((t, i) => L.push(`Tipp${b.tipsHide?.[i] ? ' (verborgen)' : ''}: ${md(t)}`)); if (b.solution) L.push(`Lösung${b.solHide ? ' (verborgen)' : ''}: ${md(b.solution).replace(/\n+/g, ' ')}`); L.push(`XP: ${b.xp}`); break;
@@ -445,6 +445,7 @@ Text, der erst nach Antippen erscheint.
 \`\`\`java
 Programmcode (Sprache nach den drei Backticks)
 \`\`\`
+(\`\`\`java ohne-knopf: Code nur zum Anschauen, ohne Knopf zum Übernehmen – z. B. wenn er schon im Projekt steht oder eine Aufgabe verraten würde)
 
 | Kopf | Kopf |
 | --- | --- |
