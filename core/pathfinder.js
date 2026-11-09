@@ -12,6 +12,8 @@
  * Ein Baustein: { n: Name, ic: Symbol, g: Gruppe, h: Hinweis, make(): Startwerte, alias?: gespeicherter Typ,
  *   render(b, ctx) → HTML, form: [Felder für ⚙], check?(b) → zählt als Aufgabe, run?(aktion, b, ctx), label?(b) }
  * Ein Feld (für ⚙): { html(f, wert, b, ctx), input?(ziel, b, neuZeichnen), click?(dataset, b, neuZeichnen) }
+ * host (Verbindung zur App, alles optional): u. a. adopt(html, titel) → „In dieses Projekt übernehmen“,
+ *   exportProject(html, titel) → Export „Als App-Projekt exportieren“ (Projektdatei mit Lernpfad und Code), exportProjectHelp
  */
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -1540,7 +1542,7 @@ ${SC}
     const draw = () => {
       el.innerHTML = `<header><b>⇩ Export</b><button data-x="1">Abbrechen</button><button class="ok" data-go="1">Exportieren</button></header><div class="ed-form">
         <span class="ed-dseg" data-eseg="fmt"><button data-v="html" aria-pressed="${st.fmt === 'html'}">📄 HTML-Datei</button>${doc.skin ? '' : `<button data-v="scorm" aria-pressed="${st.fmt === 'scorm'}">🎓 SCORM-Lernpaket</button>`}${bundled ? `<button data-v="app" aria-pressed="${st.fmt === 'app'}">${esc(bundled.bundle.icon || '📦')} für ${esc(bundled.name)}</button>` : ''}</span>
-        ${st.fmt === 'app' ? `<span class="help">Lernpfad für <b>${esc(bundled.name)}-Projekte</b>: In ${esc(bundled.name)} unter „Lernpfad einbetten“ öffnen – die Aufgaben prüft dann ${esc(bundled.name)} selbst. Im normalen Browser stellt sich die Datei automatisch auf Selbstkontrolle um.</span>${host.adopt ? `<button class="lp-btn" data-adopt="1">⤵ In dieses ${esc(bundled.name)}-Projekt übernehmen</button>` : ''}` : ''}
+        ${st.fmt === 'app' ? `<span class="help">Lernpfad für <b>${esc(bundled.name)}-Projekte</b>: In ${esc(bundled.name)} unter „Lernpfad einbetten“ öffnen – die Aufgaben prüft dann ${esc(bundled.name)} selbst. Im normalen Browser stellt sich die Datei automatisch auf Selbstkontrolle um.</span>${host.adopt ? `<button class="lp-btn" data-adopt="1">⤵ In dieses ${esc(bundled.name)}-Projekt übernehmen</button>` : ''}${host.exportProject ? `<button class="lp-btn" data-xproj="1">⇩ Als ${esc(bundled.name)}-Projekt exportieren</button><span class="help">${esc(host.exportProjectHelp || `Projektdatei mit diesem Lernpfad und allem, was gerade im ${bundled.name}-Projekt steht (z. B. Startcode).`)}</span>` : ''}` : ''}
         ${st.fmt === 'app' ? '' : `<span class="help">`}${st.fmt === 'app' ? '' : st.fmt === 'html' ? 'Eine einzige Datei mit Schriften und Bildern – läuft offline. In Moodle/ByCS als <b>Datei</b> hochladen. Der Fortschritt bleibt im Browser des Schülers.' : 'ZIP-Datei für die Aktivität <b>„Lernpaket“</b> in Moodle/ByCS. Moodle speichert den Fortschritt (auch beim Gerätewechsel) und trägt Punkte, Bestanden, Zeit und die Ergebnisse der einzelnen Aufgaben ein.'}${st.fmt === 'app' ? '' : '</span>'}
         ${st.fmt === 'scorm' ? `<label>Bestanden ab (% der Aufgaben${doc.form === 'challenge' ? ' bzw. XP' : ''})<input type="number" min="0" max="100" id="exPass" value="${st.pass}"></label>` : ''}
         ${doc.skin ? '<span class="help">Originaldesign: Die Datei ist die ursprüngliche Seite mit deinen Änderungen. Sie lässt sich später wieder in PathFinder öffnen und bearbeiten.</span><input type="checkbox" id="exCert" hidden>' : `<label class="chk"><input type="checkbox" id="exCert"${st.cert ? ' checked' : ''}>Zertifikat am Ende anbieten</label>`}
@@ -1556,6 +1558,12 @@ ${SC}
         st.cert = $('#exCert', el).checked; t.disabled = true; t.textContent = 'übernehme …';
         try { await host.adopt(await appHtml(st), doc.title); closeDlg(false); toast(`⤵ Lernpfad in ${esc(bundled.name)} übernommen`); }
         catch (er) { t.disabled = false; toast('Übernehmen fehlgeschlagen: ' + esc(er.message)); }
+        return;
+      }
+      if (t.dataset.xproj) {
+        st.cert = $('#exCert', el).checked; t.disabled = true; t.textContent = 'exportiere …';
+        try { await host.exportProject(await appHtml(st), doc.title); closeDlg(false); }
+        catch (er) { t.disabled = false; toast('Export fehlgeschlagen: ' + esc(er.message)); }
         return;
       }
       if (t.dataset.go) {
