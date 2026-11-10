@@ -7,7 +7,11 @@
  * Läuft komplett im Browser, schickt nichts weg. */
 
 const INFO = { merke: 'merke', tipp: 'tipp', achtung: 'achtung', begriff: 'begriff', regel: 'regel', abschluss: 'abschluss', hinweis: 'tipp', wichtig: 'achtung', definition: 'begriff' };
-const FIG = { ente: 'ente', nachdenken: 'denken', denken: 'denken', aha: 'aha', achtung: 'achtung', 'pass gut auf': 'achtung', 'pass auf': 'achtung' };
+// Figuren: ohne Zusatz das Kugelwesen Pfadi (Standard), mit „Smiley …“ bzw. „Pixel …“ die anderen Stile
+const FIG = { ente: 'ente', pfadi: 'pfadiAha', nachdenken: 'pfadiDenken', denken: 'pfadiDenken', aha: 'pfadiAha', achtung: 'pfadiAchtung', 'pass gut auf': 'pfadiAchtung', 'pass auf': 'pfadiAchtung',
+  'smiley nachdenken': 'smileyDenken', 'smiley denken': 'smileyDenken', 'smiley aha': 'smileyAha', 'smiley achtung': 'smileyAchtung', 'smiley pass auf': 'smileyAchtung',
+  'pixel nachdenken': 'denken', 'pixel denken': 'denken', 'pixel aha': 'aha', 'pixel achtung': 'achtung', 'pixel pass auf': 'achtung' };
+const FIG_NAME = { ente: 'Ente', pfadiAha: 'Aha', pfadiDenken: 'Nachdenken', pfadiAchtung: 'Achtung', smileyAha: 'Smiley Aha', smileyDenken: 'Smiley Nachdenken', smileyAchtung: 'Smiley Achtung', aha: 'Pixel Aha', denken: 'Pixel Nachdenken', achtung: 'Pixel Achtung' };
 const FONTS = { pixel: 'pixel', schlicht: 'schlicht', elegant: 'elegant' };
 const norm = s => String(s || '').trim().toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss');
 
@@ -292,8 +296,8 @@ export function parseText(src, env) {
         const [ref, nm] = m[2].split(/\s*\|\s*/); const src = H.img(ref, n);
         push({ type: 'info', kind: 'figur', title: '', html: mdToHtml(body), img: src, name: (nm || '').trim() }, n);
       } else if (norm(m[1]) === 'figur') {
-        const fk = FIG[norm(m[2] || 'ente')]; if (!fk) H.warn(n, `Figur „${m[2]}“ gibt es nicht – Ente genommen. Möglich: Ente, Nachdenken, Aha, Achtung.`);
-        const F = env.figures[fk || 'ente']; push({ type: 'info', kind: 'figur', title: '', html: mdToHtml(body), img: F.src, name: F.name }, n);
+        const fk = FIG[norm(m[2] || 'aha')]; if (!fk) H.warn(n, `Figur „${m[2]}“ gibt es nicht – Pfadi genommen. Möglich: Nachdenken, Aha, Achtung (davor optional „Smiley“ oder „Pixel“), Ente.`);
+        const F = env.figures[fk || 'pfadiAha']; push({ type: 'info', kind: 'figur', title: '', html: mdToHtml(body), img: F.src, name: F.name }, n);
       } else push({ type: 'info', kind: INFO[norm(m[1])], title: m[2] ? m[2].trim() : '', html: mdToHtml(body), img: '', name: '' }, n);
       continue;
     }
@@ -357,7 +361,7 @@ export function docToText(doc, env, out = {}) {
       L.push('');
       if (b.anim && (b.type === 'text' || b.type === 'info')) L.push(`{${b.anim}}`);
       const key = Object.entries(env.figures).find(([k, F]) => F.src === b.img)?.[0];
-      const figName = { ente: 'Ente', denken: 'Nachdenken', aha: 'Aha', achtung: 'Achtung' }[key] || 'Ente';
+      const figName = FIG_NAME[key] || 'Aha';
       switch (b.type) {
         case 'text': L.push(md(b.html)); break;
         case 'info': L.push(b.kind === 'figur' ? (key || !b.img ? `[Figur: ${figName}] ${md(b.html)}` : `[Figur: ${ref(b.img, 'figur')} | ${b.name || ''}] ${md(b.html)}`) : (K => `[${K}${b.title && md(b.title).toLowerCase() !== K.toLowerCase() ? ': ' + md(b.title) : ''}] ${md(b.html)}`)(b.kind[0].toUpperCase() + b.kind.slice(1))); break;
@@ -405,7 +409,7 @@ Animation: einblenden          (optional, direkt nach der Stationszeile: Animati
 Normaler Text. Leerzeile = neuer Absatz. **fett**, *kursiv*, \`Code\`, Listen mit „- “.
 
 [Merke] Wichtiger Merksatz.          (auch: [Tipp], [Achtung], [Begriff: Wort], [Regel], [Abschluss])
-[Figur: Aha] Eine Figur sagt etwas.  (Figuren: Ente, Nachdenken, Aha, Achtung)
+[Figur: Aha] Eine Figur sagt etwas.  (Figuren: Nachdenken, Aha, Achtung – davor optional „Smiley“ oder „Pixel“ für einen anderen Stil – und Ente)
 [Figur: anhang:roboter | Robo] Eigene Figur mit Bild aus dem Anhang und Namen.
 {tippen} Text mit Animation (vor einem Absatz oder Infokasten: {tippen}, {einblenden}, {glitch}, {leuchten})
 
