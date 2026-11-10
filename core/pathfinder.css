@@ -49,7 +49,7 @@ button { font: inherit; color: inherit; }
 .ed-bar .sp { flex: 1; }
 .ed-seg { display: inline-flex; background: var(--ed-mid); border-radius: 9px; padding: 3px; }
 .ed-seg button { border: 0; background: transparent; color: var(--ed-ink); font-weight: 650; padding: 6px 11px; border-radius: 7px; cursor: pointer; min-height: 34px; }
-.ed-seg button[aria-pressed="true"] { background: var(--ed-ink); color: var(--ed-bg); }
+.ed-seg button[aria-pressed="true"] { background: var(--ed-acc); color: #2b2300; }
 .ed-btn { border: 0; background: var(--ed-mid); color: var(--ed-ink); min-height: 40px; min-width: 40px; padding: 0 10px; border-radius: 9px; cursor: pointer; font-weight: 650; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .ed-btn:disabled { opacity: .4; cursor: default; }
 .ed-btn.on { background: var(--ed-acc); color: #2b2300; }
