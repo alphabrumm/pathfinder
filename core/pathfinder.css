@@ -33,6 +33,12 @@ button { font: inherit; color: inherit; }
 
 /* ---------- Lernpfad-Bereich mit Editor ---------- */
 .lpwrap { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); position: relative; }
+/* oberes Menüband: helles Theme */
+.ed-bar { --ed-bg: #f7f6fb; --ed-ink: #1f1b2e; --ed-mid: #e9e6f2; border-bottom: 1px solid #dcd8e8; }
+.ed-bar .ed-ki { background: #ece6ff; color: #4b2fb8; white-space: nowrap; flex: none; }
+.ed-bar .ed-ki .t { display: inline; }
+.ki-ico { flex: none; vertical-align: -0.15em; }
+@media (max-width: 700px) { .ed-bar .ed-ki .t { display: none; } }
 .ed-bar { flex: none; display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; align-items: center; gap: 6px; padding: 6px 8px; background: var(--ed-bg); color: var(--ed-ink); z-index: 50; }
 .ed-bar .sp { flex: 1; }
 .ed-seg { display: inline-flex; background: var(--ed-mid); border-radius: 9px; padding: 3px; }
@@ -308,7 +314,7 @@ button { font: inherit; color: inherit; }
 .lp-missing .app { display: inline-block; font: 700 11px system-ui; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); background: var(--surface); border-radius: 6px; padding: 2px 8px; margin-bottom: 4px; }
 .pf-brand { display: inline-flex; align-items: center; gap: 7px; font: 700 15px "Pixelify Sans", monospace; color: var(--ed-ink); padding: 0 6px 0 2px; white-space: nowrap; }
 .pf-brand img { width: 28px; height: 28px; border-radius: 7px; }
-@media (max-width: 700px) { .pf-brand span { display: none; } }
+@media (max-width: 900px) { .pf-brand span { display: none; } }
 /* Eigenständig auf breiten Bildschirmen: Kopf und Stationsleiste an der Inhaltsspalte ausrichten */
 .app:not(.with-side) .lp-hero, .app:not(.with-side) .lp-trail-in { padding-left: max(18px, calc((100% - 820px) / 2)); padding-right: max(18px, calc((100% - 820px) / 2)); }
 .lp-logo.applogo { background: none; box-shadow: none; }

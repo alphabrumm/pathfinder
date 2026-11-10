@@ -1164,19 +1164,21 @@ export function startPathFinder(opts = {}) {
       const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (er) { } ta.remove(); return ok;
     }
   }
+  /** gängiges KI-Symbol (Funkelsterne) */
+  const KI_ICON = '<svg class="ki-ico" viewBox="0 0 24 24" width="1.1em" height="1.1em" aria-hidden="true"><path fill="currentColor" d="M10 2.5l1.7 5.3a3 3 0 0 0 1.9 1.9L19 11.5l-5.4 1.8a3 3 0 0 0-1.9 1.9L10 20.5l-1.7-5.3a3 3 0 0 0-1.9-1.9L1 11.5l5.4-1.8a3 3 0 0 0 1.9-1.9z"/><path fill="currentColor" d="M19 1.5l.8 2.2a1.4 1.4 0 0 0 .8.8l2.2.8-2.2.8a1.4 1.4 0 0 0-.8.8l-.8 2.2-.8-2.2a1.4 1.4 0 0 0-.8-.8l-2.2-.8 2.2-.8a1.4 1.4 0 0 0 .8-.8z"/></svg>';
   async function openKI() {
     const T = await loadText(); const env = textEnv();
     const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
     const KK = (opts.storage || 'pathfinder') + '.ki';
     let info = {}; try { info = JSON.parse(LS.get(KK)) || {}; } catch (e) { }
     let parsed = null, lastAtt = {}, fileAtt = {}, tok = 0;
-    el.innerHTML = `<header><b>🤖 Vorlage für KI</b><button class="ok" data-x="1">Schließen</button></header>
+    el.innerHTML = `<header><b>${KI_ICON} Vorlage für KI</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
         <div class="ki-step"><span class="n">1</span><b>Anleitung für die KI</b></div>
         <span class="help">Fülle die Felder aus und kopiere die Anleitung in eine KI deiner Wahl (z. B. die, die deine Schule erlaubt). Sie beschreibt das Textformat – die KI muss PathFinder nicht kennen. Die KI liefert alles (auch Grafiken) in <b>einem</b> Textblock: einmal „Kopieren“ in der KI, unten einfügen, fertig.</span>
         <label>Thema<input type="text" data-k="thema" value="${esc(info.thema || '')}" placeholder="z. B. Relative Zellbezüge in der Tabellenkalkulation"></label>
-        <div class="row"><label>Zielgruppe<input type="text" data-k="klasse" value="${esc(info.klasse || '')}" placeholder="z. B. Gymnasium, 9. Klasse"></label><label>Umfang<input type="text" data-k="umfang" value="${esc(info.umfang || '')}" placeholder="z. B. 4 Stationen, 45 min"></label></div>
-        <label>Besondere Wünsche<textarea data-k="extra" rows="2" placeholder="z. B. mit Alltagsbeispiel Pausenverkauf, eine Station als Challenge">${esc(info.extra || '')}</textarea></label>
+        <div class="row"><label>Zielgruppe<input type="text" data-k="klasse" value="${esc(info.klasse || '')}" placeholder="z. B. Gymnasium, 9. Klasse"></label><label>Umfang<input type="text" data-k="umfang" value="${esc(info.umfang || '')}" placeholder="z. B. 4 Stationen, 45 min"></label><label>Fach<input type="text" data-k="fach" value="${esc(info.fach || '')}" placeholder="Informatik"></label></div>
+        <label>Präzise Beschreibung der gewünschten Inhalte<textarea data-k="extra" rows="3" placeholder="z. B. mit Alltagsbeispiel Pausenverkauf, eine Station als Challenge. Füge zwischen den Stationen wenigstens eine sinnvolle Animation für die Erklärung eines Aspekts ein.">${esc(info.extra || '')}</textarea></label>
         <div class="ki-btns"><button class="lp-btn" data-copy="prompt">📋 Anleitung kopieren</button><button class="lp-btn alt" data-copy="doc" title="Den geöffneten Lernpfad als Text – z. B. um ihn von der KI überarbeiten zu lassen">📋 Aktuellen Lernpfad als Text</button><button class="lp-btn alt" data-copy="show">Format ansehen</button></div>
         <div class="ki-step"><span class="n">2</span><b>Antwort der KI hier einfügen</b></div>
         <textarea id="kiIn" rows="10" spellcheck="false" placeholder="# Titel des Lernpfads&#10;&#10;## Station: …"></textarea>
@@ -1408,6 +1410,7 @@ export function startPathFinder(opts = {}) {
   $('#bSingle').onclick = () => { single = !single; $('#bSingle').classList.toggle('on', single); $('#bSingle').setAttribute('aria-pressed', String(single)); render(); scroller.scrollTop = 0; };
   $('#bDesign').onclick = openDesign;
   $('#bOpen').onclick = e => openChooser(e.currentTarget);
+  if ($('#bKI')) $('#bKI').onclick = () => openKI(); // nur in der eigenständigen WebApp
   const bWide = $('#bWide'); if (bWide) bWide.onclick = () => $('#app').classList.toggle('lp-only');
   function infoDlg(title, html) { const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } }; el.innerHTML = `<header><b>${title}</b><button class="ok" data-x="1">Schließen</button></header>${html}`; el.onclick = ev => { if (ev.target.closest('[data-x]')) closeDlg(false); }; }
   $('#bMore').onclick = e => {
@@ -1415,7 +1418,7 @@ export function startPathFinder(opts = {}) {
     pop.innerHTML = `<h3>Mehr</h3><div class="ed-pal">
       <button data-m="reset"><b>↺ Vorschau-Fortschritt zurücksetzen</b><span>Haken, Quiz, Sperren wieder leer</span></button>
       <button data-m="json"><b>{ } Dokument ansehen</b><span>so wird der Lernpfad gespeichert</span></button>
-      <button data-m="ki"><b>🤖 Vorlage für KI</b><span>Lernpfad von einer KI schreiben lassen und einfügen</span></button>
+      <button data-m="ki"><b>${KI_ICON} Vorlage für KI</b><span>Lernpfad von einer KI schreiben lassen und einfügen</span></button>
       <button data-m="certcheck"><b>✓ Zertifikat prüfen</b><span>Prüfcode eines Schüler-Zertifikats nachrechnen</span></button>
       <button data-m="keys"><b>⌘ Tastenkürzel</b><span>für die iPad-Tastatur</span></button>
       <button data-m="del"><b>🗑 Diesen Lernpfad löschen</b><span>nur in diesem Browser</span></button>
