@@ -12,7 +12,7 @@ const FIG = { ente: 'ente', pfadi: 'pfadiAha', nachdenken: 'pfadiDenken', denken
   'smiley nachdenken': 'smileyDenken', 'smiley denken': 'smileyDenken', 'smiley aha': 'smileyAha', 'smiley achtung': 'smileyAchtung', 'smiley pass auf': 'smileyAchtung',
   'pixel nachdenken': 'denken', 'pixel denken': 'denken', 'pixel aha': 'aha', 'pixel achtung': 'achtung', 'pixel pass auf': 'achtung' };
 const FIG_NAME = { ente: 'Ente', pfadiAha: 'Aha', pfadiDenken: 'Nachdenken', pfadiAchtung: 'Achtung', smileyAha: 'Smiley Aha', smileyDenken: 'Smiley Nachdenken', smileyAchtung: 'Smiley Achtung', aha: 'Pixel Aha', denken: 'Pixel Nachdenken', achtung: 'Pixel Achtung' };
-const FONTS = { pixel: 'pixel', schlicht: 'schlicht', elegant: 'elegant' };
+const FONTS = { pixel: 'pixel', schlicht: 'schlicht', elegant: 'elegant', hand: 'hand', handwriting: 'hand', handschrift: 'hand' };
 const norm = s => String(s || '').trim().toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss');
 
 /* ---------- kleine Formatierung: **fett**, *kursiv*, `Code`, [Link](url), Listen ---------- */
@@ -266,7 +266,7 @@ export function parseText(src, env) {
       if (k === 'art') { doc.form = /challenge/i.test(v) ? 'challenge' : 'lernpfad'; doc.kicker = doc.kicker.replace(/Lernpfad|Challenge/, doc.form === 'challenge' ? 'Challenge' : 'Lernpfad'); continue; }
       if (k === 'kopfzeile') { doc.kicker = v; continue; }
       if (k === 'farbe' || k === 'farben') { const p = env.palettes.findIndex(x => norm(x.n) === norm(v)); if (p >= 0) doc.design.pal = p; else H.warn(n, `Farbe „${v}“ gibt es nicht. Möglich: ${env.palettes.map(x => x.n).join(', ')}.`); continue; }
-      if (k === 'schrift') { const f = FONTS[norm(v)]; if (f) doc.design.font = f; else H.warn(n, 'Schrift: Pixel, schlicht oder elegant.'); continue; }
+      if (k === 'schrift') { const f = FONTS[norm(v)]; if (f) doc.design.font = f; else H.warn(n, 'Schrift: Pixel, schlicht, elegant oder Handwriting.'); continue; }
       if (k === 'kopfbild') { const src = H.img(v, n); if (src) { doc.design.heroImg = src; doc.design.hero = doc.design.hero === 'logo' ? 'bild' : doc.design.hero; } continue; }
       if (k === 'kopfbild-art' || k === 'kopfbild art') { const a = { klein: 'bild', gross: 'gross', 'groß': 'gross', hintergrund: 'hintergrund' }[norm(v)] || { gross: 'gross' }[norm(v)]; if (a) doc.design.hero = a; else H.warn(n, 'Kopfbild-Art: klein, groß oder Hintergrund.'); continue; }
       if (k === 'titel-animation' || k === 'untertitel-animation') { const a = ANIM[norm(v)]; if (a) doc.anim[k.startsWith('titel') ? 'title' : 'subtitle'] = a; else H.warn(n, 'Animation: tippen, einblenden, glitch oder leuchten.'); continue; }
@@ -396,7 +396,7 @@ export function formatHelp(env) {
 Untertitel: kurze Unterzeile
 Art: Lernpfad            (oder: Challenge)
 Farbe: ${env.palettes.map(p => p.n).join(' | ')}
-Schrift: Pixel | schlicht | elegant
+Schrift: Pixel | schlicht | elegant | Handwriting
 Ziele:
 - Lernziel 1
 - Lernziel 2

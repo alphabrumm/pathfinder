@@ -42,6 +42,7 @@ const FONTS = {
   pixel: { n: 'Pixel', d: '"Pixelify Sans", "Courier New", monospace', w: 700, ls: '0' },
   schlicht: { n: 'Schlicht', d: '"Atkinson Hyperlegible", -apple-system, system-ui, sans-serif', w: 700, ls: '-.01em' },
   elegant: { n: 'Elegant', d: '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif', w: 600, ls: '.005em' },
+  hand: { n: 'Handwriting', d: '"Caveat", "Bradley Hand", "Segoe Print", cursive', w: 700, ls: '0' },
 };
 const INFO_KINDS = { merke: ['💡', 'Merke'], tipp: ['👉', 'Tipp'], achtung: ['⚠️', 'Achtung'], begriff: ['📘', 'Begriff'], regel: ['📏', 'Regel'], figur: ['🗨', 'Figur sagt'], abschluss: ['🏁', 'Abschluss'] };
 const ANIMS = { tippen: 'Schreibmaschine', einblenden: 'Einblenden', glitch: 'Glitch', leuchten: 'Leuchten' };
@@ -357,6 +358,7 @@ export function startPathFinder(opts = {}) {
     for (const k in p.l) st.setProperty('--' + k, p.l[k]);
     st.setProperty('--font-display', f.d); st.setProperty('--display-weight', f.w); st.setProperty('--display-ls', f.ls); st.setProperty('--fz', fz);
     lp.dataset.shape = doc.design.shape; lp.dataset.form = doc.form;
+    lp.dataset.divider = doc.design.divider || 'linie'; if (doc.design.divColor) st.setProperty('--div', doc.design.divColor); else st.removeProperty('--div');
     const pat = doc.design.pattern || 'punkte', k = doc.design.patDensity || 1, op = doc.design.patOpacity ?? 1;
     const a = (x) => +(x * op).toFixed(3), sz = n => `${Math.round(n / k)}px ${Math.round(n / k)}px`;
     if (pat === 'punkte') { st.setProperty('--hero-pat', `radial-gradient(rgba(255,255,255,${a(.3)}) 2px, transparent 2px)`); st.setProperty('--hero-pat-size', sz(16)); }
@@ -383,12 +385,12 @@ export function startPathFinder(opts = {}) {
     let h = `<div class="fontsize"><button data-fz="-" aria-label="Schrift kleiner">A−</button><button data-fz="+" aria-label="Schrift größer">A+</button></div>`;
     const goals = doc.goals || [];
     h += `<header class="lp-hero${d.hero === 'hintergrund' && d.heroImg ? ' has-bg' : ''}${d.hero === 'gross' && d.heroImg ? ' big' : ''}"${d.hero === 'hintergrund' && d.heroImg ? ` style="background-image:url(${d.heroImg})"` : ''}>`
-      + (d.hero !== 'hintergrund' ? `<div class="lp-logo${d.hero === 'logo' && opts.logo ? ' applogo' : ''}"${E() ? ' title="Antippen: eigenes Bild oder GIF setzen"' : ''}>${logo}</div>` : '')
+      + (d.hero !== 'hintergrund' ? `<div class="lp-logo${d.hero === 'logo' && opts.logo ? ' applogo' : ''}${d.hero !== 'logo' && d.heroImg ? ' own' : ''}"${E() ? ' title="Antippen: eigenes Bild oder GIF setzen"' : ''}>${logo}</div>` : '')
       + `<div style="min-width:0">${ce('$kicker', doc.kicker, 'Kopfzeile', { tag: 'small' })}${ce('$title', doc.title, 'Titel des Lernpfads', { tag: 'h1', anim: doc.anim?.title })}${ce('$subtitle', doc.subtitle, 'Untertitel', { tag: 'p', rich: true, anim: doc.anim?.subtitle })}`
       + (goals.length ? `<ul class="lp-goals">${goals.map((g, i) => ce('$goals.' + i, g, 'Lernziel', { tag: 'li', rich: true })).join('')}</ul>` : '')
       + (doc.rank ? `<div class="lp-rank">${ce('$rank', doc.rank, 'Rang', { tag: 'span', rich: true })}</div>` : '')
-      + (E() && (!goals.length || !doc.rank) ? `<div class="ed-hint" style="display:inline-block">Lernziele und Rang: 🎨 Design → Kopf</div>` : '')
-      + `</div></header>`;
+      + (E() && (!goals.length || !doc.rank) ? `<div class="ed-hint" style="display:inline-block">Lernziele und Rang: ⚙ Einstellungen → Kopf</div>` : '')
+      + `</div></header><div class="lp-divider" aria-hidden="true"></div>`;
     h += `<nav class="lp-trail"><div class="lp-trail-in"><div class="lp-stops" id="stops">${doc.stations.map((s, i) => `<a data-sid="${s.id}" class="${stationDone(s) ? 'done' : ''}${s.id === curSid ? ' cur' : ''}" title="${esc(s.title)}">${stationDone(s) ? '✓' : esc(s.nr || i + 1)}</a>`).join('')}${doc.cert.on ? '<a data-sid="cert" title="Abschluss">🏁</a>' : ''}</div><span class="lp-count">${doc.stations.filter(stationDone).length} / ${doc.stations.length}</span></div></nav>`;
     h += `<main class="lp-main">`;
     if (doc.form === 'challenge') { const x = xpNow(), mx = xpMax() || 1; h += `<div class="lp-hud"><span>⚡ ${x} XP</span><span class="bar"><i style="width:${Math.round(100 * x / mx)}%"></i></span><span>von ${mx}</span></div>`; }
@@ -1058,7 +1060,7 @@ export function startPathFinder(opts = {}) {
   const PATTERNS = [['punkte', '• •', 'Punkte'], ['raster', '▦', 'Raster'], ['keins', '–', 'kein Muster'], ...['✦', '★', '♥', '⚡', '💡', '🧪', '⚛', '✏️', '🐾', '{ }', '01', '＋'].map(c => [c, c, c])];
   /** Design-Fenster bei Originaldesign: Aussehen kommt aus der Vorlage; Kopf, Skript und Stile als HTML */
   function skinDesignUI(el, live) {
-    el.innerHTML = `${live ? '<div class="pf-ptitle">🎨 Design</div>' : '<header><b>🎨 Design</b><button class="ok" data-x="ok">Fertig</button></header>'}<div class="ed-form">
+    el.innerHTML = `${live ? '<div class="pf-ptitle">Allgemein</div>' : '<header><b>Allgemein</b><button class="ok" data-x="ok">Fertig</button></header>'}<div class="ed-form">
       <span class="help">Dieser Lernpfad behält sein <b>Originaldesign</b>: Farben, Schriften, Bilder und Animationen kommen aus der ursprünglichen Seite. Kopfzeile, Titel, Untertitel, Lernziele, Stationen und Bausteine bearbeitest du direkt im Lernpfad. <b>▶ Vorschau</b> zeigt ihn genau so, wie ihn Schüler sehen.</span>
       <label>Für Fortgeschrittene</label>
       <div class="ki-btns" style="flex-direction:column;align-items:stretch">
@@ -1082,18 +1084,27 @@ export function startPathFinder(opts = {}) {
       };
     };
   }
+  const paletteDiv = d => { const c = (PALETTES[d.pal] || PALETTES[0]).l.a3 || '#f6bf3a'; return /^#[0-9a-f]{6}$/i.test(c) ? c : '#f6bf3a'; };
   function designUI(el, live) {    if (doc.skin) { skinDesignUI(el, live); return; }
     const seg = (k, o, cur) => `<span class="ed-dseg" data-seg="${k}">${o.map(([v, n]) => `<button data-v="${v}" aria-pressed="${v === cur}">${n}</button>`).join('')}</span>`;
     const sel = (k, cur) => `<select data-anim-k="${k}">${ANIM_OPTS.map(([v, n]) => `<option value="${v}"${(cur || '') === v ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
     const draw = () => {
       const d = doc.design;
       const pat = d.pattern || 'punkte', custom = !PATTERNS.some(x => x[0] === pat);
-      el.innerHTML = `${live ? '<div class="pf-ptitle">🎨 Design</div>' : '<header><b>🎨 Design</b><button class="ok" data-x="ok">Fertig</button></header>'}<div class="ed-form">
-        <label>Form</label>${seg('form', [['lernpfad', 'Lernpfad'], ['challenge', 'Challenge']], doc.form)}
+      el.innerHTML = `${live ? '<div class="pf-ptitle">Allgemein</div>' : '<header><b>Allgemein</b><button class="ok" data-x="ok">Fertig</button></header>'}<div class="ed-form">
+        <fieldset><legend>Art</legend>
+        ${seg('form', [['lernpfad', 'Lernpfad'], ['challenge', 'Challenge']], doc.form)}
+        <span class="help">${doc.form === 'challenge' ? 'Challenge: mit XP-Leiste und Rang – spielerisch.' : 'Lernpfad: Stationen der Reihe nach, ruhig und übersichtlich.'}</span>
+        <label class="chk"><input type="checkbox" id="ptsIn"${doc.pointsOn ? ' checked' : ''}>Punkte für Aufgaben vergeben</label><span class="help">Die Punkte stehen links neben jeder Aufgabe, lassen sich dort anpassen und zählen im SCORM-Lernpaket.</span>
+        </fieldset>
+        <fieldset><legend>Aussehen</legend>
         <label>Farbpalette <span class="help">${esc(PALETTES[d.pal].n)}</span></label><div class="ed-sw">${PALETTES.map((p, i) => `<button data-pal="${i}" title="${esc(p.n)}" aria-pressed="${i === d.pal}"><span style="background:${p.l.a1}"></span><span style="background:${p.l.a2}"></span><span style="background:${p.l.a3}"></span></button>`).join('')}</div>
         <label>Schrift</label>${seg('font', Object.entries(FONTS).map(([k, f]) => [k, f.n]), d.font)}
-        <label>Stationen</label>${seg('shape', [['eckig', '▢ eckig'], ['rund', '◯ rund']], d.shape)}
-        <label class="chk"><input type="checkbox" id="ptsIn"${doc.pointsOn ? ' checked' : ''}>Punkte anpassen <span class="help">– Punkte stehen links neben den Aufgaben und zählen im SCORM-Lernpaket</span></label>
+        <label>Stationen</label>${seg('shape', [['eckig', '▢ eckig'], ['rund', '◯ rund'], ['skizze', '✎ skizziert']], d.shape)}
+        <div class="row"><label>Animation Titel${sel('title', doc.anim?.title)}</label><label>Animation Untertitel${sel('subtitle', doc.anim?.subtitle)}</label></div>
+        <label>Stil Trennstrich <span class="help">unter dem Kopf</span></label>${seg('divider', [['linie', 'Linie'], ['doppelt', 'Doppelt'], ['gestrichelt', 'Gestrichelt'], ['punkte', 'Punkte'], ['welle', 'Welle'], ['keiner', 'keiner']], d.divider || 'linie')}
+        ${(d.divider || 'linie') !== 'keiner' ? `<label>Farbe Trennstrich</label><div class="ed-divc"><button data-divpal="1" aria-pressed="${!d.divColor}">wie Farbpalette</button><label class="ed-color" aria-pressed="${!!d.divColor}"><input type="color" id="divColIn" value="${esc(d.divColor || paletteDiv(d))}"><span>eigene Farbe</span></label></div>` : ''}
+        </fieldset>
         <fieldset><legend>Kopf</legend>
         <label>Muster im Hintergrund</label><div class="ed-pat">${PATTERNS.map(([v, n, t]) => `<button data-pat="${esc(v)}" title="${esc(t)}" aria-pressed="${v === pat}">${esc(n)}</button>`).join('')}<input type="text" id="patIn" maxlength="2" placeholder="eigenes" value="${custom ? esc(pat) : ''}" aria-label="eigenes Zeichen oder Emoji"></div>
         ${pat !== 'keins' ? `<div class="row"><label>Dichte<input type="range" id="patK" min="0.5" max="2" step="0.1" value="${d.patDensity || 1}"><span class="help">weiter ← → dichter</span></label><label>Sichtbarkeit<input type="range" id="patO" min="0.15" max="2" step="0.05" value="${d.patOpacity ?? 1}"><span class="help">durchsichtiger ← → kräftiger</span></label></div>` : ''}
@@ -1101,7 +1112,6 @@ export function startPathFinder(opts = {}) {
         ${d.hero !== 'logo' ? `<div class="imgprev">${d.heroImg ? `<img src="${d.heroImg}" alt="">` : ''}<label class="take" style="display:inline-flex;align-items:center;cursor:pointer">🖼 ${d.heroImg ? 'Anderes Bild' : 'Bild/GIF wählen'}<input type="file" accept="image/*" id="heroFile" hidden></label></div>` : ''}
         <label>Lernziele</label><div class="list">${(doc.goals || []).map((g, i) => `<div class="it"><input type="text" data-goal="${i}" value="${esc(plain(g))}" placeholder="Lernziel ${i + 1}"><button data-gdel="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-gadd="1">＋ Lernziel</button></div>
         <label>Rang / Abzeichen (optional)<input type="text" id="rankIn" value="${esc(plain(doc.rank))}" placeholder="z. B. Dein Rang: HACKER NEWBIE"></label>
-        <div class="row"><label>Animation Titel${sel('title', doc.anim?.title)}</label><label>Animation Untertitel${sel('subtitle', doc.anim?.subtitle)}</label></div>
         ${d.hero === 'gross' ? `<label>Tipp-Zeilen auf dem großen Bild (wie ein Terminal)<textarea id="linesIn" class="mono" placeholder="&gt; login crew&#10;&gt; lade daten.exe">${esc((doc.typeLines || []).join('\n'))}</textarea><span class="help">Jede Zeile wird nacheinander getippt.</span></label>` : ''}</fieldset>
       </div>`;
     };
@@ -1111,6 +1121,7 @@ export function startPathFinder(opts = {}) {
       if (t.dataset.x) { closeDlg(true); return; }
       if (t.dataset.pal) doc.design.pal = +t.dataset.pal;
       if (t.dataset.pat) doc.design.pattern = t.dataset.pat;
+      if (t.dataset.divpal) delete doc.design.divColor;
       if (t.dataset.gadd) doc.goals.push('');
       if (t.dataset.gdel) doc.goals.splice(+t.dataset.gdel, 1);
       const sg = t.closest('[data-seg]'); if (sg) { const k = sg.dataset.seg; if (k === 'form') doc.form = t.dataset.v; else doc.design[k] = t.dataset.v; }
@@ -1125,6 +1136,7 @@ export function startPathFinder(opts = {}) {
       if (t.id === 'patIn') { if (t.value.trim()) { doc.design.pattern = t.value.trim(); render(); $$('[data-pat]', el).forEach(x => x.setAttribute('aria-pressed', 'false')); } }
       if (t.id === 'ptsIn') { doc.pointsOn = t.checked; render(); }
       if (t.id === 'patK') { doc.design.patDensity = +t.value; applyDesign(); }
+      if (t.id === 'divColIn') { doc.design.divColor = t.value; applyDesign(); $$('[data-divpal]', el).forEach(x => x.setAttribute('aria-pressed', 'false')); $('.ed-color', el)?.setAttribute('aria-pressed', 'true'); }
       if (t.id === 'patO') { doc.design.patOpacity = +t.value; applyDesign(); }
       if (live) softCommit();
     });
@@ -1156,7 +1168,7 @@ export function startPathFinder(opts = {}) {
     if (what.startsWith('st:') ? !doc.stations.some(x => 'st:' + x.id === what) : what !== 'design' && !findBlock(what)) what = 'none';
     // gleiche Ansicht neu gezeichnet (z. B. nach einer Änderung per Schieberegler): Scrollstand behalten
     const keep = panelDrawn === what ? ($('.pf-pbody', panelEl)?.scrollTop || 0) : 0; panelDrawn = what;
-    panelEl.innerHTML = `<div class="pf-ptabs"><button data-pt="design" aria-pressed="${what === 'design'}">🎨 Design</button><button data-pt="sel" aria-pressed="${what !== 'design'}">⚙ Auswahl</button><span class="sp"></span><button data-pt="close" aria-label="Seitenleiste schließen" title="schließen">✕</button></div>`;
+    panelEl.innerHTML = `<div class="pf-ptabs"><button data-pt="design" aria-pressed="${what === 'design'}">Allgemein</button><button data-pt="sel" aria-pressed="${what !== 'design'}">Auswahl</button><span class="sp"></span><button data-pt="close" aria-label="Seitenleiste schließen" title="schließen">✕</button></div>`;
     const body = document.createElement('div'); body.className = 'pf-pbody'; panelEl.appendChild(body);
     if (what === 'design') designUI(body, true);
     else if (what === 'none') body.innerHTML = '<div class="ed-form"><span class="help">Tippe im Lernpfad einen Baustein an – hier erscheinen seine Einstellungen. Für eine Station: ⚙ neben dem Stationstitel.</span></div>';
@@ -1521,6 +1533,7 @@ ${SC}`;
       return SK.pageHtml(d, { json: JSON.stringify(keep).replace(/</g, '\\u003c') });
     }
     let css = await fetchText('pathfinder.css');
+    if (d.design?.font !== 'hand') css = css.replace(/@font-face \{ font-family: "Caveat";[^}]*\}\n?/, '');
     const fonts = {}; for (const m of css.matchAll(/url\(\.\.\/fonts\/([^)]+)\)/g)) fonts[m[1]] = fonts[m[1]] || await fetchData('../fonts/' + m[1], 'font/ttf');
     css = css.replace(/url\(\.\.\/fonts\/([^)]+)\)/g, (m, f) => `url(${fonts[f]})`);
     css += plugins.map(p => p.css || '').join('\n');
