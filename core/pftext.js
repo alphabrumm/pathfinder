@@ -465,8 +465,8 @@ export function promptFor(info, env) {
   return `Du erstellst einen interaktiven Lernpfad für die Plattform PathFinder${env.appName && env.appName !== 'PathFinder' ? ` (App: ${env.appName})` : ''}.
 
 THEMA: ${f('thema', '[bitte Thema eintragen]')}
-ZIELGRUPPE: ${f('klasse', '[Jahrgangsstufe / Schulart]')}
-${info.fach?.trim() ? 'FACH: ' + info.fach.trim() + '\n' : ''}UMFANG: ${f('umfang', 'etwa 4 Stationen, ca. 45 Minuten')}
+${info.fach?.trim() ? 'FACH: ' + info.fach.trim() + '\n' : ''}ZIELGRUPPE: ${f('klasse', '[Jahrgangsstufe / Schulart]')}
+UMFANG: ${f('umfang', 'etwa 4 Stationen, ca. 45 Minuten')}
 ${info.extra?.trim() ? 'GEWÜNSCHTE INHALTE (bitte genau umsetzen): ' + info.extra.trim() + '\n' : ''}
 REGELN
 - WICHTIG – alles in EINEN kopierbaren Textblock: Der komplette Lernpfad samt Anhang mit allen Grafiken steht in einem einzigen Codeblock, damit die Lehrkraft nur einmal kopieren und einfügen muss. Beginne den Block mit vier Backticks und „text“ (\`\`\`\`text) und beende ihn mit vier Backticks (\`\`\`\`), damit Code-Beispiele darin den Block nicht vorzeitig schließen. Kein Text davor oder danach, nichts auf mehrere Blöcke oder Nachrichten verteilen.
