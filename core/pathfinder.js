@@ -204,7 +204,7 @@ export function startPathFinder(opts = {}) {
     v: 2, id: uid(), form, design: { pal: 0, font: 'pixel', shape: 'eckig', hero: 'logo', heroImg: '' },
     kicker: `${appName} · ${form === 'challenge' ? 'Challenge' : 'Lernpfad'}`, title: '', subtitle: '', goals: [], rank: '', anim: {}, typeLines: [],
     stations: [{ id: uid(), title: '', sub: '', check: false, blocks: [{ id: uid(), type: 'text', html: '' }] }],
-    cert: { on: true, need: 'alle', pct: 80, text: 'hat den Lernpfad erfolgreich bearbeitet.', show: { zeit: true, tipps: true, quiz: true, xp: true } },
+    cert: { on: true, need: 'immer', pct: 80, text: 'hat den Lernpfad mit folgendem Ergebnis bearbeitet:', show: { zeit: true, tipps: true, quiz: true, xp: true } },
   });
   function migrate(d) {
     d.goals = d.goals || []; d.rank = d.rank || ''; d.id = d.id || uid(); d.anim = d.anim || {}; d.typeLines = d.typeLines || [];
@@ -945,7 +945,7 @@ export function startPathFinder(opts = {}) {
     if (id === 'cert') {
       b = clone(doc.cert); title = '★ Zertifikat';
       fields = [{ k: 'on', l: 'Zertifikat am Ende anbieten', t: 'check' },
-        { k: 'need', l: 'Erreichbar, wenn …', t: 'select', o: [['alle', 'alle Aufgaben gelöst sind'], ['pct', 'ein Mindestanteil gelöst ist'], ['immer', 'immer – dann als „Nachweis“ mit dem aktuellen Stand']] },
+        { k: 'need', l: 'Erreichbar, wenn …', t: 'select', o: [['immer', 'immer – als „Nachweis“ mit dem aktuellen Stand'], ['alle', 'alle Aufgaben gelöst sind'], ['pct', 'ein Mindestanteil gelöst ist']] },
         { k: 'pct', l: 'Mindestanteil in %', t: 'number', show: x => x.need === 'pct' },
         { k: 'text', l: 'Text auf dem Zertifikat', t: 'text', help: '„Max Muster … hat den Lernpfad erfolgreich bearbeitet.“' },
         { k: 'show.zeit', l: 'Bearbeitungszeit zeigen', t: 'check' }, { k: 'show.tipps', l: 'Benutzte Tipps und Lösungshilfen zeigen', t: 'check' },

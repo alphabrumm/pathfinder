@@ -56,7 +56,7 @@ const sample = () => {
         { type: 'info', kind: 'abschluss', title: 'Stark!', html: 'Sperren sorgen dafür, dass es erst weitergeht, wenn eine Aufgabe gelöst ist. Ganz unten wartet das <b>Zertifikat</b> mit Name, Bearbeitungszeit und Erfolgsübersicht.', img: '', name: '' },
       ] },
     ].map((s, i) => ({ id: 's' + i, ...s, blocks: s.blocks.map((b, j) => ({ id: b.id || `b${i}${j}`, ...b })) })),
-    cert: { on: true, need: 'alle', pct: 80, text: 'hat den Lernpfad erfolgreich bearbeitet.', show: { zeit: true, tipps: true, quiz: true, xp: true } },
+    cert: { on: true, need: 'immer', pct: 80, text: 'hat den Lernpfad mit folgendem Ergebnis bearbeitet:', show: { zeit: true, tipps: true, quiz: true, xp: true } },
   };
 };
 

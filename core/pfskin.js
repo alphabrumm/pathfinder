@@ -75,7 +75,7 @@ export async function importHtml(html, { uid, appName = '', inline } = {}) {
   const doc = {
     v: 2, id: uid(), form: 'lernpfad', design: { pal: 0, font: 'schlicht', shape: 'rund', hero: 'logo', heroImg: '' },
     kicker: '', title: '', subtitle: '', goals: [], rank: '', anim: {}, typeLines: [], stations: [],
-    cert: { on: false, need: 'alle', pct: 80, text: 'hat den Lernpfad erfolgreich bearbeitet.', show: { zeit: true, tipps: true, quiz: true, xp: true } },
+    cert: { on: false, need: 'immer', pct: 80, text: 'hat den Lernpfad mit folgendem Ergebnis bearbeitet:', show: { zeit: true, tipps: true, quiz: true, xp: true } },
   };
 
   // Kopf: Kopfzeile, Titel, Untertitel, Lernziele werden zu Feldern des Lernpfads
