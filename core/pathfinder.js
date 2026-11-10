@@ -1235,7 +1235,8 @@ export function startPathFinder(opts = {}) {
         <div class="ki-step"><span class="n">2</span><b>Antwort der KI hier einfügen</b></div>
         <textarea id="kiIn" rows="9" spellcheck="false" placeholder="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&lt;quiz&gt; …"></textarea>
         <div id="exRes" class="ki-res"></div>
-        <div class="ki-btns"><button class="lp-btn" id="exDl" disabled>⇩ Moodle-XML herunterladen</button></div>
+        <div class="ki-btns"><button class="lp-btn alt" id="exPv" disabled>👁 Vorschau</button><button class="lp-btn" id="exDl" disabled>⇩ Moodle-XML herunterladen</button></div>
+        <div id="exPrev" class="ex-prev" hidden></div>
         <span class="help">In Moodle: Kurs → Fragensammlung → Import → Format „Moodle-XML“ → Datei hochladen. Die Fragen landen in den Kategorien Basis, Mittel und Anspruchsvoll – so kannst du im Test pro Niveau Zufallsfragen ziehen.</span>
       </div>`;
     const lv = () => {
@@ -1246,12 +1247,31 @@ export function startPathFinder(opts = {}) {
     lv();
     const check = () => {
       const r = X.checkXml($('#kiIn', el).value); checked = r; const out = $('#exRes', el);
-      if (!r.xml) { out.innerHTML = ''; $('#exDl', el).disabled = true; return; }
+      if (!r.xml) { out.innerHTML = ''; $('#exDl', el).disabled = true; $('#exPv', el).disabled = true; $('#exPrev', el).hidden = true; return; }
       const names = Object.fromEntries(X.TYPES), typ = Object.entries(r.byType).map(([k, n]) => `${n} × ${names[k] || k}`).join(', ');
       out.innerHTML = (r.errors.length ? `<div class="bad">✗ ${r.errors.length} Problem${r.errors.length === 1 ? '' : 'e'} – bitte die KI um Korrektur bitten:</div><ul>${r.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : `<div class="good">✓ ${r.count} Fragen erkannt · Basis ${r.byLevel.B} · Mittel ${r.byLevel.M} · Anspruchsvoll ${r.byLevel.A}</div><div class="help">${esc(typ)}</div>`)
         + (r.count && r.count !== o.count ? `<div class="warn">Bestellt waren ${o.count} Fragen, die KI hat ${r.count} geliefert.</div>` : '')
         + (r.warnings.length ? `<div class="warn">Hinweise:</div><ul>${r.warnings.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : '');
-      $('#exDl', el).disabled = !!r.errors.length || !r.count;
+      $('#exDl', el).disabled = !!r.errors.length || !r.count; $('#exPv', el).disabled = !r.count;
+      if (!$('#exPrev', el).hidden) preview();
+    };
+    // Vorschau: grob wie in Moodle, mit Lösungen, zum frühen Prüfen und Korrigieren
+    const clean = h => { const d = new DOMParser().parseFromString(`<div>${h || ''}</div>`, 'text/html'); d.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(n => n.remove()); d.querySelectorAll('*').forEach(n => [...n.attributes].forEach(a => { if (/^on/i.test(a.name) || /^\s*javascript:/i.test(a.value)) n.removeAttribute(a.name); })); return d.body.firstChild.innerHTML; };
+    const notes = {};
+    const preview = () => {
+      const box = $('#exPrev', el); let qs = [];
+      try { qs = X.readQuestions(checked.xml); } catch (e) { box.innerHTML = '<div class="help">Vorschau nicht möglich – die Datei ist kein gültiges XML.</div>'; return; }
+      const names = Object.fromEntries(X.TYPES); let lastCat = null;
+      box.innerHTML = qs.map(q => {
+        let body = clean(q.text);
+        if (q.choices.length) body = body.replace(/\[\[(\d+)\]\]/g, (m, n) => `<span class="ex-gap" title="${q.type === 'gapselect' ? 'Auswahlmenü' : 'Ziehfeld'}">${q.type === 'gapselect' ? '▾ ' : '⇢ '}${esc(q.choices[n - 1]?.t ?? '??')}</span>`);
+        const extra = q.choices.length ? `<div class="ex-opts"><b>${q.type === 'gapselect' ? 'Auswahl' : 'Begriffe zum Ziehen'}:</b> ${q.choices.map((c, k) => `<span class="${body.includes('>' + (q.type === 'gapselect' ? '▾ ' : '⇢ ') + esc(c.t) + '<') ? 'ok' : ''}">${esc(c.t)}</span>`).join(' ')}</div>` : '';
+        const ans = q.answers.length ? `<ul class="ex-ans">${q.answers.map(a => `<li class="${a.ok ? 'ok' : ''}">${a.ok ? '✓' : '✗'} ${clean(a.t)}${a.fb ? `<small> – ${clean(a.fb)}</small>` : ''}</li>`).join('')}</ul>` : '';
+        const head = q.cat !== lastCat ? `<h4>${esc(q.cat || 'ohne Kategorie')}</h4>` : ''; lastCat = q.cat;
+        return `${head}<div class="ex-q" data-qi="${q.i}"><div class="ex-qh"><b>${esc(q.name)}</b><span class="ex-tag">${esc(names[q.type] || q.type)}</span>${q.grade ? `<span class="ex-tag">${esc(q.grade)} P.</span>` : ''}<span class="sp"></span><button class="ex-del" data-del="${q.i}" title="Frage entfernen">🗑</button></div>
+          <div class="ex-qt">${body}</div>${extra}${ans}${q.grader ? `<div class="ex-fb"><b>Erwartungshorizont:</b> ${clean(q.grader)}</div>` : ''}${q.feedback ? `<div class="ex-fb"><b>Rückmeldung:</b> ${clean(q.feedback)}</div>` : ''}
+          <input type="text" class="ex-note" data-note="${esc(q.name)}" value="${esc(notes[q.name] || '')}" placeholder="Korrekturwunsch an die KI (optional)"></div>`;
+      }).join('') + `<div class="ki-btns"><button class="lp-btn" data-copy="fix">${KI_ICON} Korrektur-Prompt generieren</button><span class="help" style="align-self:center">für alle Fragen mit Korrekturwunsch – die Antwort der KI ersetzt oben die Datei</span></div>`;
     };
     el.addEventListener('input', e => {
       const t = e.target;
@@ -1263,10 +1283,23 @@ export function startPathFinder(opts = {}) {
       }
       if (t.dataset.type) { o.types = $$('[data-type]', el).filter(x => x.checked).map(x => x.dataset.type); save(); }
       if (t.id === 'kiIn') check();
+      if (t.dataset.note != null) notes[t.dataset.note] = t.value;
     });
     el.addEventListener('click', async e => {
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.x) { closeDlg(false); return; }
+      if (t.id === 'exPv') { const b = $('#exPrev', el); b.hidden = !b.hidden; t.textContent = b.hidden ? '👁 Vorschau' : '👁 Vorschau schließen'; if (!b.hidden) { preview(); b.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }
+      if (t.dataset.del != null) {
+        const q = X.readQuestions(checked.xml).find(x => x.i === +t.dataset.del);
+        if (!confirm(`Frage „${q?.name || ''}“ aus der Sammlung entfernen?`)) return;
+        $('#kiIn', el).value = X.removeQuestion(checked.xml, +t.dataset.del); check(); toast('Frage entfernt');
+      }
+      if (t.dataset.copy === 'fix') {
+        const list = Object.entries(notes).filter(([, v]) => v.trim());
+        if (!list.length) { toast('Trage zuerst bei mindestens einer Frage einen Korrekturwunsch ein'); return; }
+        if (await copyText(X.correctionPrompt(checked.xml, list))) { kiCopiedPopup('die Fragen überarbeitet hat'); $('#kiIn', el).value = ''; $('#kiIn', el).placeholder = 'Hier die überarbeitete Datei der KI einfügen …'; for (const k in notes) delete notes[k]; check(); $('#kiIn', el).scrollIntoView({ block: 'center' }); }
+        else toast('Kopieren ging nicht');
+      }
       if (t.dataset.copy === 'exam') {
         if (!o.types.length) { toast('Bitte mindestens einen Aufgabenstil wählen'); return; }
         const p = X.examPrompt({ ...o, title: plain(doc.title) || 'Lernpfad' }, T.docToText(doc, env));

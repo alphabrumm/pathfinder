@@ -124,3 +124,41 @@ export function checkXml(src) {
 }
 
 export const fileName = title => `Pruefung-${slug(title).replace(/\s+/g, '-')}.xml`;
+
+/* ---------- Vorschau: Fragen lesen, eine Frage entfernen, Korrektur bei der KI anfordern ---------- */
+const txt = (q, sel) => q.querySelector(sel)?.textContent || '';
+/** Liest die Fragen für die Vorschau (ohne Kategorien) */
+export function readQuestions(xml) {
+  const x = new DOMParser().parseFromString(xml, 'application/xml'); let cat = '';
+  const out = [];
+  [...x.documentElement.children].filter(q => q.nodeName === 'question').forEach((q, i) => {
+    const type = q.getAttribute('type');
+    if (type === 'category') { cat = txt(q, 'category > text').split('/').pop(); return; }
+    const opt = sel => [...q.querySelectorAll(':scope > ' + sel)].map(o => ({ t: txt(o, 'text'), g: txt(o, 'group') || '1' }));
+    out.push({
+      i, cat, type, name: txt(q, ':scope > name > text').trim(), grade: txt(q, ':scope > defaultgrade').trim(),
+      text: txt(q, ':scope > questiontext > text'), feedback: txt(q, ':scope > generalfeedback > text'), grader: txt(q, ':scope > graderinfo > text'),
+      choices: type === 'gapselect' ? opt('selectoption') : type === 'ddwtos' ? opt('dragbox') : [],
+      answers: [...q.querySelectorAll(':scope > answer')].map(a => ({ ok: parseFloat(a.getAttribute('fraction')) > 0, t: txt(a, ':scope > text'), fb: txt(a, 'feedback > text') })),
+    });
+  });
+  return out;
+}
+/** entfernt die Frage mit Index i (Zählung über alle <question>, wie readQuestions) */
+export function removeQuestion(xml, i) {
+  const x = new DOMParser().parseFromString(xml, 'application/xml');
+  const qs = [...x.documentElement.children].filter(q => q.nodeName === 'question'); qs[i]?.remove();
+  const s = new XMLSerializer().serializeToString(x);
+  return s.startsWith('<?xml') ? s : '<?xml version="1.0" encoding="UTF-8"?>\n' + s;
+}
+/** Prompt: die KI soll die markierten Fragen überarbeiten und die ganze Datei zurückgeben */
+export function correctionPrompt(xml, notes) {
+  return `Überarbeite die folgende Moodle-XML-Fragensammlung. Ändere NUR die unten genannten Fragen gemäß den Hinweisen, alle anderen Fragen bleiben unverändert. Behalte Format, Kategorien und Fragenamen bei.
+Antworte NUR mit der vollständigen, wohlgeformten Moodle-XML-Datei in EINEM Codeblock (Beginn \`\`\`xml).
+
+KORREKTUREN
+${notes.map(([n, t]) => `- ${n}: ${t}`).join('\n')}
+
+FRAGENSAMMLUNG
+${xml}`;
+}
