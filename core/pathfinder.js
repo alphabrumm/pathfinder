@@ -1166,6 +1166,16 @@ export function startPathFinder(opts = {}) {
   }
   /** gängiges KI-Symbol (Funkelsterne) */
   const KI_ICON = '<svg class="ki-ico" viewBox="0 0 24 24" width="1.1em" height="1.1em" aria-hidden="true"><path fill="currentColor" d="M10 2.5l1.7 5.3a3 3 0 0 0 1.9 1.9L19 11.5l-5.4 1.8a3 3 0 0 0-1.9 1.9L10 20.5l-1.7-5.3a3 3 0 0 0-1.9-1.9L1 11.5l5.4-1.8a3 3 0 0 0 1.9-1.9z"/><path fill="currentColor" d="M19 1.5l.8 2.2a1.4 1.4 0 0 0 .8.8l2.2.8-2.2.8a1.4 1.4 0 0 0-.8.8l-.8 2.2-.8-2.2a1.4 1.4 0 0 0-.8-.8l-2.2-.8 2.2-.8a1.4 1.4 0 0 0 .8-.8z"/></svg>';
+  /** Hinweis nach „KI-Prompt generieren“: was jetzt in der KI zu tun ist */
+  function kiCopiedPopup() {
+    const w = document.createElement('div'); w.className = 'ki-pop-bd';
+    w.innerHTML = `<div class="ki-pop" role="dialog" aria-modal="true"><div class="ki-pop-ico">${KI_ICON}</div>
+      <p>Der Prompt für deine KI (ByLKI, Mistral AI, Claude, …) wurde generiert und in die Zwischenablage kopiert. Gehe jetzt zu deinem KI-Chatbot und füge den Prompt per Rechtsklick oder Tastenkürzel (⌘V bzw. Strg+V) ein.</p>
+      <p>Warte, bis deine KI mit dem Bau des Lernpfads fertig ist, und kopiere ihr Ergebnis hierher ins Feld „Antwort der KI“.</p>
+      <button class="lp-btn" data-ok="1">Erledigt</button></div>`;
+    w.addEventListener('click', e => { if (e.target.closest('[data-ok]')) { w.remove(); document.getElementById('kiIn')?.focus(); } });
+    document.body.appendChild(w); w.querySelector('[data-ok]').focus();
+  }
   async function openKI() {
     const T = await loadText(); const env = textEnv();
     const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
@@ -1174,12 +1184,12 @@ export function startPathFinder(opts = {}) {
     let parsed = null, lastAtt = {}, fileAtt = {}, tok = 0;
     el.innerHTML = `<header><b>${KI_ICON} Vorlage für KI</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
-        <div class="ki-step"><span class="n">1</span><b>Anleitung für die KI</b></div>
-        <span class="help">Fülle die Felder aus und kopiere die Anleitung in eine KI deiner Wahl (z. B. die, die deine Schule erlaubt). Sie beschreibt das Textformat – die KI muss PathFinder nicht kennen. Die KI liefert alles (auch Grafiken) in <b>einem</b> Textblock: einmal „Kopieren“ in der KI, unten einfügen, fertig.</span>
+        <div class="ki-step"><span class="n">1</span><b>Prompt für die KI</b></div>
+        <span class="help">Fülle die Felder aus und tippe auf „KI-Prompt generieren“. Den Prompt fügst du in eine KI deiner Wahl ein (z. B. die, die deine Schule erlaubt). Er beschreibt das Textformat – die KI muss PathFinder nicht kennen. Die KI liefert alles (auch Grafiken) in <b>einem</b> Textblock: einmal „Kopieren“ in der KI, unten einfügen, fertig.</span>
         <label>Thema<input type="text" data-k="thema" value="${esc(info.thema || '')}" placeholder="z. B. Relative Zellbezüge in der Tabellenkalkulation"></label>
         <div class="row"><label>Fach<input type="text" data-k="fach" value="${esc(info.fach || '')}" placeholder="Informatik"></label><label>Zielgruppe<input type="text" data-k="klasse" value="${esc(info.klasse || '')}" placeholder="z. B. Gymnasium, 9. Klasse"></label><label>Umfang<input type="text" data-k="umfang" value="${esc(info.umfang || '')}" placeholder="z. B. 4 Stationen, 45 min"></label></div>
         <label>Präzise Beschreibung der gewünschten Inhalte<textarea data-k="extra" rows="3" placeholder="z. B. mit Alltagsbeispiel Pausenverkauf, eine Station als Challenge. Füge zwischen den Stationen wenigstens eine sinnvolle Animation für die Erklärung eines Aspekts ein.">${esc(info.extra || '')}</textarea></label>
-        <div class="ki-btns"><button class="lp-btn" data-copy="prompt">📋 Anleitung kopieren</button><button class="lp-btn alt" data-copy="doc" title="Den geöffneten Lernpfad als Text – z. B. um ihn von der KI überarbeiten zu lassen">📋 Aktuellen Lernpfad als Text</button><button class="lp-btn alt" data-copy="show">Format ansehen</button></div>
+        <div class="ki-btns"><button class="lp-btn" data-copy="prompt">${KI_ICON} KI-Prompt generieren</button><button class="lp-btn alt" data-copy="doc" title="Den geöffneten Lernpfad als Text – z. B. um ihn von der KI überarbeiten zu lassen">📋 Aktuellen Lernpfad als Text</button><button class="lp-btn alt" data-copy="show">Format ansehen</button></div>
         <div class="ki-step"><span class="n">2</span><b>Antwort der KI hier einfügen</b></div>
         <textarea id="kiIn" rows="10" spellcheck="false" placeholder="# Titel des Lernpfads&#10;&#10;## Station: …"></textarea>
         <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Datei der KI laden<input type="file" id="kiFiles" multiple accept=".txt,.md,.svg,.png,.gif,.jpg,.jpeg,.webp,.zip" hidden></label><span class="help" style="align-self:center">statt Einfügen: lernpfad.txt – auch zusätzliche Bilder (.svg, .png, .gif, ZIP)</span></div>
@@ -1224,7 +1234,7 @@ export function startPathFinder(opts = {}) {
     el.addEventListener('click', async e => {
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.x) { closeDlg(false); return; }
-      if (t.dataset.copy === 'prompt') toast(await copyText(T.promptFor(info, env)) ? '📋 Anleitung kopiert – jetzt in die KI einfügen' : 'Kopieren ging nicht');
+      if (t.dataset.copy === 'prompt') { if (await copyText(T.promptFor(info, env))) kiCopiedPopup(); else toast('Kopieren ging nicht'); }
       if (t.dataset.copy === 'doc') { const o = {}; const txt = T.docToText(doc, env, o); lastAtt = Object.fromEntries(Object.entries(o.attachments).map(([k, v]) => [k.toLowerCase(), v])); }
       if (t.dataset.copy === 'doc') toast(await copyText('Überarbeite diesen Lernpfad. Behalte das Format genau bei und antworte nur mit dem vollständigen Lernpfad in einem Codeblock. Verweise wie anhang:bild1 ohne Eintrag im Anhang einfach stehen lassen.\n\n' + T.formatHelp(env) + '\nLERNPFAD:\n' + T.docToText(doc, env)) ? '📋 Lernpfad als Text kopiert (mit Formatbeschreibung)' : 'Kopieren ging nicht');
       if (t.dataset.copy === 'show') { const pre = document.createElement('pre'); pre.className = 'ki-fmt'; pre.textContent = T.formatHelp(env); t.closest('.ki-btns').after(pre); t.remove(); }
