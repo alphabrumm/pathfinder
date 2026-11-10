@@ -444,3 +444,40 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .pf-skin .ed-hint { font-family: -apple-system, system-ui, sans-serif; }
 .pf-skin-frame { background: #fff; }
 .pf-skin.editing .code pre[contenteditable] { padding: 12px 16px; margin: 0; white-space: pre; overflow-x: auto; }
+
+/* ---------- Dunkle Oberfläche des Editors (folgt der Einstellung des Geräts) ----------
+   Gilt nur für Menüband, Seitenleiste, Menüs und Dialoge – der Lernpfad selbst behält seine Farbpalette,
+   damit Lehrkraft und Schüler genau dasselbe sehen. Exportierte Seiten (body.pf-player) bleiben unberührt. */
+@media (prefers-color-scheme: dark) {
+  body:not(.pf-player) {
+    --dk-bg: #1b1924; --dk-surf: #252231; --dk-surf2: #2f2b3d; --dk-line: #3c3750; --dk-ink: #ece9f4; --dk-mute: #a8a1bb;
+    color-scheme: dark;
+  }
+  body:not(.pf-player) .ed-bar { --ed-bg: #1b1924; --ed-ink: #ece9f4; --ed-mid: #2f2b3d; border-bottom-color: #3c3750; }
+  body:not(.pf-player) .ed-bar .ed-ki { background: #3a2f6b; color: #d9ceff; }
+  body:not(.pf-player) .ed-sep { background: #3c3750; }
+  body:not(.pf-player) .pf-panel, body:not(.pf-player) .ed-dlg, body:not(.pf-player) .ed-pop, body:not(.pf-player) .ki-pop { background: var(--dk-surf); color: var(--dk-ink); border-color: var(--dk-line); }
+  body:not(.pf-player) .ed-dlg header { background: var(--dk-surf); border-bottom-color: var(--dk-line); }
+  body:not(.pf-player) .ed-dlg header button { background: var(--dk-surf2); color: var(--dk-ink); }
+  body:not(.pf-player) .ed-dlg header button.ok { background: #5b8def; color: #fff; }
+  body:not(.pf-player) .pf-ptabs { border-bottom-color: var(--dk-line); }
+  body:not(.pf-player) .pf-ptabs button, body:not(.pf-player) .ed-dseg, body:not(.pf-player) .ed-divc > button, body:not(.pf-player) .ed-color { background: var(--dk-surf2); color: var(--dk-ink); }
+  body:not(.pf-player) .ed-dseg button { color: var(--dk-ink); }
+  body:not(.pf-player) .pf-ptabs button[aria-pressed="true"], body:not(.pf-player) .ed-dseg button[aria-pressed="true"], body:not(.pf-player) .ed-divc > [aria-pressed="true"] { background: #f6bf3a; color: #2b2300; }
+  body:not(.pf-player) .pf-ptabs [data-pt="close"] { background: transparent; }
+  body:not(.pf-player) .ed-form label, body:not(.pf-player) .ed-form .chk, body:not(.pf-player) .ex-lv, body:not(.pf-player) .ed-form .ed-divc .ed-color { color: var(--dk-ink); }
+  body:not(.pf-player) .ed-form .help { color: var(--dk-mute); }
+  body:not(.pf-player) .ed-form legend { color: var(--dk-mute); }
+  body:not(.pf-player) .ed-form fieldset, body:not(.pf-player) .ed-form .rule { border-color: var(--dk-line); }
+  body:not(.pf-player) .ed-form input[type=text], body:not(.pf-player) .ed-form input[type=number], body:not(.pf-player) .ed-form select, body:not(.pf-player) .ed-form textarea { background: var(--dk-bg); color: var(--dk-ink); border-color: var(--dk-line); }
+  body:not(.pf-player) .ed-form .list button, body:not(.pf-player) .ed-form .add, body:not(.pf-player) .ed-pat button, body:not(.pf-player) .ed-figs button, body:not(.pf-player) .ed-pal button, body:not(.pf-player) .ed-form .list .pf-eye { background: var(--dk-surf2); color: var(--dk-ink); border-color: var(--dk-line); }
+  body:not(.pf-player) .ed-pal button:hover, body:not(.pf-player) .ed-pal button.hi { background: #3a3157; border-color: #8a72e0; }
+  body:not(.pf-player) .ed-pal button span { color: var(--dk-mute); }
+  body:not(.pf-player) .ed-pat button[aria-pressed="true"], body:not(.pf-player) .ed-figs button[aria-pressed="true"] { background: #4a3d12; border-color: #f6bf3a; }
+  body:not(.pf-player) .ed-figs img { background: #fff; border-radius: 8px; }
+  body:not(.pf-player) .ki-step .n { background: #ece9f4; color: #1b1924; }
+  body:not(.pf-player) .ki-fmt { background: var(--dk-bg); color: var(--dk-ink); }
+  body:not(.pf-player) .ki-res .good { color: #7fd69c; } body:not(.pf-player) .ki-res .bad { color: #ff8f80; } body:not(.pf-player) .ki-res .warn { color: #f6c35a; }
+  body:not(.pf-player) .ed-certprev { background: #fff; color: #222; } /* wie das spätere PDF: Papier */
+  body:not(.pf-player) .ex-tri input[type=range]::-webkit-slider-thumb { border-color: #ece9f4; background: #252231; }
+}

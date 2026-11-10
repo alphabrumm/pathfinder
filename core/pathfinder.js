@@ -36,6 +36,8 @@ export const PALETTES = [
   { n: 'Papier', l: { bg: '#faf6ee', surface: '#fffdf8', 'surface-2': '#f3ecdf', ink: '#2f2a24', 'ink-2': '#6f6558', line: '#e7dccb', a1: '#8c3b2e', a1s: '#ead1c6', a2: '#2e5a6b', a2s: '#c9dde4', a3: '#d9b56a', a3d: '#a8822f', a3s: '#f5ead1', a3ink: '#2c2208', g1: '#efe3cc', g2: '#e8d6c4', g3: '#dfe6e0', heroink: '#2f2a24' } },
   { n: 'Schiefer', l: { bg: '#f4f6f8', surface: '#fff', 'surface-2': '#e9edf1', ink: '#1e2833', 'ink-2': '#5b6876', line: '#d9e0e7', a1: '#34506b', a1s: '#c4d3e2', a2: '#e0662f', a2s: '#fbd2bf', a3: '#f59e0b', a3d: '#c27c00', a3s: '#fdecc8', a3ink: '#2a1c00', g1: '#c4d3e2', g2: '#dde4ea', g3: '#fbd2bf', heroink: '#1e2833' } },
   { n: 'Retro-Arcade', l: { bg: '#14112b', surface: '#1e1a3d', 'surface-2': '#2a2552', ink: '#f2eeff', 'ink-2': '#b3aad8', line: '#3a3470', a1: '#29e0ff', a1s: '#123d55', a2: '#ff3fb4', a2s: '#4a1440', a3: '#ffe23f', a3d: '#c9a800', a3s: '#3a3410', a3ink: '#1a1600', g1: '#3b1f7a', g2: '#9a1f7a', g3: '#e05a2a', heroink: '#ffffff' } },
+  { n: 'Nacht', l: { bg: '#161b26', surface: '#1f2533', 'surface-2': '#283042', ink: '#e8edf6', 'ink-2': '#a7b1c4', line: '#343d52', a1: '#7aa7ff', a1s: '#1f3358', a2: '#c79bff', a2s: '#3a2a57', a3: '#ffcc66', a3d: '#c99a2e', a3s: '#3d3220', a3ink: '#2a1f00', g1: '#1d2b4f', g2: '#2f2a5e', g3: '#4a2f5e', heroink: '#ffffff' } },
+  { n: 'Tafel', l: { bg: '#18241f', surface: '#1f2e28', 'surface-2': '#273a32', ink: '#eef3ea', 'ink-2': '#aebdb3', line: '#33493f', a1: '#8fd3b0', a1s: '#22433a', a2: '#f2a7a0', a2s: '#4a2d2b', a3: '#f4e27a', a3d: '#c2b14a', a3s: '#3b3a22', a3ink: '#2a2600', g1: '#1e3a30', g2: '#25463a', g3: '#2f5446', heroink: '#f4f7f1' } },
   { n: 'Terminal', l: { bg: '#0d1410', surface: '#121c16', 'surface-2': '#18261d', ink: '#d9f7e3', 'ink-2': '#8fb79c', line: '#1f3328', a1: '#4ade80', a1s: '#143322', a2: '#38bdf8', a2s: '#0f2c3a', a3: '#a3e635', a3d: '#6c9d1a', a3s: '#1d2a10', a3ink: '#0b1400', g1: '#0f2e1c', g2: '#123b2a', g3: '#1d4a20', heroink: '#d9f7e3' } },
 ];
 const FONTS = {
@@ -1353,13 +1355,17 @@ export function startPathFinder(opts = {}) {
     const xp = c.show.xp && doc.form === 'challenge' ? `${xpNow()} von ${xpMax()} XP` : '';
     const from = new Date(prog.start || Date.now()).toLocaleDateString('de-DE'), to = new Date().toLocaleDateString('de-DE');
     const code = certCode([doc.id, (name || '').trim().toLowerCase(), pct, mins, to]);
-    return { c, name: (name || '').trim(), mins, rows, pct, solved, total: all.length, pts, xp, from, to, code, head: c.need === 'immer' ? 'Nachweis' : doc.form === 'challenge' ? 'Challenge-Urkunde' : 'Zertifikat' };
+    // „erfolgreich“ nur, wenn mindestens 80 % gelöst sind; sonst neutral „mit folgendem Ergebnis“
+    let text = c.text || '';
+    if (pct >= 80) text = text.replace(/mit folgendem Ergebnis bearbeitet/i, 'erfolgreich bearbeitet');
+    else text = /erfolgreich bearbeitet\.?/i.test(text) ? text.replace(/erfolgreich bearbeitet\.?/i, 'mit folgendem Ergebnis bearbeitet:') : text.replace(/\s*erfolgreich\b/i, '');
+    return { c, text, name: (name || '').trim(), mins, rows, pct, solved, total: all.length, pts, xp, from, to, code, head: c.need === 'immer' ? 'Nachweis' : doc.form === 'challenge' ? 'Challenge-Urkunde' : 'Zertifikat' };
   }
   function certView(D) {
     const p = PALETTES[doc.design.pal].l, c = D.c;
     return `<div class="ed-certprev" style="border-color:${p.a1}"><div style="font-size:12px;letter-spacing:.14em;color:#888">${esc(plain(doc.kicker)).toUpperCase()}</div>
       <h2 style="color:${p.a1}">${D.head}</h2><div style="font-size:20px;font-weight:700;margin:8px 0">${esc(D.name || '(dein Name)')}</div>
-      <div>${esc(c.text)}</div><div style="font-weight:700;margin-top:4px">„${esc(plain(doc.title))}“</div>
+      <div>${esc(D.text)}</div><div style="font-weight:700;margin-top:4px">„${esc(plain(doc.title))}“</div>
       ${c.show.zeit ? `<div style="margin-top:8px;font-size:14px">Aktive Bearbeitungszeit: <b>${D.mins} min</b> · ${D.from}${D.from !== D.to ? ' – ' + D.to : ''}</div>` : ''}
       ${c.show.quiz ? `<table><tr><td><b>Station</b></td><td><b>gelöst</b></td>${c.show.tipps ? '<td><b>Hilfen</b></td>' : ''}</tr>${D.rows.map(r => `<tr><td>${esc(r.title)}</td><td>${r.done}</td>${c.show.tipps ? `<td>${r.help}</td>` : ''}</tr>`).join('')}</table>` : ''}
       <div style="font-weight:700;margin-top:6px">${D.total ? `${D.solved} von ${D.total} Aufgaben gelöst (${D.pct} %)` : ''}${D.pts ? ' · ' + D.pts : ''}${D.xp ? ' · ⚡ ' + D.xp : ''}</div>
@@ -1379,7 +1385,7 @@ export function startPathFinder(opts = {}) {
     pdf.text(D.head, W / 2, y, 34, { bold: true, col: P.a1, align: 'center' }); y += 50;
     pdf.text(fitText(D.name || ' ', 24, true, W - 2 * M - 40), W / 2, y, 24, { bold: true, col: '#1f1b2e', align: 'center' }); y += 10;
     pdf.line(W / 2 - 120, y, W / 2 + 120, y, P.a3, 1.5); y += 26;
-    for (const l of wrapText(c.text, 13, false, W - 2 * M - 60)) { pdf.text(l, W / 2, y, 13, { col: '#333333', align: 'center' }); y += 18; }
+    for (const l of wrapText(D.text, 13, false, W - 2 * M - 60)) { pdf.text(l, W / 2, y, 13, { col: '#333333', align: 'center' }); y += 18; }
     for (const l of wrapText('„' + plain(doc.title) + '“', 16, true, W - 2 * M - 60)) { pdf.text(l, W / 2, y + 4, 16, { bold: true, col: '#1f1b2e', align: 'center' }); y += 22; }
     y += 14;
     if (c.show.zeit) { pdf.text(`Aktive Bearbeitungszeit: ${D.mins} min   ·   ${D.from}${D.from !== D.to ? ' – ' + D.to : ''}`, W / 2, y, 11, { col: '#555555', align: 'center' }); y += 28; }
