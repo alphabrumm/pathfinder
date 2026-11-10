@@ -377,7 +377,7 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .ed-figs button { display: grid; justify-items: center; gap: 4px; padding: 8px 4px; border: 2px solid #e3dceb; background: #faf8fc; border-radius: 10px; cursor: pointer; font-size: 12px; }
 .ed-figs button[aria-pressed="true"] { border-color: #1f1b2e; background: #fff; }
 .ed-figs img { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; }
-.lp-figur > img { image-rendering: pixelated; object-fit: contain; background: var(--surface); padding: 6px; }
+.lp-figur > img { image-rendering: pixelated; object-fit: contain; background: var(--surface); padding: 10px; } /* Bild ganz im Kreis: Quadrat-Inhalt passt bei 10px Abstand in den runden Rahmen */
 .ed-form input[type=range] { width: 100%; accent-color: #5b6fc2; }
 
 /* Vorlage für KI */
