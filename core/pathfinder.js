@@ -271,7 +271,7 @@ export function startPathFinder(opts = {}) {
     clearTimeout(pending); pending = null;
     const s = JSON.stringify(doc); if (s === hist[hist.length - 1]) return;
     hist.push(s); if (hist.length > (s.length > 300000 ? 25 : 200)) hist.shift(); fut = []; save(); updUndo();
-    if (panelOpen && !panelEl.contains(document.activeElement)) drawPanel(); // im Lernpfad Geändertes auch rechts zeigen
+    if (panelOpen && !panelEl.contains(document.activeElement) && Date.now() - panelTouched > 1500) drawPanel(); // im Lernpfad Geändertes auch rechts zeigen
   }
   function softCommit() { $('#saved').textContent = '…'; clearTimeout(pending); pending = setTimeout(commit, 500); }
   function undo() { if (pending) commit(); if (hist.length < 2) return; fut.push(hist.pop()); doc = JSON.parse(hist[hist.length - 1]); save(); render(); updUndo(); drawPanel?.(); }
@@ -1126,12 +1126,12 @@ export function startPathFinder(opts = {}) {
   }
 
   /* ---------- Seitenleiste rechts (wie am iPad): Design und Einstellungen des gewählten Bausteins ---------- */
-  let panelOpen = false, panelWhat = 'design', panelEl = null, panelBack = false;
+  let panelOpen = false, panelWhat = 'design', panelEl = null, panelBack = false, panelTouched = 0;
   const wrapEl = $('.lpwrap');
   if (!PLAYER) {
     const body = document.createElement('div'); body.className = 'pf-body';
     scroller.parentNode.insertBefore(body, scroller); body.appendChild(scroller);
-    panelEl = document.createElement('aside'); panelEl.className = 'pf-panel'; panelEl.hidden = true; panelEl.setAttribute('aria-label', 'Einstellungen');
+    panelEl = document.createElement('aside'); panelEl.className = 'pf-panel'; panelEl.hidden = true; panelEl.setAttribute('aria-label', 'Einstellungen'); ['input', 'change', 'pointerdown'].forEach(t => panelEl.addEventListener(t, () => { panelTouched = Date.now(); }, true));
     body.appendChild(panelEl);
     panelEl.addEventListener('click', e => {
       const t = e.target.closest('[data-pt]'); if (!t) return;
@@ -1143,15 +1143,19 @@ export function startPathFinder(opts = {}) {
   function panelFits() { return !!panelEl && wrapEl.clientWidth >= 760; }
   function showPanel(what) { panelWhat = what || panelWhat; panelOpen = true; panelEl.hidden = false; wrapEl.classList.add('panel-open'); $('#bDesign')?.classList.add('on'); drawPanel(); }
   function hidePanel() { panelOpen = false; if (panelEl) panelEl.hidden = true; wrapEl.classList.remove('panel-open'); $('#bDesign')?.classList.remove('on'); }
+  let panelDrawn = null;
   function drawPanel() {
     if (!panelOpen) return;
     let what = panelWhat;
     if (what.startsWith('st:') ? !doc.stations.some(x => 'st:' + x.id === what) : what !== 'design' && !findBlock(what)) what = 'none';
+    // gleiche Ansicht neu gezeichnet (z. B. nach einer Änderung per Schieberegler): Scrollstand behalten
+    const keep = panelDrawn === what ? ($('.pf-pbody', panelEl)?.scrollTop || 0) : 0; panelDrawn = what;
     panelEl.innerHTML = `<div class="pf-ptabs"><button data-pt="design" aria-pressed="${what === 'design'}">🎨 Design</button><button data-pt="sel" aria-pressed="${what !== 'design'}">⚙ Auswahl</button><span class="sp"></span><button data-pt="close" aria-label="Seitenleiste schließen" title="schließen">✕</button></div>`;
     const body = document.createElement('div'); body.className = 'pf-pbody'; panelEl.appendChild(body);
     if (what === 'design') designUI(body, true);
     else if (what === 'none') body.innerHTML = '<div class="ed-form"><span class="help">Tippe im Lernpfad einen Baustein an – hier erscheinen seine Einstellungen. Für eine Station: ⚙ neben dem Stationstitel.</span></div>';
     else formUI(body, what, { live: true });
+    if (keep) body.scrollTop = keep;
   }
 
 
