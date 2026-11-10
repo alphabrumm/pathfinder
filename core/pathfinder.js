@@ -1417,7 +1417,9 @@ export function startPathFinder(opts = {}) {
   if (!PLAYER) {
   $('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
   $('#bUndo').onclick = undo; $('#bRedo').onclick = redo;
-  $('#bSingle').onclick = () => { single = !single; $('#bSingle').classList.toggle('on', single); $('#bSingle').setAttribute('aria-pressed', String(single)); render(); scroller.scrollTop = 0; };
+  const setSingle = v => { single = v; const b = $('#bSingle'); if (b) { b.classList.toggle('on', single); b.setAttribute('aria-pressed', String(single)); } document.querySelectorAll('#viewSeg button').forEach(x => x.setAttribute('aria-pressed', String((x.dataset.view === 'one') === single))); render(); scroller.scrollTop = 0; };
+  if ($('#bSingle')) $('#bSingle').onclick = () => setSingle(!single);
+  if ($('#viewSeg')) $('#viewSeg').onclick = e => { const x = e.target.closest('button[data-view]'); if (x) setSingle(x.dataset.view === 'one'); };
   $('#bDesign').onclick = openDesign;
   $('#bOpen').onclick = e => openChooser(e.currentTarget);
   if ($('#bKI')) $('#bKI').onclick = () => openKI(); // nur in der eigenständigen WebApp
