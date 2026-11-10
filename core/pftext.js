@@ -476,7 +476,7 @@ REGELN
 - WICHTIG – alles in EINEN kopierbaren Textblock: Der komplette Lernpfad samt Anhang mit allen Grafiken steht in einem einzigen Codeblock, damit die Lehrkraft nur einmal kopieren und einfügen muss. Beginne den Block mit vier Backticks und „text“ (\`\`\`\`text) und beende ihn mit vier Backticks (\`\`\`\`), damit Code-Beispiele darin den Block nicht vorzeitig schließen. Kein Text davor oder danach, nichts auf mehrere Blöcke oder Nachrichten verteilen.
 - Wenn du Dateien zum Herunterladen erzeugen kannst, liefere denselben Inhalt zusätzlich als eine Textdatei „lernpfad.txt“.
 - Sprache: Deutsch, Schüler werden mit „du“ angesprochen, kurze Sätze.
-- Jede Station: kurzer Einstieg, dann Erklärung, dann mindestens eine Übung (Aufgabe, Quiz, Lückentext oder Zuordnen).
+${[info.fach, info.klasse].some(x => x?.trim()) ? `- Schreibe im Kopf die Zeile „Kopfzeile: ${[info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')}“.\n` : ''}- Jede Station: kurzer Einstieg, dann Erklärung, dann mindestens eine Übung (Aufgabe, Quiz, Lückentext oder Zuordnen).
 - Aufgaben mit eindeutiger Lösung bekommen eine „Antwort:“-Zeile, damit sie automatisch geprüft werden.
 - Tipps bauen aufeinander auf: zuerst ein kleiner Denkanstoß, zuletzt fast die Lösung.
 - Beim Quiz: 3–4 Antworten, genau eine oder mehrere mit [x], zu falschen Antworten eine kurze Rückmeldung.

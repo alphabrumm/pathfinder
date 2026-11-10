@@ -4,7 +4,7 @@
 @font-face { font-family: "Pixelify Sans"; src: url(../fonts/PixelifySans.ttf) format("truetype"); font-weight: 400 700; }
 @font-face { font-family: "Atkinson Hyperlegible"; src: url(../fonts/AtkinsonHyperlegible-Regular.ttf) format("truetype"); font-weight: 400; }
 @font-face { font-family: "Atkinson Hyperlegible"; src: url(../fonts/AtkinsonHyperlegible-Bold.ttf) format("truetype"); font-weight: 700; }
-@font-face { font-family: "Caveat"; src: url(../fonts/Caveat.ttf) format("truetype"); font-weight: 400 700; }
+@font-face { font-family: "Caveat"; src: url(../fonts/Caveat.ttf) format("truetype"); font-weight: 400 700; size-adjust: 122%; }
 
 :root {
   --fz: 1;
@@ -410,6 +410,18 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .ki-step { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 16px; }
 .ki-step .n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #1f1b2e; color: #fff; font-weight: 700; font-size: 14px; }
 .ki-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Prüfung: Schieberegler mit zwei Griffen (Basis | Mittel | Anspruchsvoll) */
+.ex-tri { position: relative; height: 34px; }
+.ex-bar { position: absolute; left: 11px; right: 11px; top: 12px; height: 10px; border-radius: 6px; }
+.ex-tri input[type=range] { position: absolute; inset: 0; width: 100%; margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+.ex-tri input[type=range]::-webkit-slider-runnable-track { background: none; height: 34px; }
+.ex-tri input[type=range]::-moz-range-track { background: none; }
+.ex-tri input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 26px; height: 26px; margin-top: 4px; border-radius: 50%; background: #fff; border: 3px solid #1f1b2e; box-shadow: 0 1px 4px rgba(0,0,0,.25); cursor: grab; }
+.ex-tri input[type=range]::-moz-range-thumb { pointer-events: auto; width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 3px solid #1f1b2e; cursor: grab; }
+.ex-lv { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; font-weight: 650; color: #333; }
+.ex-lv i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.ex-types { display: grid; gap: 6px; }
+.ed-pal.ed-pal1 { grid-template-columns: 1fr; width: min(340px, 86vw); }
 #kiIn { font: 13px/1.45 ui-monospace, Menlo, monospace; width: 100%; box-sizing: border-box; }
 .ki-res { font-size: 14px; } .ki-res ul { margin: 4px 0 8px; padding-left: 20px; max-height: 160px; overflow: auto; }
 .ki-res .good { color: #2e7d4f; font-weight: 700; } .ki-res .bad { color: #c0392b; font-weight: 700; } .ki-res .warn { color: #a86b00; font-weight: 700; margin-top: 4px; }

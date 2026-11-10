@@ -209,13 +209,15 @@ export function startPathFinder(opts = {}) {
   /* ---------- Beispiel und Umwandlung ---------- */
   const emptyDoc = (form = 'lernpfad') => ({
     v: 2, id: uid(), form, design: { pal: 0, font: 'pixel', shape: 'eckig', hero: 'logo', heroImg: '' },
-    kicker: `${appName} · ${form === 'challenge' ? 'Challenge' : 'Lernpfad'}`, title: '', subtitle: '', goals: [], rank: '', anim: {}, typeLines: [],
+    kicker: '', title: '', subtitle: '', goals: [], rank: '', anim: {}, typeLines: [],
     stations: [{ id: uid(), title: '', sub: '', check: false, blocks: [{ id: uid(), type: 'text', html: '' }] }],
     cert: { on: true, need: 'immer', pct: 80, text: 'hat den Lernpfad mit folgendem Ergebnis bearbeitet:', show: { zeit: true, tipps: true, quiz: true, xp: true } },
   });
   function migrate(d) {
     d.goals = d.goals || []; d.rank = d.rank || ''; d.id = d.id || uid(); d.anim = d.anim || {}; d.typeLines = d.typeLines || [];
     d.cert = d.cert || emptyDoc().cert;
+    // frühere Standard-Kopfzeile („PathFinder · Lernpfad“, „JPad · Challenge“ …) ist Werbung – weg damit
+    if (/^\s*(PathFinder|JPad|\w+Pad)\s*·\s*(Lernpfad|Challenge)\s*$/i.test(d.kicker || '')) d.kicker = '';
     for (const s of d.stations) {
       s.check = !!s.check;
       for (const b of s.blocks) {
@@ -284,7 +286,7 @@ export function startPathFinder(opts = {}) {
   function undo() { if (pending) commit(); if (hist.length < 2) return; fut.push(hist.pop()); doc = JSON.parse(hist[hist.length - 1]); save(); render(); updUndo(); drawPanel?.(); }
   function redo() { if (!fut.length) return; const s = fut.pop(); hist.push(s); doc = JSON.parse(s); save(); render(); updUndo(); drawPanel?.(); }
   function updUndo() { if (!$('#bUndo')) return; $('#bUndo').disabled = hist.length < 2; $('#bRedo').disabled = !fut.length; }
-  function openDoc(d) { if (pending) commit(); if (panelOpen) panelWhat = 'design'; doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); selId = null; curSid = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; drawPanel(); }
+  function openDoc(d) { if (pending) commit(); if (panelOpen) { panelWhat = 'design'; hidePanel(); } doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); selId = null; curSid = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; drawPanel(); }
 
   function findBlock(id) {
     for (const st of doc.stations) { const i = st.blocks.findIndex(b => b.id === id); if (i >= 0) return { st, i, b: st.blocks[i] }; }
@@ -358,6 +360,7 @@ export function startPathFinder(opts = {}) {
     for (const k in p.l) st.setProperty('--' + k, p.l[k]);
     st.setProperty('--font-display', f.d); st.setProperty('--display-weight', f.w); st.setProperty('--display-ls', f.ls); st.setProperty('--fz', fz);
     lp.dataset.shape = doc.design.shape; lp.dataset.form = doc.form;
+    if (doc.design.bgColor) { st.setProperty('--bg', doc.design.bgColor); lp.closest('.lpwrap')?.style.setProperty('--bg', doc.design.bgColor); } else lp.closest('.lpwrap')?.style.removeProperty('--bg');
     lp.dataset.divider = doc.design.divider || 'linie'; if (doc.design.divColor) st.setProperty('--div', doc.design.divColor); else st.removeProperty('--div');
     const pat = doc.design.pattern || 'punkte', k = doc.design.patDensity || 1, op = doc.design.patOpacity ?? 1;
     const a = (x) => +(x * op).toFixed(3), sz = n => `${Math.round(n / k)}px ${Math.round(n / k)}px`;
@@ -386,7 +389,7 @@ export function startPathFinder(opts = {}) {
     const goals = doc.goals || [];
     h += `<header class="lp-hero${d.hero === 'hintergrund' && d.heroImg ? ' has-bg' : ''}${d.hero === 'gross' && d.heroImg ? ' big' : ''}"${d.hero === 'hintergrund' && d.heroImg ? ` style="background-image:url(${d.heroImg})"` : ''}>`
       + (d.hero !== 'hintergrund' ? `<div class="lp-logo${d.hero === 'logo' && opts.logo ? ' applogo' : ''}${d.hero !== 'logo' && d.heroImg ? ' own' : ''}"${E() ? ' title="Antippen: eigenes Bild oder GIF setzen"' : ''}>${logo}</div>` : '')
-      + `<div style="min-width:0">${ce('$kicker', doc.kicker, 'Kopfzeile', { tag: 'small' })}${ce('$title', doc.title, 'Titel des Lernpfads', { tag: 'h1', anim: doc.anim?.title })}${ce('$subtitle', doc.subtitle, 'Untertitel', { tag: 'p', rich: true, anim: doc.anim?.subtitle })}`
+      + `<div style="min-width:0">${ce('$kicker', doc.kicker, 'Kopfzeile, z. B. Fach · Jahrgangsstufe', { tag: 'small' })}${ce('$title', doc.title, 'Titel des Lernpfads', { tag: 'h1', anim: doc.anim?.title })}${ce('$subtitle', doc.subtitle, 'Untertitel', { tag: 'p', rich: true, anim: doc.anim?.subtitle })}`
       + (goals.length ? `<ul class="lp-goals">${goals.map((g, i) => ce('$goals.' + i, g, 'Lernziel', { tag: 'li', rich: true })).join('')}</ul>` : '')
       + (doc.rank ? `<div class="lp-rank">${ce('$rank', doc.rank, 'Rang', { tag: 'span', rich: true })}</div>` : '')
       + (E() && (!goals.length || !doc.rank) ? `<div class="ed-hint" style="display:inline-block">Lernziele und Rang: ⚙ Einstellungen → Kopf</div>` : '')
@@ -416,7 +419,7 @@ export function startPathFinder(opts = {}) {
     });
     if (E()) h += `<button class="ed-add-station" data-act="addStation">＋ Neue Station</button>`;
     if (doc.cert.on || E()) h += certHtml();
-    h += `</main><footer class="lp-foot">${doc.form === 'challenge' ? 'Challenge' : 'Lernpfad'} · erstellt mit PathFinder · läuft komplett im Browser${scorm?.ok ? ' · Fortschritt wird in der Lernplattform gespeichert' : ''}</footer>`;
+    h += `</main><footer class="lp-foot">${doc.form === 'challenge' ? 'Challenge' : 'Lernpfad'} · läuft komplett im Browser${scorm?.ok ? ' · Fortschritt wird in der Lernplattform gespeichert' : ''}</footer>`;
     lp.innerHTML = h;
     runAnims();
     if (PLAYER) progSave();
@@ -463,7 +466,7 @@ export function startPathFinder(opts = {}) {
       const k = el.dataset.pf; if (k === 'nr') continue;
       el.contentEditable = 'true'; el.spellcheck = true;
       if (el.closest('[data-sid]')) { el.dataset.f = '$st.' + k; el.dataset.ph = k === 'title' ? 'Titel der Station' : 'Untertitel'; }
-      else { el.dataset.f = k === 'goals' ? '$goalsList' : '$' + k; el.dataset.ph = { title: 'Titel des Lernpfads', kicker: 'Kopfzeile', subtitle: 'Untertitel', goals: 'Lernziele' }[k] || ''; if (k !== 'title') el.dataset.rich = '1'; }
+      else { el.dataset.f = k === 'goals' ? '$goalsList' : '$' + k; el.dataset.ph = { title: 'Titel des Lernpfads', kicker: 'Kopfzeile, z. B. Fach · Jahrgangsstufe', subtitle: 'Untertitel', goals: 'Lernziele' }[k] || ''; if (k !== 'title') el.dataset.rich = '1'; }
     }
     // Code-Kästen innerhalb von HTML-Bausteinen (z. B. zwei nebeneinander) zeigen und bearbeitbar machen
     for (const c of $$('.pf-skin-html .code[data-src]', lp)) { const k = c.dataset.src; if (!(k in (sk.src || {}))) continue; c.innerHTML = `<div class="code-head"><span class="fname">${esc(c.dataset.file || '')}</span></div><pre contenteditable="true" data-f="$skin.src.${esc(k)}" data-ph="Code …" spellcheck="false">${esc(sk.src[k])}</pre>`; }
@@ -1084,6 +1087,8 @@ export function startPathFinder(opts = {}) {
       };
     };
   }
+  const paletteBg = d => { const c = (PALETTES[d.pal] || PALETTES[0]).l.bg || '#ffffff'; return /^#[0-9a-f]{6}$/i.test(c) ? c : '#ffffff'; };
+  const lum = hex => { const n = parseInt(hex.slice(1), 16), f = v => (v /= 255) <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; return .2126 * f(n >> 16) + .7152 * f(n >> 8 & 255) + .0722 * f(n & 255); };
   const paletteDiv = d => { const c = (PALETTES[d.pal] || PALETTES[0]).l.a3 || '#f6bf3a'; return /^#[0-9a-f]{6}$/i.test(c) ? c : '#f6bf3a'; };
   function designUI(el, live) {    if (doc.skin) { skinDesignUI(el, live); return; }
     const seg = (k, o, cur) => `<span class="ed-dseg" data-seg="${k}">${o.map(([v, n]) => `<button data-v="${v}" aria-pressed="${v === cur}">${n}</button>`).join('')}</span>`;
@@ -1099,6 +1104,7 @@ export function startPathFinder(opts = {}) {
         </fieldset>
         <fieldset><legend>Aussehen</legend>
         <label>Farbpalette <span class="help">${esc(PALETTES[d.pal].n)}</span></label><div class="ed-sw">${PALETTES.map((p, i) => `<button data-pal="${i}" title="${esc(p.n)}" aria-pressed="${i === d.pal}"><span style="background:${p.l.a1}"></span><span style="background:${p.l.a2}"></span><span style="background:${p.l.a3}"></span></button>`).join('')}</div>
+        <label>Hintergrund des Lernpfads</label><div class="ed-divc"><button data-bgpal="1" aria-pressed="${!d.bgColor}">wie Farbpalette</button><label class="ed-color" aria-pressed="${!!d.bgColor}"><input type="color" id="bgColIn" value="${esc(d.bgColor || paletteBg(d))}"><span>eigene Farbe</span></label></div>${d.bgColor && lum(d.bgColor) < .45 ? '<span class="help" style="color:#a86b00">Achtung: Auf dunklem Hintergrund ist Text schlecht lesbar – wähle lieber eine helle Farbe.</span>' : ''}
         <label>Schrift</label>${seg('font', Object.entries(FONTS).map(([k, f]) => [k, f.n]), d.font)}
         <label>Stationen</label>${seg('shape', [['eckig', '▢ eckig'], ['rund', '◯ rund'], ['skizze', '✎ skizziert']], d.shape)}
         <div class="row"><label>Animation Titel${sel('title', doc.anim?.title)}</label><label>Animation Untertitel${sel('subtitle', doc.anim?.subtitle)}</label></div>
@@ -1122,6 +1128,7 @@ export function startPathFinder(opts = {}) {
       if (t.dataset.pal) doc.design.pal = +t.dataset.pal;
       if (t.dataset.pat) doc.design.pattern = t.dataset.pat;
       if (t.dataset.divpal) delete doc.design.divColor;
+      if (t.dataset.bgpal) delete doc.design.bgColor;
       if (t.dataset.gadd) doc.goals.push('');
       if (t.dataset.gdel) doc.goals.splice(+t.dataset.gdel, 1);
       const sg = t.closest('[data-seg]'); if (sg) { const k = sg.dataset.seg; if (k === 'form') doc.form = t.dataset.v; else doc.design[k] = t.dataset.v; }
@@ -1136,10 +1143,12 @@ export function startPathFinder(opts = {}) {
       if (t.id === 'patIn') { if (t.value.trim()) { doc.design.pattern = t.value.trim(); render(); $$('[data-pat]', el).forEach(x => x.setAttribute('aria-pressed', 'false')); } }
       if (t.id === 'ptsIn') { doc.pointsOn = t.checked; render(); }
       if (t.id === 'patK') { doc.design.patDensity = +t.value; applyDesign(); }
-      if (t.id === 'divColIn') { doc.design.divColor = t.value; applyDesign(); $$('[data-divpal]', el).forEach(x => x.setAttribute('aria-pressed', 'false')); $('.ed-color', el)?.setAttribute('aria-pressed', 'true'); }
+      if (t.id === 'bgColIn') { doc.design.bgColor = t.value; applyDesign(); render(); $$('[data-bgpal]', el).forEach(x => x.setAttribute('aria-pressed', 'false')); t.closest('.ed-color')?.setAttribute('aria-pressed', 'true'); }
+      if (t.id === 'divColIn') { doc.design.divColor = t.value; applyDesign(); $$('[data-divpal]', el).forEach(x => x.setAttribute('aria-pressed', 'false')); t.closest('.ed-color')?.setAttribute('aria-pressed', 'true'); }
       if (t.id === 'patO') { doc.design.patOpacity = +t.value; applyDesign(); }
       if (live) softCommit();
     });
+    el.addEventListener('change', e => { if (e.target.id === 'bgColIn') draw(); });
     el.addEventListener('change', async e => { if (e.target.id === 'heroFile' && e.target.files[0]) { doc.design.heroImg = await loadImage(e.target.files[0]); draw(); render(); if (live) softCommit(); } });
   }
 
@@ -1189,15 +1198,82 @@ export function startPathFinder(opts = {}) {
   /** gängiges KI-Symbol (Funkelsterne) */
   const KI_ICON = '<svg class="ki-ico" viewBox="0 0 24 24" width="1.1em" height="1.1em" aria-hidden="true"><path fill="currentColor" d="M10 2.5l1.7 5.3a3 3 0 0 0 1.9 1.9L19 11.5l-5.4 1.8a3 3 0 0 0-1.9 1.9L10 20.5l-1.7-5.3a3 3 0 0 0-1.9-1.9L1 11.5l5.4-1.8a3 3 0 0 0 1.9-1.9z"/><path fill="currentColor" d="M19 1.5l.8 2.2a1.4 1.4 0 0 0 .8.8l2.2.8-2.2.8a1.4 1.4 0 0 0-.8.8l-.8 2.2-.8-2.2a1.4 1.4 0 0 0-.8-.8l-2.2-.8 2.2-.8a1.4 1.4 0 0 0 .8-.8z"/></svg>';
   /** Hinweis nach „KI-Prompt generieren“: was jetzt in der KI zu tun ist */
-  function kiCopiedPopup() {
+  function kiCopiedPopup(what = 'mit dem Bau des Lernpfads fertig ist') {
     const w = document.createElement('div'); w.className = 'ki-pop-bd';
     w.innerHTML = `<div class="ki-pop" role="dialog" aria-modal="true"><div class="ki-pop-ico">${KI_ICON}</div>
       <p>Der Prompt für deine KI (ByLKI, Mistral AI, Claude, …) wurde generiert und in die Zwischenablage kopiert. Gehe jetzt zu deinem KI-Chatbot und füge den Prompt per Rechtsklick oder Tastenkürzel (⌘V bzw. Strg+V) ein.</p>
-      <p>Warte, bis deine KI mit dem Bau des Lernpfads fertig ist, und kopiere ihr Ergebnis hierher ins Feld „Antwort der KI“.</p>
+      <p>Warte, bis deine KI ${what}, und kopiere ihr Ergebnis hierher ins Feld „Antwort der KI“.</p>
       <button class="lp-btn" data-ok="1">Erledigt</button></div>`;
     w.addEventListener('click', e => { if (e.target.closest('[data-ok]')) { w.remove(); document.getElementById('kiIn')?.focus(); } });
     document.body.appendChild(w); w.querySelector('[data-ok]').focus();
   }
+  /* ---------- Prüfung aus dem geladenen Lernpfad (Moodle-XML über eine fremde KI) ---------- */
+  async function openExam() {
+    const [T, X] = await Promise.all([loadText(), import('./pfexam.js')]); const env = textEnv();
+    const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
+    const KK = (opts.storage || 'pathfinder') + '.exam', KI = (opts.storage || 'pathfinder') + '.ki';
+    let o = {}; try { o = JSON.parse(LS.get(KK)) || {}; } catch (e) { }
+    let ki = {}; try { ki = JSON.parse(LS.get(KI)) || {}; } catch (e) { }
+    o = { count: 10, p1: 40, p2: 80, types: ['gapselect', 'ddwtos', 'multichoice', 'essay'], fach: ki.fach || '', klasse: ki.klasse || '', extra: '', ...o };
+    const save = () => LS.set(KK, JSON.stringify(o));
+    let checked = null;
+    const tasks = doc.stations.reduce((n, s) => n + s.blocks.filter(isCheck).length, 0);
+    el.innerHTML = `<header><b>${KI_ICON} Prüfung aus Lernpfad</b><button class="ok" data-x="1">Schließen</button></header>
+      <div class="ed-form">
+        <span class="help">Grundlage ist der geöffnete Lernpfad <b>„${esc(plain(doc.title) || 'ohne Titel')}“</b> (${doc.stations.length} Station${doc.stations.length === 1 ? '' : 'en'}, ${tasks} Aufgabe${tasks === 1 ? '' : 'n'}). Die KI erstellt daraus eine Fragensammlung für Moodle.</span>
+        <div class="ki-step"><span class="n">1</span><b>Prüfung einstellen</b></div>
+        <div class="row"><label>Fach<input type="text" data-o="fach" value="${esc(o.fach)}" placeholder="Informatik"></label><label>Zielgruppe<input type="text" data-o="klasse" value="${esc(o.klasse)}" placeholder="z. B. Gymnasium, 9. Klasse"></label><label>Anzahl Fragen<input type="number" data-o="count" min="1" max="60" value="${o.count}"></label></div>
+        <label>Schwierigkeit</label>
+        <div class="ex-tri"><div class="ex-bar" id="exBar"></div><input type="range" id="exP1" min="0" max="100" step="5" value="${o.p1}" aria-label="Grenze Basis / Mittel"><input type="range" id="exP2" min="0" max="100" step="5" value="${o.p2}" aria-label="Grenze Mittel / Anspruchsvoll"></div>
+        <div class="ex-lv" id="exLv"></div>
+        <label>Aufgabenstile</label>
+        <div class="ex-types">${X.TYPES.map(([k, n, h]) => `<label class="chk"><input type="checkbox" data-type="${k}"${o.types.includes(k) ? ' checked' : ''}>${n} <span class="help">– ${h}</span></label>`).join('')}</div>
+        <label>Weitere Wünsche (optional)<textarea data-o="extra" rows="2" placeholder="z. B. Schwerpunkt auf Station 3, keine Fragen zur Geschichte">${esc(o.extra)}</textarea></label>
+        <div class="ki-btns"><button class="lp-btn" data-copy="exam">${KI_ICON} KI-Prompt generieren</button></div>
+        <div class="ki-step"><span class="n">2</span><b>Antwort der KI hier einfügen</b></div>
+        <textarea id="kiIn" rows="9" spellcheck="false" placeholder="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&lt;quiz&gt; …"></textarea>
+        <div id="exRes" class="ki-res"></div>
+        <div class="ki-btns"><button class="lp-btn" id="exDl" disabled>⇩ Moodle-XML herunterladen</button></div>
+        <span class="help">In Moodle: Kurs → Fragensammlung → Import → Format „Moodle-XML“ → Datei hochladen. Die Fragen landen in den Kategorien Basis, Mittel und Anspruchsvoll – so kannst du im Test pro Niveau Zufallsfragen ziehen.</span>
+      </div>`;
+    const lv = () => {
+      const [b, m, a] = X.split(o.count, [o.p1, o.p2 - o.p1, 100 - o.p2]);
+      $('#exBar', el).style.background = `linear-gradient(90deg, #8fd19e 0 ${o.p1}%, #f6bf3a ${o.p1}% ${o.p2}%, #ef8a7a ${o.p2}% 100%)`;
+      $('#exLv', el).innerHTML = `<span><i style="background:#8fd19e"></i>Basis ${o.p1} % · ${b} Frage${b === 1 ? '' : 'n'}</span><span><i style="background:#f6bf3a"></i>Mittel ${o.p2 - o.p1} % · ${m}</span><span><i style="background:#ef8a7a"></i>Anspruchsvoll ${100 - o.p2} % · ${a}</span>`;
+    };
+    lv();
+    const check = () => {
+      const r = X.checkXml($('#kiIn', el).value); checked = r; const out = $('#exRes', el);
+      if (!r.xml) { out.innerHTML = ''; $('#exDl', el).disabled = true; return; }
+      const names = Object.fromEntries(X.TYPES), typ = Object.entries(r.byType).map(([k, n]) => `${n} × ${names[k] || k}`).join(', ');
+      out.innerHTML = (r.errors.length ? `<div class="bad">✗ ${r.errors.length} Problem${r.errors.length === 1 ? '' : 'e'} – bitte die KI um Korrektur bitten:</div><ul>${r.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : `<div class="good">✓ ${r.count} Fragen erkannt · Basis ${r.byLevel.B} · Mittel ${r.byLevel.M} · Anspruchsvoll ${r.byLevel.A}</div><div class="help">${esc(typ)}</div>`)
+        + (r.count && r.count !== o.count ? `<div class="warn">Bestellt waren ${o.count} Fragen, die KI hat ${r.count} geliefert.</div>` : '')
+        + (r.warnings.length ? `<div class="warn">Hinweise:</div><ul>${r.warnings.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : '');
+      $('#exDl', el).disabled = !!r.errors.length || !r.count;
+    };
+    el.addEventListener('input', e => {
+      const t = e.target;
+      if (t.dataset.o) { o[t.dataset.o] = t.type === 'number' ? Math.max(1, Math.min(60, +t.value || 1)) : t.value; save(); lv(); }
+      if (t.id === 'exP1' || t.id === 'exP2') {
+        let p1 = +$('#exP1', el).value, p2 = +$('#exP2', el).value;
+        if (p1 > p2) { if (t.id === 'exP1') p2 = p1; else p1 = p2; $('#exP1', el).value = p1; $('#exP2', el).value = p2; }
+        o.p1 = p1; o.p2 = p2; save(); lv();
+      }
+      if (t.dataset.type) { o.types = $$('[data-type]', el).filter(x => x.checked).map(x => x.dataset.type); save(); }
+      if (t.id === 'kiIn') check();
+    });
+    el.addEventListener('click', async e => {
+      const t = e.target.closest('button'); if (!t) return;
+      if (t.dataset.x) { closeDlg(false); return; }
+      if (t.dataset.copy === 'exam') {
+        if (!o.types.length) { toast('Bitte mindestens einen Aufgabenstil wählen'); return; }
+        const p = X.examPrompt({ ...o, title: plain(doc.title) || 'Lernpfad' }, T.docToText(doc, env));
+        if (await copyText(p)) kiCopiedPopup('die Fragen erstellt hat (eine Moodle-XML-Datei)'); else toast('Kopieren ging nicht');
+      }
+      if (t.id === 'exDl' && checked && !checked.errors.length) { download(new Blob([checked.xml], { type: 'application/xml' }), X.fileName(plain(doc.title))); toast('⇩ Moodle-XML gespeichert'); }
+    });
+  }
+
   async function openKI() {
     const T = await loadText(); const env = textEnv();
     const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
@@ -1261,7 +1337,7 @@ export function startPathFinder(opts = {}) {
       if (t.dataset.copy === 'doc') toast(await copyText('Überarbeite diesen Lernpfad. Behalte das Format genau bei und antworte nur mit dem vollständigen Lernpfad in einem Codeblock. Verweise wie anhang:bild1 ohne Eintrag im Anhang einfach stehen lassen.\n\n' + T.formatHelp(env) + '\nLERNPFAD:\n' + T.docToText(doc, env)) ? '📋 Lernpfad als Text kopiert (mit Formatbeschreibung)' : 'Kopieren ging nicht');
       if (t.dataset.copy === 'show') { const pre = document.createElement('pre'); pre.className = 'ki-fmt'; pre.textContent = T.formatHelp(env); t.closest('.ki-btns').after(pre); t.remove(); }
       if (t.id === 'kiOpen' && parsed && !parsed.errors.length) {
-        const d = parsed.doc; closeDlg(false); openDoc(d); toast(`„${esc(d.title)}“ angelegt – jetzt kannst du alles im Editor anpassen.`);
+        const d = parsed.doc; if (!plain(d.kicker || '').trim()) d.kicker = esc([info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')); closeDlg(false); openDoc(d); toast(`„${esc(d.title)}“ angelegt – jetzt kannst du alles im Editor anpassen.`);
       }
     });
   }
@@ -1323,7 +1399,7 @@ export function startPathFinder(opts = {}) {
     const sum = [D.total ? `${D.solved} von ${D.total} Aufgaben gelöst (${D.pct} %)` : '', D.pts, D.xp].filter(Boolean).join('   ·   ');
     if (sum) { pdf.text(sum, W / 2, y, 12, { bold: true, col: '#1f1b2e', align: 'center' }); y += 20; }
     pdf.text(`Prüfcode ${D.code}`, W / 2, 842 - M - 24, 10, { bold: true, col: P.a1, align: 'center', spacing: 1 });
-    pdf.text(`Ausgestellt am ${D.to} · erstellt mit ${appName === 'PathFinder' ? 'PathFinder' : appName + ' / PathFinder'}`, W / 2, 842 - M - 10, 8, { col: '#999999', align: 'center' });
+    pdf.text(`Ausgestellt am ${D.to}`, W / 2, 842 - M - 10, 8, { col: '#999999', align: 'center' });
     return new Blob([pdf.bytes()], { type: 'application/pdf' });
   }
   function certPreview() {
@@ -1444,7 +1520,14 @@ export function startPathFinder(opts = {}) {
   if ($('#viewSeg')) $('#viewSeg').onclick = e => { const x = e.target.closest('button[data-view]'); if (x) setSingle(x.dataset.view === 'one'); };
   $('#bDesign').onclick = openDesign;
   $('#bOpen').onclick = e => openChooser(e.currentTarget);
-  if ($('#bKI')) $('#bKI').onclick = () => openKI(); // nur in der eigenständigen WebApp
+  if ($('#bKI')) $('#bKI').onclick = e => { // nur in der eigenständigen WebApp: Auswahl der KI-Prompts
+    closePop(); pop = document.createElement('div'); pop.className = 'ed-pop';
+    pop.innerHTML = `<h3>KI-Prompts</h3><div class="ed-pal ed-pal1">
+      <button data-k="ki"><b>${KI_ICON} KI-Lernpfad</b><span>einen neuen Lernpfad von einer KI schreiben lassen</span></button>
+      <button data-k="exam"><b>${KI_ICON} Prüfung aus geladenem Lernpfad generieren</b><span>Fragensammlung für Moodle (Moodle-XML)</span></button></div>`;
+    document.body.appendChild(pop); placePop(e.currentTarget);
+    pop.onclick = ev => { const k = ev.target.closest('[data-k]')?.dataset.k; if (!k) return; closePop(); if (k === 'ki') openKI(); else openExam(); };
+  };
   const bWide = $('#bWide'); if (bWide) bWide.onclick = () => $('#app').classList.toggle('lp-only');
   function infoDlg(title, html) { const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } }; el.innerHTML = `<header><b>${title}</b><button class="ok" data-x="1">Schließen</button></header>${html}`; el.onclick = ev => { if (ev.target.closest('[data-x]')) closeDlg(false); }; }
   $('#bMore').onclick = e => {
@@ -1453,6 +1536,7 @@ export function startPathFinder(opts = {}) {
       <button data-m="reset"><b>↺ Vorschau-Fortschritt zurücksetzen</b><span>Haken, Quiz, Sperren wieder leer</span></button>
       <button data-m="json"><b>{ } Dokument ansehen</b><span>so wird der Lernpfad gespeichert</span></button>
       <button data-m="ki"><b>${KI_ICON} Vorlage für KI</b><span>Lernpfad von einer KI schreiben lassen und einfügen</span></button>
+      <button data-m="exam"><b>${KI_ICON} Prüfung aus Lernpfad</b><span>Fragensammlung für Moodle von einer KI erstellen lassen</span></button>
       <button data-m="certcheck"><b>✓ Zertifikat prüfen</b><span>Prüfcode eines Schüler-Zertifikats nachrechnen</span></button>
       <button data-m="keys"><b>⌘ Tastenkürzel</b><span>für die iPad-Tastatur</span></button>
       <button data-m="del"><b>🗑 Diesen Lernpfad löschen</b><span>nur in diesem Browser</span></button>
@@ -1466,6 +1550,7 @@ export function startPathFinder(opts = {}) {
       if (m === 'json') infoDlg('{ } Dokument', `<pre style="margin:0;padding:12px;font:12px/1.4 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all">${esc(JSON.stringify(doc, (k, v) => typeof v === 'string' && v.length > 200 && /^(data:|[A-Za-z0-9+/=]{200})/.test(v) ? v.slice(0, 40) + '…' : v, 2))}</pre>`);
       if (m === 'certcheck') { certCheck(); return; }
       if (m === 'ki') { openKI(); return; }
+      if (m === 'exam') { openExam(); return; }
       if (m === 'keys') infoDlg('⌘ Tastenkürzel', `<div class="ed-form"><table style="border-collapse:collapse;font-size:15px">${[['⌘B / ⌘I', 'fett / kursiv'], ['⌘E', 'Code'], ['⌘K', 'Link'], ['⌘Z / ⇧⌘Z', 'rückgängig / wiederholen'], ['⌘↵', 'neuer Textbaustein darunter'], ['⌥↑ / ⌥↓', 'gewählten Baustein verschieben'], ['⌘P', 'Vorschau ein/aus'], ['/', 'in leerem Text: Bausteinauswahl, weitertippen filtert (z. B. /quiz ↵)'], ['Esc', 'Auswahl aufheben']].map(([k, v]) => `<tr><td style="padding:5px 14px 5px 0;font-weight:700;white-space:nowrap">${k}</td><td>${v}</td></tr>`).join('')}</table></div>`);
     };
   };
