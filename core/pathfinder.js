@@ -26,6 +26,10 @@ const clone = o => JSON.parse(JSON.stringify(o));
 const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }, del(k) { try { localStorage.removeItem(k); } catch (e) { } } };
 
 /* ---------- Design ---------- */
+/** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
+const PF_BUILD = '2026-11-10b';
+const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
+
 export const PALETTES = [
   { n: 'Pastell', l: { bg: '#fdf8f3', surface: '#fff', 'surface-2': '#f7edf2', ink: '#2a2340', 'ink-2': '#6c6280', line: '#eedbe4', a1: '#5b6fc2', a1s: '#b9cdf5', a2: '#c75a8c', a2s: '#f6c3d8', a3: '#f6bf3a', a3d: '#d99a0b', a3s: '#fdf0cf', a3ink: '#2b2300', g1: '#b9cdf5', g2: '#f6c3d8', g3: '#fbd98a', heroink: '#2a2340' } },
   { n: 'Meer', l: { bg: '#f3f8fa', surface: '#fff', 'surface-2': '#e6f1f5', ink: '#14303d', 'ink-2': '#55707c', line: '#d3e5ec', a1: '#1f6f8b', a1s: '#a9dbe8', a2: '#0f9d8a', a2s: '#bfece5', a3: '#f2c879', a3d: '#c99a3c', a3s: '#fbf0d9', a3ink: '#33250a', g1: '#8fd3e8', g2: '#bfece5', g3: '#f7e2b3', heroink: '#10303b' } },
@@ -431,7 +435,7 @@ export function startPathFinder(opts = {}) {
   }
   /* ---------- Originaldesign: Lernpfad im Aussehen der Vorlage bearbeiten ---------- */
   let SK = null, skinCssFor = null;
-  const loadSkin = async () => SK || (SK = await import(new URL('pfskin.js' + new URL(import.meta.url).search, BASE).href));
+  const loadSkin = async () => SK || (SK = await import(modUrl('pfskin.js')));
   function skinRender(sc) {
     if (!SK) { lp.innerHTML = '<div class="ed-hint" style="padding:40px">lädt …</div>'; loadSkin().then(() => render()).catch(e => toast('Originaldesign nicht geladen: ' + esc(e.message))); return; }
     const sk = doc.skin;
@@ -1190,7 +1194,7 @@ export function startPathFinder(opts = {}) {
 
   /* ---------- Vorlage für KI (Textformat) ---------- */
   let pftext = null;
-  const loadText = async () => pftext || (pftext = await import(new URL('pftext.js' + new URL(import.meta.url).search, BASE).href));
+  const loadText = async () => pftext || (pftext = await import(modUrl('pftext.js')));
   const textEnv = () => ({ emptyDoc, palettes: PALETTES, figures: FIGURES, uid, plugins, isCheck, appName });
   async function copyText(t) {
     try { await navigator.clipboard.writeText(t); return true; } catch (e) {
@@ -1211,7 +1215,7 @@ export function startPathFinder(opts = {}) {
   }
   /* ---------- Prüfung aus dem geladenen Lernpfad (Moodle-XML über eine fremde KI) ---------- */
   async function openExam() {
-    const [T, X] = await Promise.all([loadText(), import('./pfexam.js')]); const env = textEnv();
+    const [T, X] = await Promise.all([loadText(), import(modUrl('pfexam.js'))]); const env = textEnv();
     const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
     const KK = (opts.storage || 'pathfinder') + '.exam', KI = (opts.storage || 'pathfinder') + '.ki';
     let o = {}; try { o = JSON.parse(LS.get(KK)) || {}; } catch (e) { }
@@ -1260,7 +1264,7 @@ export function startPathFinder(opts = {}) {
     const notes = {};
     const preview = () => {
       const box = $('#exPrev', el); let qs = [];
-      try { qs = X.readQuestions(checked.xml); } catch (e) { box.innerHTML = '<div class="help">Vorschau nicht möglich – die Datei ist kein gültiges XML.</div>'; return; }
+      try { qs = X.readQuestions(checked.xml); } catch (e) { box.innerHTML = `<div class="help">Vorschau nicht möglich (${esc(String(e.message || e))}). Lade die Seite einmal neu und versuch es noch einmal.</div>`; return; }
       const names = Object.fromEntries(X.TYPES); let lastCat = null;
       box.innerHTML = qs.map(q => {
         let body = clean(q.text);
