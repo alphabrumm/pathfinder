@@ -232,7 +232,7 @@ button { font: inherit; color: inherit; }
 .ed-form fieldset { border: 1px solid #ece6f3; border-radius: 12px; padding: 8px 10px 10px; display: grid; gap: 10px; }
 .ed-form legend { font-size: 12px; font-weight: 700; color: #8a80a0; text-transform: uppercase; letter-spacing: .06em; padding: 0 4px; }
 .ed-sw { display: flex; gap: 6px; flex-wrap: wrap; }
-.ed-sw button { width: 40px; height: 40px; border-radius: 10px; border: 3px solid transparent; padding: 0; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr 1fr; cursor: pointer; }
+.ed-sw button { width: 40px; height: 40px; border-radius: 10px; border: 3px solid transparent; padding: 4px; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr 1fr; cursor: pointer; }
 .ed-sw button[aria-pressed="true"] { border-color: #f6bf3a; box-shadow: 0 0 0 2px #f6bf3a; }
 .ed-dseg { display: inline-flex; background: #eee9f4; border-radius: 9px; padding: 3px; flex-wrap: wrap; }
 .ed-dseg button { border: 0; background: transparent; padding: 7px 12px; border-radius: 7px; cursor: pointer; font-weight: 650; min-height: 36px; }
@@ -498,3 +498,9 @@ body.pf-player { background: var(--bg, #fdf8f3); }
   body:not(.pf-player) .ex-prev h4 { color: var(--dk-mute); }
   body:not(.pf-player) .ex-note { background: var(--dk-bg); color: var(--dk-ink); border-color: var(--dk-line); }
 }
+
+/* Dunkler Modus des Lernpfads: Bilder und Figuren bekommen einen hellen Grund, damit dunkle Linien
+   (z. B. in Grafiken der KI oder Bildern mit durchsichtigem Hintergrund) sichtbar bleiben */
+.lp[data-scheme="dunkel"] .lp-img img { background: #f4f2f8; }
+.lp[data-scheme="dunkel"] .lp-figur > img { background: #f4f2f8; }
+.lp[data-scheme="dunkel"] .lp-logo.own img { background: transparent; }

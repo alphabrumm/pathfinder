@@ -30,19 +30,20 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 const PF_BUILD = '2026-11-10b';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
+/** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
 export const PALETTES = [
-  { n: 'Pastell', l: { bg: '#fdf8f3', surface: '#fff', 'surface-2': '#f7edf2', ink: '#2a2340', 'ink-2': '#6c6280', line: '#eedbe4', a1: '#5b6fc2', a1s: '#b9cdf5', a2: '#c75a8c', a2s: '#f6c3d8', a3: '#f6bf3a', a3d: '#d99a0b', a3s: '#fdf0cf', a3ink: '#2b2300', g1: '#b9cdf5', g2: '#f6c3d8', g3: '#fbd98a', heroink: '#2a2340' } },
-  { n: 'Meer', l: { bg: '#f3f8fa', surface: '#fff', 'surface-2': '#e6f1f5', ink: '#14303d', 'ink-2': '#55707c', line: '#d3e5ec', a1: '#1f6f8b', a1s: '#a9dbe8', a2: '#0f9d8a', a2s: '#bfece5', a3: '#f2c879', a3d: '#c99a3c', a3s: '#fbf0d9', a3ink: '#33250a', g1: '#8fd3e8', g2: '#bfece5', g3: '#f7e2b3', heroink: '#10303b' } },
-  { n: 'Wald', l: { bg: '#f6f7f0', surface: '#fff', 'surface-2': '#ecefe1', ink: '#22301f', 'ink-2': '#5f6b58', line: '#dde3cd', a1: '#3e7a3a', a1s: '#c4e0b5', a2: '#9a6b2f', a2s: '#ecd9b8', a3: '#e7c14f', a3d: '#b38f1c', a3s: '#f7efcf', a3ink: '#2c2400', g1: '#c4e0b5', g2: '#e3ebc4', g3: '#f3dfa0', heroink: '#22301f' } },
-  { n: 'Sonnenuntergang', l: { bg: '#fff7f1', surface: '#fff', 'surface-2': '#fdebe0', ink: '#3a1f2b', 'ink-2': '#7a5a62', line: '#f6d9c9', a1: '#c2410c', a1s: '#fdc9a8', a2: '#9d2b6b', a2s: '#f4bdd6', a3: '#fbbf24', a3d: '#d68f00', a3s: '#fff0c8', a3ink: '#2e2100', g1: '#fdba8c', g2: '#f9a8c9', g3: '#c4a5f0', heroink: '#3a1f2b' } },
-  { n: 'Lavendel', l: { bg: '#f8f6fd', surface: '#fff', 'surface-2': '#efebfb', ink: '#2b2545', 'ink-2': '#6b6588', line: '#e2dcf5', a1: '#6d4fc4', a1s: '#d4c8f6', a2: '#2f9e86', a2s: '#c2eadf', a3: '#a6e3c7', a3d: '#4fae86', a3s: '#e4f6ee', a3ink: '#11372a', g1: '#d4c8f6', g2: '#e9d5f7', g3: '#c2eadf', heroink: '#2b2545' } },
-  { n: 'Bonbon', l: { bg: '#fff8fb', surface: '#fff', 'surface-2': '#ffeef6', ink: '#3b2340', 'ink-2': '#7d6283', line: '#fbdbe9', a1: '#e0458f', a1s: '#ffc6de', a2: '#16a3a3', a2s: '#bdf0ee', a3: '#fde047', a3d: '#d6b400', a3s: '#fff8c7', a3ink: '#332a00', g1: '#ffc6de', g2: '#bdf0ee', g3: '#fff19a', heroink: '#3b2340' } },
-  { n: 'Papier', l: { bg: '#faf6ee', surface: '#fffdf8', 'surface-2': '#f3ecdf', ink: '#2f2a24', 'ink-2': '#6f6558', line: '#e7dccb', a1: '#8c3b2e', a1s: '#ead1c6', a2: '#2e5a6b', a2s: '#c9dde4', a3: '#d9b56a', a3d: '#a8822f', a3s: '#f5ead1', a3ink: '#2c2208', g1: '#efe3cc', g2: '#e8d6c4', g3: '#dfe6e0', heroink: '#2f2a24' } },
-  { n: 'Schiefer', l: { bg: '#f4f6f8', surface: '#fff', 'surface-2': '#e9edf1', ink: '#1e2833', 'ink-2': '#5b6876', line: '#d9e0e7', a1: '#34506b', a1s: '#c4d3e2', a2: '#e0662f', a2s: '#fbd2bf', a3: '#f59e0b', a3d: '#c27c00', a3s: '#fdecc8', a3ink: '#2a1c00', g1: '#c4d3e2', g2: '#dde4ea', g3: '#fbd2bf', heroink: '#1e2833' } },
-  { n: 'Retro-Arcade', l: { bg: '#14112b', surface: '#1e1a3d', 'surface-2': '#2a2552', ink: '#f2eeff', 'ink-2': '#b3aad8', line: '#3a3470', a1: '#29e0ff', a1s: '#123d55', a2: '#ff3fb4', a2s: '#4a1440', a3: '#ffe23f', a3d: '#c9a800', a3s: '#3a3410', a3ink: '#1a1600', g1: '#3b1f7a', g2: '#9a1f7a', g3: '#e05a2a', heroink: '#ffffff' } },
-  { n: 'Nacht', l: { bg: '#161b26', surface: '#1f2533', 'surface-2': '#283042', ink: '#e8edf6', 'ink-2': '#a7b1c4', line: '#343d52', a1: '#7aa7ff', a1s: '#1f3358', a2: '#c79bff', a2s: '#3a2a57', a3: '#ffcc66', a3d: '#c99a2e', a3s: '#3d3220', a3ink: '#2a1f00', g1: '#1d2b4f', g2: '#2f2a5e', g3: '#4a2f5e', heroink: '#ffffff' } },
-  { n: 'Tafel', l: { bg: '#18241f', surface: '#1f2e28', 'surface-2': '#273a32', ink: '#eef3ea', 'ink-2': '#aebdb3', line: '#33493f', a1: '#8fd3b0', a1s: '#22433a', a2: '#f2a7a0', a2s: '#4a2d2b', a3: '#f4e27a', a3d: '#c2b14a', a3s: '#3b3a22', a3ink: '#2a2600', g1: '#1e3a30', g2: '#25463a', g3: '#2f5446', heroink: '#f4f7f1' } },
-  { n: 'Terminal', l: { bg: '#0d1410', surface: '#121c16', 'surface-2': '#18261d', ink: '#d9f7e3', 'ink-2': '#8fb79c', line: '#1f3328', a1: '#4ade80', a1s: '#143322', a2: '#38bdf8', a2s: '#0f2c3a', a3: '#a3e635', a3d: '#6c9d1a', a3s: '#1d2a10', a3ink: '#0b1400', g1: '#0f2e1c', g2: '#123b2a', g3: '#1d4a20', heroink: '#d9f7e3' } },
+  { n: 'Pastell', l: { bg: '#fdf8f3', surface: '#fff', 'surface-2': '#f7edf2', ink: '#2a2340', 'ink-2': '#6c6280', line: '#eedbe4', a1: '#5b6fc2', a1s: '#b9cdf5', a2: '#c75a8c', a2s: '#f6c3d8', a3: '#f6bf3a', a3d: '#d99a0b', a3s: '#fdf0cf', a3ink: '#2b2300', g1: '#b9cdf5', g2: '#f6c3d8', g3: '#fbd98a', heroink: '#2a2340' }, d: { bg: '#1d1a26', surface: '#262233', 'surface-2': '#2e2838', ink: '#eee8f6', 'ink-2': '#b4aac6', line: '#3b3348', a1: '#9fb2f0', a1s: '#2c3560', a2: '#f08fbd', a2s: '#4d2840', a3: '#f6bf3a', a3d: '#c99412', a3s: '#3d3218', a3ink: '#2b2300', g1: '#2d3466', g2: '#55305a', g3: '#6a5326', heroink: '#f4f0fa' } },
+  { n: 'Meer', l: { bg: '#f3f8fa', surface: '#fff', 'surface-2': '#e6f1f5', ink: '#14303d', 'ink-2': '#55707c', line: '#d3e5ec', a1: '#1f6f8b', a1s: '#a9dbe8', a2: '#0f9d8a', a2s: '#bfece5', a3: '#f2c879', a3d: '#c99a3c', a3s: '#fbf0d9', a3ink: '#33250a', g1: '#8fd3e8', g2: '#bfece5', g3: '#f7e2b3', heroink: '#10303b' }, d: { bg: '#0f1e24', surface: '#15282f', 'surface-2': '#1b333b', ink: '#e2f0f4', 'ink-2': '#9bb8c2', line: '#26414b', a1: '#5cc0de', a1s: '#163a47', a2: '#3fd0b8', a2s: '#123d37', a3: '#f2c879', a3d: '#c99a3c', a3s: '#3a3020', a3ink: '#33250a', g1: '#11465a', g2: '#125249', g3: '#4f4426', heroink: '#eaf6f9' } },
+  { n: 'Wald', l: { bg: '#f6f7f0', surface: '#fff', 'surface-2': '#ecefe1', ink: '#22301f', 'ink-2': '#5f6b58', line: '#dde3cd', a1: '#3e7a3a', a1s: '#c4e0b5', a2: '#9a6b2f', a2s: '#ecd9b8', a3: '#e7c14f', a3d: '#b38f1c', a3s: '#f7efcf', a3ink: '#2c2400', g1: '#c4e0b5', g2: '#e3ebc4', g3: '#f3dfa0', heroink: '#22301f' }, d: { bg: '#161c14', surface: '#1e261b', 'surface-2': '#262f22', ink: '#e9eee2', 'ink-2': '#a7b39d', line: '#334030', a1: '#86c47f', a1s: '#24401f', a2: '#d6a466', a2s: '#45331b', a3: '#e7c14f', a3d: '#b38f1c', a3s: '#3a3216', a3ink: '#2c2400', g1: '#22411f', g2: '#3a4320', g3: '#5a4a1c', heroink: '#eef3e8' } },
+  { n: 'Sonnenuntergang', l: { bg: '#fff7f1', surface: '#fff', 'surface-2': '#fdebe0', ink: '#3a1f2b', 'ink-2': '#7a5a62', line: '#f6d9c9', a1: '#c2410c', a1s: '#fdc9a8', a2: '#9d2b6b', a2s: '#f4bdd6', a3: '#fbbf24', a3d: '#d68f00', a3s: '#fff0c8', a3ink: '#2e2100', g1: '#fdba8c', g2: '#f9a8c9', g3: '#c4a5f0', heroink: '#3a1f2b' }, d: { bg: '#211419', surface: '#2b1b21', 'surface-2': '#35222a', ink: '#f8e9ec', 'ink-2': '#c4a3aa', line: '#4a2f37', a1: '#ff8a52', a1s: '#4d2412', a2: '#e77bb3', a2s: '#4d1f37', a3: '#fbbf24', a3d: '#d68f00', a3s: '#40310f', a3ink: '#2e2100', g1: '#6b2a14', g2: '#5e1f43', g3: '#3e2c6b', heroink: '#fff2ec' } },
+  { n: 'Lavendel', l: { bg: '#f8f6fd', surface: '#fff', 'surface-2': '#efebfb', ink: '#2b2545', 'ink-2': '#6b6588', line: '#e2dcf5', a1: '#6d4fc4', a1s: '#d4c8f6', a2: '#2f9e86', a2s: '#c2eadf', a3: '#a6e3c7', a3d: '#4fae86', a3s: '#e4f6ee', a3ink: '#11372a', g1: '#d4c8f6', g2: '#e9d5f7', g3: '#c2eadf', heroink: '#2b2545' }, d: { bg: '#1b1828', surface: '#242035', 'surface-2': '#2c2740', ink: '#ece8fa', 'ink-2': '#aea7c8', line: '#3a3452', a1: '#a891f0', a1s: '#33295c', a2: '#5fd1b5', a2s: '#16403a', a3: '#a6e3c7', a3d: '#4fae86', a3s: '#1d3a31', a3ink: '#11372a', g1: '#3a2d6e', g2: '#4e2f63', g3: '#1f4d44', heroink: '#f2effc' } },
+  { n: 'Bonbon', l: { bg: '#fff8fb', surface: '#fff', 'surface-2': '#ffeef6', ink: '#3b2340', 'ink-2': '#7d6283', line: '#fbdbe9', a1: '#e0458f', a1s: '#ffc6de', a2: '#16a3a3', a2s: '#bdf0ee', a3: '#fde047', a3d: '#d6b400', a3s: '#fff8c7', a3ink: '#332a00', g1: '#ffc6de', g2: '#bdf0ee', g3: '#fff19a', heroink: '#3b2340' }, d: { bg: '#21151c', surface: '#2c1c26', 'surface-2': '#36222f', ink: '#fbe9f2', 'ink-2': '#c9a5b8', line: '#4a2e3e', a1: '#ff7fb7', a1s: '#55203a', a2: '#4fd6d6', a2s: '#123f3f', a3: '#fde047', a3d: '#d6b400', a3s: '#403a12', a3ink: '#332a00', g1: '#6a2246', g2: '#14504f', g3: '#5a5214', heroink: '#fff1f7' } },
+  { n: 'Papier', l: { bg: '#faf6ee', surface: '#fffdf8', 'surface-2': '#f3ecdf', ink: '#2f2a24', 'ink-2': '#6f6558', line: '#e7dccb', a1: '#8c3b2e', a1s: '#ead1c6', a2: '#2e5a6b', a2s: '#c9dde4', a3: '#d9b56a', a3d: '#a8822f', a3s: '#f5ead1', a3ink: '#2c2208', g1: '#efe3cc', g2: '#e8d6c4', g3: '#dfe6e0', heroink: '#2f2a24' }, d: { bg: '#1e1b16', surface: '#27231d', 'surface-2': '#2f2a22', ink: '#f1eadf', 'ink-2': '#bcae9b', line: '#40382d', a1: '#e08a74', a1s: '#4a2a22', a2: '#79b2c6', a2s: '#1f3a44', a3: '#d9b56a', a3d: '#a8822f', a3s: '#3c3220', a3ink: '#2c2208', g1: '#3d3324', g2: '#3e2e26', g3: '#2c3a36', heroink: '#f6efe3' } },
+  { n: 'Schiefer', l: { bg: '#f4f6f8', surface: '#fff', 'surface-2': '#e9edf1', ink: '#1e2833', 'ink-2': '#5b6876', line: '#d9e0e7', a1: '#34506b', a1s: '#c4d3e2', a2: '#e0662f', a2s: '#fbd2bf', a3: '#f59e0b', a3d: '#c27c00', a3s: '#fdecc8', a3ink: '#2a1c00', g1: '#c4d3e2', g2: '#dde4ea', g3: '#fbd2bf', heroink: '#1e2833' }, d: { bg: '#151a20', surface: '#1d232b', 'surface-2': '#252c35', ink: '#e6ebf0', 'ink-2': '#9fadbb', line: '#323b46', a1: '#8fb2d6', a1s: '#24384d', a2: '#ff8a52', a2s: '#4a2615', a3: '#f59e0b', a3d: '#c27c00', a3s: '#3d2c10', a3ink: '#2a1c00', g1: '#273c52', g2: '#2a333d', g3: '#4d2e1f', heroink: '#eef2f6' } },
+  { n: 'Retro-Arcade', l: { bg: '#f7f5ff', surface: '#fff', 'surface-2': '#eeeaff', ink: '#1d1840', 'ink-2': '#5e5785', line: '#ddd6fb', a1: '#0891b2', a1s: '#c5f1fb', a2: '#db2777', a2s: '#fbcfe5', a3: '#facc15', a3d: '#c9a000', a3s: '#fef6c3', a3ink: '#2a2200', g1: '#c4b5fd', g2: '#f9a8d4', g3: '#fdba74', heroink: '#1d1840' }, d: { bg: '#14112b', surface: '#1e1a3d', 'surface-2': '#2a2552', ink: '#f2eeff', 'ink-2': '#b3aad8', line: '#3a3470', a1: '#29e0ff', a1s: '#123d55', a2: '#ff3fb4', a2s: '#4a1440', a3: '#ffe23f', a3d: '#c9a800', a3s: '#3a3410', a3ink: '#1a1600', g1: '#3b1f7a', g2: '#9a1f7a', g3: '#e05a2a', heroink: '#ffffff' } },
+  { n: 'Nacht', l: { bg: '#f4f6fb', surface: '#fff', 'surface-2': '#e8edf7', ink: '#18213a', 'ink-2': '#5a6684', line: '#d8dff0', a1: '#3b6fd8', a1s: '#c9d9fb', a2: '#8a4fd8', a2s: '#e2d3fb', a3: '#f5b83d', a3d: '#c98d12', a3s: '#fdf0d0', a3ink: '#2a1f00', g1: '#c9d9fb', g2: '#ddd0f7', g3: '#f3dcf0', heroink: '#18213a' }, d: { bg: '#161b26', surface: '#1f2533', 'surface-2': '#283042', ink: '#e8edf6', 'ink-2': '#a7b1c4', line: '#343d52', a1: '#7aa7ff', a1s: '#1f3358', a2: '#c79bff', a2s: '#3a2a57', a3: '#ffcc66', a3d: '#c99a2e', a3s: '#3d3220', a3ink: '#2a1f00', g1: '#1d2b4f', g2: '#2f2a5e', g3: '#4a2f5e', heroink: '#ffffff' } },
+  { n: 'Tafel', l: { bg: '#f5f8f6', surface: '#fff', 'surface-2': '#e8f0eb', ink: '#1b2b24', 'ink-2': '#56695f', line: '#d5e3da', a1: '#2f8a63', a1s: '#c3e8d6', a2: '#d0544a', a2s: '#f6cfcb', a3: '#e9cf3c', a3d: '#b29a12', a3s: '#faf2c8', a3ink: '#2a2600', g1: '#c3e8d6', g2: '#dcefe3', g3: '#f6eebf', heroink: '#1b2b24' }, d: { bg: '#18241f', surface: '#1f2e28', 'surface-2': '#273a32', ink: '#eef3ea', 'ink-2': '#aebdb3', line: '#33493f', a1: '#8fd3b0', a1s: '#22433a', a2: '#f2a7a0', a2s: '#4a2d2b', a3: '#f4e27a', a3d: '#c2b14a', a3s: '#3b3a22', a3ink: '#2a2600', g1: '#1e3a30', g2: '#25463a', g3: '#2f5446', heroink: '#f4f7f1' } },
+  { n: 'Terminal', l: { bg: '#f3f8f4', surface: '#fff', 'surface-2': '#e5f0e8', ink: '#0f2a1a', 'ink-2': '#4b6b57', line: '#cfe3d5', a1: '#15803d', a1s: '#c6efd4', a2: '#0369a1', a2s: '#c9e8f7', a3: '#84cc16', a3d: '#5b8c0e', a3s: '#ecf8d0', a3ink: '#0b1400', g1: '#c6efd4', g2: '#cfe9f2', g3: '#e3f5c0', heroink: '#0f2a1a' }, d: { bg: '#0d1410', surface: '#121c16', 'surface-2': '#18261d', ink: '#d9f7e3', 'ink-2': '#8fb79c', line: '#1f3328', a1: '#4ade80', a1s: '#143322', a2: '#38bdf8', a2s: '#0f2c3a', a3: '#a3e635', a3d: '#6c9d1a', a3s: '#1d2a10', a3ink: '#0b1400', g1: '#0f2e1c', g2: '#123b2a', g3: '#1d4a20', heroink: '#d9f7e3' } },
 ];
 const FONTS = {
   pixel: { n: 'Pixel', d: '"Pixelify Sans", "Courier New", monospace', w: 700, ls: '0' },
@@ -222,6 +223,7 @@ export function startPathFinder(opts = {}) {
   function migrate(d) {
     d.goals = d.goals || []; d.rank = d.rank || ''; d.id = d.id || uid(); d.anim = d.anim || {}; d.typeLines = d.typeLines || [];
     d.cert = d.cert || emptyDoc().cert;
+    if (d.design) delete d.design.bgColor; // eigene Hintergrundfarbe gibt es nicht mehr – jede Palette hat einen hellen und einen dunklen Modus
     // frühere Standard-Kopfzeile („PathFinder · Lernpfad“, „JPad · Challenge“ …) ist Werbung – weg damit
     if (/^\s*(PathFinder|JPad|\w+Pad)\s*·\s*(Lernpfad|Challenge)\s*$/i.test(d.kicker || '')) d.kicker = '';
     for (const s of d.stations) {
@@ -361,12 +363,17 @@ export function startPathFinder(opts = {}) {
     (function step() { if (!ty.isConnected || li >= lines.length) return; if (ci < lines[li].length) { txt += lines[li][ci++]; ty.textContent = txt; setTimeout(step, 45); } else { txt += '\n'; li++; ci = 0; setTimeout(step, 500); } })();
   }
 
+  // Hell/Dunkel: im Editor kann die Lehrkraft beide Modi ansehen (schemePrev), sonst gilt die Vorgabe des Lernpfads oder das Gerät
+  let schemePrev = null;
+  const darkMQ = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null;
+  const scheme = () => schemePrev || (doc.design.scheme === 'hell' || doc.design.scheme === 'dunkel' ? doc.design.scheme : darkMQ?.matches ? 'dunkel' : 'hell');
+  darkMQ?.addEventListener?.('change', () => { if (!schemePrev) { applyDesign(); render(); } });
   function applyDesign() {
     const p = PALETTES[doc.design.pal] || PALETTES[0], f = FONTS[doc.design.font] || FONTS.pixel, st = lp.style;
-    for (const k in p.l) st.setProperty('--' + k, p.l[k]);
+    const sch = scheme(), cols = sch === 'dunkel' ? p.d || p.l : p.l; lp.dataset.scheme = sch;
+    for (const k in cols) st.setProperty('--' + k, cols[k]);
     st.setProperty('--font-display', f.d); st.setProperty('--display-weight', f.w); st.setProperty('--display-ls', f.ls); st.setProperty('--fz', fz);
     lp.dataset.shape = doc.design.shape; lp.dataset.form = doc.form;
-    if (doc.design.bgColor) { st.setProperty('--bg', doc.design.bgColor); lp.closest('.lpwrap')?.style.setProperty('--bg', doc.design.bgColor); } else lp.closest('.lpwrap')?.style.removeProperty('--bg');
     lp.dataset.divider = doc.design.divider || 'linie'; if (doc.design.divColor) st.setProperty('--div', doc.design.divColor); else st.removeProperty('--div');
     const pat = doc.design.pattern || 'punkte', k = doc.design.patDensity || 1, op = doc.design.patOpacity ?? 1;
     const a = (x) => +(x * op).toFixed(3), sz = n => `${Math.round(n / k)}px ${Math.round(n / k)}px`;
@@ -378,7 +385,7 @@ export function startPathFinder(opts = {}) {
       st.setProperty('--hero-pat', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`); st.setProperty('--hero-pat-size', sz(64));
     }
     lp.classList.toggle('with-pts', !!doc.pointsOn);
-    $('.lpwrap').style.background = p.l.bg;
+    $('.lpwrap').style.background = cols.bg; $('.lpwrap').style.setProperty('--bg', cols.bg);
   }
   function render() {
     const sc = scroller.scrollTop;
@@ -1093,8 +1100,6 @@ export function startPathFinder(opts = {}) {
       };
     };
   }
-  const paletteBg = d => { const c = (PALETTES[d.pal] || PALETTES[0]).l.bg || '#ffffff'; return /^#[0-9a-f]{6}$/i.test(c) ? c : '#ffffff'; };
-  const lum = hex => { const n = parseInt(hex.slice(1), 16), f = v => (v /= 255) <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; return .2126 * f(n >> 16) + .7152 * f(n >> 8 & 255) + .0722 * f(n & 255); };
   const paletteDiv = d => { const c = (PALETTES[d.pal] || PALETTES[0]).l.a3 || '#f6bf3a'; return /^#[0-9a-f]{6}$/i.test(c) ? c : '#f6bf3a'; };
   function designUI(el, live) {    if (doc.skin) { skinDesignUI(el, live); return; }
     const seg = (k, o, cur) => `<span class="ed-dseg" data-seg="${k}">${o.map(([v, n]) => `<button data-v="${v}" aria-pressed="${v === cur}">${n}</button>`).join('')}</span>`;
@@ -1109,8 +1114,10 @@ export function startPathFinder(opts = {}) {
         <label class="chk"><input type="checkbox" id="ptsIn"${doc.pointsOn ? ' checked' : ''}>Punkte für Aufgaben vergeben</label><span class="help">Die Punkte stehen links neben jeder Aufgabe, lassen sich dort anpassen und zählen im SCORM-Lernpaket.</span>
         </fieldset>
         <fieldset><legend>Aussehen</legend>
-        <label>Farbpalette <span class="help">${esc(PALETTES[d.pal].n)}</span></label><div class="ed-sw">${PALETTES.map((p, i) => `<button data-pal="${i}" title="${esc(p.n)}" aria-pressed="${i === d.pal}"><span style="background:${p.l.a1}"></span><span style="background:${p.l.a2}"></span><span style="background:${p.l.a3}"></span></button>`).join('')}</div>
-        <label>Hintergrund des Lernpfads</label><div class="ed-divc"><button data-bgpal="1" aria-pressed="${!d.bgColor}">wie Farbpalette</button><label class="ed-color" aria-pressed="${!!d.bgColor}"><input type="color" id="bgColIn" value="${esc(d.bgColor || paletteBg(d))}"><span>eigene Farbe</span></label></div>${d.bgColor && lum(d.bgColor) < .45 ? '<span class="help" style="color:#a86b00">Achtung: Auf dunklem Hintergrund ist Text schlecht lesbar – wähle lieber eine helle Farbe.</span>' : ''}
+        <label>Vorschau</label>${seg('preview', [['hell', '☀ Hell'], ['dunkel', '☾ Dunkel']], scheme())}
+        <label>Farbpalette <span class="help">${esc(PALETTES[d.pal].n)} · ${scheme() === 'dunkel' ? 'dunkler' : 'heller'} Modus</span></label><div class="ed-sw">${PALETTES.map((p, i) => { const c = scheme() === 'dunkel' ? p.d || p.l : p.l; return `<button data-pal="${i}" title="${esc(p.n)}" aria-pressed="${i === d.pal}" style="background:${c.bg}"><span style="background:${c.a1}"></span><span style="background:${c.a2}"></span><span style="background:${c.a3}"></span></button>`; }).join('')}</div>
+        <label>Für Schüler</label>${seg('scheme', [['auto', 'wie das Gerät'], ['hell', 'immer hell'], ['dunkel', 'immer dunkel']], d.scheme || 'auto')}
+        <span class="help">„wie das Gerät“: Der Lernpfad erscheint hell oder dunkel, je nachdem, wie das iPad eingestellt ist. Prüfe mit der Vorschau beide Modi – vor allem Bilder und Grafiken.</span>
         <label>Schrift</label>${seg('font', Object.entries(FONTS).map(([k, f]) => [k, f.n]), d.font)}
         <label>Stationen</label>${seg('shape', [['eckig', '▢ eckig'], ['rund', '◯ rund'], ['skizze', '✎ skizziert']], d.shape)}
         <div class="row"><label>Animation Titel${sel('title', doc.anim?.title)}</label><label>Animation Untertitel${sel('subtitle', doc.anim?.subtitle)}</label></div>
@@ -1134,10 +1141,9 @@ export function startPathFinder(opts = {}) {
       if (t.dataset.pal) doc.design.pal = +t.dataset.pal;
       if (t.dataset.pat) doc.design.pattern = t.dataset.pat;
       if (t.dataset.divpal) delete doc.design.divColor;
-      if (t.dataset.bgpal) delete doc.design.bgColor;
       if (t.dataset.gadd) doc.goals.push('');
       if (t.dataset.gdel) doc.goals.splice(+t.dataset.gdel, 1);
-      const sg = t.closest('[data-seg]'); if (sg) { const k = sg.dataset.seg; if (k === 'form') doc.form = t.dataset.v; else doc.design[k] = t.dataset.v; }
+      const sg = t.closest('[data-seg]'); if (sg) { const k = sg.dataset.seg; if (k === 'form') doc.form = t.dataset.v; else if (k === 'preview') schemePrev = t.dataset.v; else if (k === 'scheme') { doc.design.scheme = t.dataset.v; schemePrev = null; } else doc.design[k] = t.dataset.v; }
       draw(); render(); if (live) softCommit(); if (t.dataset.gadd) $$('[data-goal]', el).pop()?.focus();
     });
     el.addEventListener('input', e => {
@@ -1149,12 +1155,10 @@ export function startPathFinder(opts = {}) {
       if (t.id === 'patIn') { if (t.value.trim()) { doc.design.pattern = t.value.trim(); render(); $$('[data-pat]', el).forEach(x => x.setAttribute('aria-pressed', 'false')); } }
       if (t.id === 'ptsIn') { doc.pointsOn = t.checked; render(); }
       if (t.id === 'patK') { doc.design.patDensity = +t.value; applyDesign(); }
-      if (t.id === 'bgColIn') { doc.design.bgColor = t.value; applyDesign(); render(); $$('[data-bgpal]', el).forEach(x => x.setAttribute('aria-pressed', 'false')); t.closest('.ed-color')?.setAttribute('aria-pressed', 'true'); }
       if (t.id === 'divColIn') { doc.design.divColor = t.value; applyDesign(); $$('[data-divpal]', el).forEach(x => x.setAttribute('aria-pressed', 'false')); t.closest('.ed-color')?.setAttribute('aria-pressed', 'true'); }
       if (t.id === 'patO') { doc.design.patOpacity = +t.value; applyDesign(); }
       if (live) softCommit();
     });
-    el.addEventListener('change', e => { if (e.target.id === 'bgColIn') draw(); });
     el.addEventListener('change', async e => { if (e.target.id === 'heroFile' && e.target.files[0]) { doc.design.heroImg = await loadImage(e.target.files[0]); draw(); render(); if (live) softCommit(); } });
   }
 
