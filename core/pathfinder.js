@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-11a';
+const PF_BUILD = '2026-11-11b';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -68,7 +68,7 @@ const CORE = {
   code: { n: 'Code', ic: '{ }', g: 'Grundbausteine', h: 'Programmcode mit Kopierknopf', make: () => ({ lang: 'java', code: '' }) },
   uml: { n: 'UML-Klasse', ic: '▭', g: 'Grundbausteine', h: 'Klassenkarte mit Attributen und Methoden', make: () => ({ name: 'Hund', attrs: ['name: String'], methods: ['bellen()'] }) },
   html: { n: 'HTML', ic: '</>', g: 'Grundbausteine', h: 'freies HTML, z. B. GeoGebra', make: () => ({ html: '' }) },
-  task: { n: 'Aufgabe', ic: '✎', g: 'Aufgaben', h: 'Auftrag mit Tipps, Lösung, Haken', make: () => ({ title: '', html: '', xp: 20, tips: [], solution: '', img: '' }) },
+  task: { n: 'Aufgabe', ic: '✎', g: 'Aufgaben', h: 'Auftrag mit Tipps, Lösung, Haken', make: () => ({ title: '', html: '', xp: 20, tips: [], solution: '', solHide: true, img: '' }) },
   quiz: { n: 'Quiz', ic: '?', g: 'Aufgaben', h: 'eine oder mehrere Fragen mit Rückmeldung', make: () => ({ qs: [{ q: '', opts: [{ t: '', ok: true, fb: '' }, { t: '', ok: false, fb: '' }, { t: '', ok: false, fb: '' }] }], xp: 10 }) },
   gap: { n: 'Lückentext', ic: '▭', g: 'Aufgaben', h: 'Lücken als [[Antwort]], auch mit Begriffen zum Ziehen', make: () => ({ html: 'Das Wort in der Lücke ist [[richtig]].', bank: false, extra: [], heft: false, title: '', sub: '', xp: 10 }) },
   match: { n: 'Zuordnen', ic: '⇄', g: 'Aufgaben', h: 'Paare per Drag & Drop', make: () => ({ title: 'Ordne zu', pairs: [{ a: '', b: '' }, { a: '', b: '' }], xp: 10 }) },
@@ -1045,7 +1045,13 @@ export function startPathFinder(opts = {}) {
       const d = t.dataset;
       if (d.x) { closeDlg(d.x === 'ok'); return; }
       for (const F of Object.values(FIELDS)) F.click?.(d, b, draw, ctx);
-      if (d.ladd) { getP(b, d.ladd).push(''); draw(); $$(`[data-li]`, el).pop()?.focus(); }
+      if (d.ladd) {
+        const L = getP(b, d.ladd); L.push('');
+        // Standard: der letzte Tipp ist für Schüler verborgen (meist verrät er fast die Lösung) – ab zwei Tipps
+        const F = fields.find(x => x.k === d.ladd);
+        if (F?.vis && L.length >= 2) { const a = b[F.vis] = b[F.vis] || []; while (a.length < L.length) a.push(false); const prev = L.length - 2; if (L.length === 2 || a[prev]) { a[prev] = false; a[L.length - 1] = true; } }
+        draw(); $$(`[data-li]`, el).pop()?.focus();
+      }
       if (d.ldel) { getP(b, d.ldel).splice(+d.i, 1); const F = fields.find(x => x.k === d.ldel); if (F?.vis && b[F.vis]) b[F.vis].splice(+d.i, 1); draw(); }
       if (d.lvis) { const a = b[d.lvis] = b[d.lvis] || []; a[+d.i] = !a[+d.i]; draw(); }
       if (d.qadd) { b.qs.push({ q: '', opts: [{ t: '', ok: true, fb: '' }, { t: '', ok: false, fb: '' }] }); draw(); }
@@ -1523,7 +1529,7 @@ export function startPathFinder(opts = {}) {
     const mine = docList();
     let h = '<div class="grp">Meine Lernpfade (in diesem Browser)</div>';
     h += mine.map(d => `<button data-open="${esc(d.id)}" class="${d.id === doc.id ? 'hi' : ''}"><b>${d.form === 'challenge' ? '⚡' : '📘'} ${esc(d.title)}</b><span>zuletzt ${new Date(d.t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</span></button>`).join('') || '<div class="grp" style="text-transform:none;letter-spacing:0">noch keine</div>';
-    h += '<button data-new="lernpfad"><b>＋ Neuer Lernpfad</b><span>leer beginnen</span></button><button data-new="challenge"><b>＋ Neue Challenge</b><span>leer beginnen</span></button><button data-imp="1"><b>⤒ HTML-Lernpfad importieren</b><span>vorhandene Lernpfad-Seite · Design bleibt wie im Original</span></button>';
+    h += '<button data-new="lernpfad"><b>＋ Neuer Lernpfad</b><span>leer beginnen</span></button><button data-new="challenge"><b>＋ Neue Challenge</b><span>leer beginnen</span></button><button data-imp="1"><b>⤒ Lernpfad-Datei öffnen</b><span>HTML-Lernpfad oder SCORM-Paket (.zip) aus PathFinder · fremde Lernpfad-Seiten behalten ihr Design</span></button>';
     if (ex.length) h += `<div class="grp">${esc(opts.examplesTitle || 'Beispiele')}</div>` + ex.map(e => `<button data-ex="${esc(e.file)}"><b>${esc(e.title)}</b><span>${esc(e.note || '')}</span></button>`).join('');
     $('#openList', pop).innerHTML = h; placePop(anchor);
     pop.onclick = async ev => {
@@ -1531,8 +1537,8 @@ export function startPathFinder(opts = {}) {
       if (b.dataset.open) { const d = loadDoc(b.dataset.open); closePop(); if (d) openDoc(d); }
       if (b.dataset.new) { closePop(); openDoc(emptyDoc(b.dataset.new)); }
       if (b.dataset.imp) {
-        closePop(); const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.html,.htm,text/html';
-        inp.onchange = async () => { const f = inp.files[0]; if (f) importPage(await f.text()); }; inp.click();
+        closePop(); const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.html,.htm,text/html,.zip,application/zip';
+        inp.onchange = async () => { const f = inp.files[0]; if (f) openFile(f); }; inp.click();
       }
       if (b.dataset.ex) {
         closePop(); toast('lädt …');
@@ -1546,7 +1552,31 @@ export function startPathFinder(opts = {}) {
     };
   }
   /** Vorhandene HTML-Lernpfad-Seite übernehmen: Inhalte werden Bausteine, das Design bleibt */
+  /** Datei öffnen: HTML-Lernpfad (eigener Export oder fremde Seite) oder SCORM-Paket (ZIP) aus PathFinder */
+  async function openFile(f) {
+    if (/\.zip$/i.test(f.name) || f.type.includes('zip')) {
+      try {
+        const T = await loadText(), files = await T.unzip(await f.arrayBuffer());
+        const page = files.find(x => /(^|\/)index\.html?$/i.test(x.name)) || files.find(x => /\.html?$/i.test(x.name));
+        if (!page) { toast('Im ZIP ist keine HTML-Seite – ist das ein SCORM-Paket aus PathFinder?', 4000); return; }
+        return importPage(new TextDecoder().decode(page.data));
+      } catch (e) { toast('ZIP ließ sich nicht öffnen: ' + esc(e.message), 4000); return; }
+    }
+    return importPage(await f.text());
+  }
   async function importPage(html) {
+    // eigener Export (HTML-Datei, SCORM-Paket, Lernpfad für eine App): das gespeicherte Dokument übernehmen
+    const own = html.match(/<script type="application\/json" id="pf-doc(-app)?">([\s\S]*?)<\/script>/g);
+    if (own) {
+      try {
+        const pick = own.find(s => s.includes('id="pf-doc-app"') && plugins.length) || own.find(s => s.includes('id="pf-doc"'));
+        const d = migrate(JSON.parse(pick.replace(/^<script[^>]*>/, '').replace(/<\/script>$/, '')));
+        const have = d.id && loadDoc(d.id);
+        if (have && confirm(`Diesen Lernpfad hast du hier schon („${plain(have.title)}“). Die Datei enthält keine verborgenen Tipps und Lösungen.\n\nOK = als Kopie öffnen · Abbrechen = deine vorhandene Fassung öffnen`)) { d.id = uid(); d.title = (d.title || '') + ' (Kopie)'; }
+        else if (have) { openDoc(have); return have; }
+        openDoc(d); toast(`„${esc(plain(d.title))}“ geöffnet`); return d;
+      } catch (e) { toast('Datei ließ sich nicht öffnen: ' + esc(e.message), 4000); return null; }
+    }
     try {
       await loadSkin();
       const d = await SK.importHtml(html, { uid, appName });
@@ -1615,16 +1645,20 @@ export function startPathFinder(opts = {}) {
   /* ---------- Export: HTML-Datei und SCORM-Lernpaket ---------- */
   async function appHtml(st) {
     const { d } = exportDoc(st), a = clone(doc); a.cert = { ...a.cert, on: !!st.cert }; a.pass = st.pass;
+    stripHidden(a); // auch in der Fassung für die App: Verborgenes nicht mitliefern (sonst im Seitenquelltext lesbar)
     return buildHtml(d, false, { plugin: plugins.find(p => p.bundle), doc: a });
+  }
+  // was die Lehrkraft verborgen hat, kommt gar nicht erst in die Datei
+  function stripHidden(d) {
+    for (const st of d.stations) for (const b of st.blocks) {
+      if (b.tipsHide && b.tips) { b.tips = b.tips.filter((t, i) => !b.tipsHide[i]); delete b.tipsHide; }
+      if (b.solHide) { b.solution = ''; delete b.solHide; }
+    }
   }
   function exportDoc(settings) {
     const d = clone(doc); let converted = 0;
     const env = { doc: d, sheetBefore(st, i) { for (let k = i - 1; k >= 0; k--) { const x = st.blocks[k]; if (x.sheet?.cells) return x.sheet; } for (const s2 of d.stations) { if (s2 === st) break; for (let k = s2.blocks.length - 1; k >= 0; k--) if (s2.blocks[k].sheet?.cells) return s2.blocks[k].sheet; } return null; } };
-    for (const st of d.stations) for (const b of st.blocks) {
-      // was die Lehrkraft verborgen hat, kommt gar nicht erst in die Datei
-      if (b.tipsHide && b.tips) { b.tips = b.tips.filter((t, i) => !b.tipsHide[i]); delete b.tipsHide; }
-      if (b.solHide) { b.solution = ''; delete b.solHide; }
-    }
+    stripHidden(d);
     for (const st of d.stations) {
       const out = [];
       st.blocks.forEach((b, i) => {
@@ -1808,7 +1842,7 @@ ${SC}
     buildForApp: () => { if (pending) commit(); return appHtml({ pass: doc.pass || 80, cert: doc.cert?.on !== false }); },
     get dirty() { return hist.length > 1; },
     /** vorhandene HTML-Lernpfad-Seite öffnen (Originaldesign); liefert das Dokument oder null */
-    importHtml: html => importPage(html),
+    importHtml: html => importPage(html), openFile: f => openFile(f),
   };
   save(); render(); updUndo();
   host.attach?.(ctx);

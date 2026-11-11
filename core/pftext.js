@@ -107,7 +107,7 @@ export function readAttachments(lines, warn = () => { }) {
   return att;
 }
 /** ZIP lesen (gespeichert oder deflate) – nur im Browser, ohne Bibliothek */
-async function unzip(buf) {
+export async function unzip(buf) {
   const u = new Uint8Array(buf), dv = new DataView(u.buffer, u.byteOffset, u.byteLength), out = [];
   let e = u.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
   if (e < 0) throw new Error('kein ZIP');
@@ -146,13 +146,21 @@ export async function readFiles(files) {
   return { att, notes, text };
 }
 
+/** Standard für Tipps und Lösung: Lösung und – ab zwei Tipps – der letzte Tipp sind für Schüler verborgen.
+ *  Hat der Text selbst etwas als verborgen markiert, gilt genau diese Angabe. */
+export function hideDefaults(b, S) {
+  const th = S ? S.hid('tipp') : [], explicit = th.some(Boolean);
+  if (explicit) b.tipsHide = th; else if ((b.tips || []).length >= 2) b.tipsHide = b.tips.map((t, i) => i === b.tips.length - 1);
+  if (b.solution) b.solHide = true;
+  return b;
+}
+
 /* ---------- Aufbau der Bausteine aus Abschnitten ---------- */
 const CORE_SECTIONS = {
   aufgabe: { n: 'Aufgabe', keys: ['antwort', 'tipp', 'loesung', 'xp', 'punkte', 'bild'], make(S, H) {
     const b = { type: 'task', title: S.title, html: H.md(S.body), xp: S.num('xp', 20), tips: S.all('tipp').map(inline), solution: S.one('loesung') ? inline(S.one('loesung')) : '', img: S.one('bild') ? H.img(S.one('bild'), S.line) : '' };
     if (S.one('antwort')) b.answer = S.one('antwort');
-    if (S.hid('tipp').some(Boolean)) b.tipsHide = S.hid('tipp');
-    if (S.hid('loesung')[0]) b.solHide = true;
+    hideDefaults(b, S);
     return b;
   } },
   quiz: { n: 'Quiz', keys: ['xp', 'punkte'], make(S, H) {
@@ -190,7 +198,7 @@ const SEC_ALIAS = { aufgabe: 'aufgabe', auftrag: 'aufgabe', quiz: 'quiz', test: 
 
 export function parseText(src, env) {
   const errors = [], warnings = [];
-  const H = { err: (n, m) => errors.push({ n, m }), warn: (n, m) => warnings.push({ n, m }), md: mdToHtml, inline };
+  const H = { err: (n, m) => errors.push({ n, m }), warn: (n, m) => warnings.push({ n, m }), md: mdToHtml, inline, hideDefaults };
   const att = { ...(env.attachments || {}) }, images = [];
   H.img = (ref, n) => {
     ref = String(ref || '').trim().replace(/^<|>$/g, '');
