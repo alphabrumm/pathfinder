@@ -142,7 +142,7 @@ button { font: inherit; color: inherit; }
 .lp-gap input.ok { border-color: var(--good); } .lp-gap input.no { border-color: var(--bad); }
 .lp-gap .gapmark { background: var(--a3s); border-bottom: 2px solid var(--a3d); padding: 0 4px; border-radius: 3px; }
 .lp-match .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-top: 8px; }
-.lp-match .chip { padding: 8px 12px; border-radius: 9px; background: var(--a1s); color: #1d2340; font-weight: 700; text-align: center; border: 2px solid var(--a1); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.lp-match .chip { padding: 8px 12px; border-radius: 9px; background: var(--a1s); color: var(--ink); font-weight: 700; text-align: center; border: 2px solid var(--a1); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .lp-match .chip.picked { outline: 3px solid var(--a3); }
 .lp-match .chip.used { opacity: .35; }
 .lp-match .slot { min-height: 44px; border: 2px dashed var(--line); border-radius: 9px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; color: var(--ink-2); }
@@ -282,11 +282,11 @@ button { font: inherit; color: inherit; }
 .lp-quiz .hd, .lp-sheet .hd { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .lp-quiz .qq { margin-top: 10px; padding-top: 6px; }
 .lp-quiz .qq + .qq { border-top: 1px dashed var(--line); }
-.lp-quiz .qn { float: left; margin-right: 8px; width: 26px; height: 26px; border-radius: 50%; background: var(--a1s); color: #1d2340; font-weight: 700; display: grid; place-items: center; font-size: 14px; }
+.lp-quiz .qn { float: left; margin-right: 8px; width: 26px; height: 26px; border-radius: 50%; background: var(--a1s); color: var(--ink); font-weight: 700; display: grid; place-items: center; font-size: 14px; }
 .lp-quiz .qt { font-weight: 600; }
 .lp-gap .bank { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 6px; padding: 8px; border-radius: 10px; background: var(--surface-2); }
 .lp-gap .bank .bl { width: 100%; font-size: .8em; color: var(--ink-2); }
-.lp-gap .gchip { padding: 5px 10px; border-radius: 8px; background: var(--a1s); border: 2px solid var(--a1); color: #1d2340; font-weight: 700; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.lp-gap .gchip { padding: 5px 10px; border-radius: 8px; background: var(--a1s); border: 2px solid var(--a1); color: var(--ink); font-weight: 700; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .lp-gap .gchip.picked { outline: 3px solid var(--a3); } .lp-gap .gchip.used { opacity: .3; }
 .lp-gap .gapslot { display: inline-block; min-width: 5em; min-height: 1.5em; vertical-align: bottom; border-bottom: 2px dashed var(--a3d); background: var(--a3s); border-radius: 4px; padding: 0 6px; cursor: pointer; text-align: center; }
 .lp-gap .gapslot.filled { border-bottom-style: solid; font-weight: 700; }
@@ -298,7 +298,7 @@ button { font: inherit; color: inherit; }
 .lp-gap .heft-sub { font-size: .8em; letter-spacing: .1em; color: var(--ink-2); margin-bottom: 6px; }
 .lp-task .where { font-size: .82em; color: var(--ink-2); background: var(--surface-2); border-radius: 6px; padding: 1px 7px; margin-left: 6px; }
 .lp-uml { display: inline-block; min-width: 220px; margin: 12px 0; border: 2px solid var(--ink); background: var(--surface); font: 14px ui-monospace, Menlo, monospace; }
-.lp-uml .un { text-align: center; font-weight: 700; padding: 6px 10px; border-bottom: 2px solid var(--ink); background: var(--a1s); color: #1d2340; }
+.lp-uml .un { text-align: center; font-weight: 700; padding: 6px 10px; border-bottom: 2px solid var(--ink); background: var(--a1s); color: var(--ink); }
 .lp-uml .us { padding: 6px 10px; } .lp-uml .us + .us { border-top: 2px solid var(--ink); }
 .ed-form .rule { display: grid; gap: 6px; padding: 8px; border: 1px solid #ece6f3; border-radius: 10px; }
 .ed-form .rule select { max-width: 13em; }

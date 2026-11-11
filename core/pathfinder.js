@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-10b';
+const PF_BUILD = '2026-11-11a';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -605,9 +605,9 @@ export function startPathFinder(opts = {}) {
         const got = prog.quiz[b.id] || {}; let n = 0;
         if (b.bank) {
           const answers = [...(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].map(m => m[1].split('|')[0]);
-          const words = shuffled(answers.concat(b.extra || []), b.id), used = Object.values(got);
+          const words = shuffled(answers.concat(b.extra || []), b.id), used = Object.values(got), seen = {};
           const html = (b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const i = n++; const v = got[i]; const st = prog.quiz[b.id + ':chk'] ? (v != null && isGapOk(b, i, v) ? ' ok' : ' no') : ''; return `<span class="gapslot${v != null ? ' filled' : ''}${st}" data-gslot="${i}" role="button" tabindex="0">${v != null ? esc(v) : ''}</span>`; });
-          return wrap(b, `<div class="lp-card lp-gap${b.heft ? ' heft' : ''}">${head}${xpTag(b)}<div>${html}</div><div class="bank"><span class="bl">Begriffe · ziehen oder erst Begriff, dann Lücke antippen</span>${words.map(w => `<span class="gchip${used.includes(w) ? ' used' : ''}" data-gchip="${esc(w)}">${esc(w)}</span>`).join('')}</div><div><button class="lp-btn" data-run="gapcheck">Prüfen</button><span class="lp-state" style="margin-left:8px">${ok ? '✓ alles richtig' : ''}</span></div></div>`);
+          return wrap(b, `<div class="lp-card lp-gap${b.heft ? ' heft' : ''}">${head}${xpTag(b)}<div>${html}</div><div class="bank"><span class="bl">Begriffe · ziehen oder erst Begriff, dann Lücke antippen</span>${words.map(w => { const k = seen[w] = (seen[w] || 0) + 1; return `<span class="gchip${used.filter(x => x === w).length >= k ? ' used' : ''}" data-gchip="${esc(w)}">${esc(w)}</span>`; }).join('')}</div><div><button class="lp-btn" data-run="gapcheck">Prüfen</button><span class="lp-state" style="margin-left:8px">${ok ? '✓ alles richtig' : ''}</span></div></div>`);
         }
         const html = (b.html || '').replace(/\[\[(.+?)\]\]/g, () => `<input data-gap="${n}" value="${esc(got[n] || '')}" autocomplete="off" autocapitalize="off" spellcheck="false" data-n="${n++}">`);
         return wrap(b, `<div class="lp-card lp-gap${b.heft ? ' heft' : ''}">${head}${xpTag(b)}<div>${html}</div><div class="lp-state" style="margin-top:6px">${ok ? '✓ alles richtig' : ''}</div></div>`);
@@ -738,7 +738,14 @@ export function startPathFinder(opts = {}) {
   function placeGap(id, slot, word) {
     const got = prog.quiz[id] || (prog.quiz[id] = {});
     delete prog.quiz[id + ':chk'];
-    if (word == null) delete got[slot]; else { for (const k in got) if (got[k] === word) delete got[k]; got[slot] = word; }
+    if (word == null) delete got[slot];
+    else if (got[slot] !== word) {
+      // dasselbe Wort kann mehrmals in der Bank stehen (z. B. zwei Lücken „Spitze“) – erst wenn alle Kärtchen liegen, wird eines umgelegt
+      const b = findBlock(id)?.b, copies = b ? [...(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].map(m => m[1].split('|')[0]).concat(b.extra || []).filter(w => w === word).length : 1;
+      const placed = Object.keys(got).filter(k => got[k] === word);
+      if (placed.length >= copies) delete got[placed[0]];
+      got[slot] = word;
+    }
     render();
   }
   function solve(id, keepFocus) {
