@@ -45,8 +45,10 @@ export const PALETTES = [
   { n: 'Tafel', l: { bg: '#f5f8f6', surface: '#fff', 'surface-2': '#e8f0eb', ink: '#1b2b24', 'ink-2': '#56695f', line: '#d5e3da', a1: '#2f8a63', a1s: '#c3e8d6', a2: '#d0544a', a2s: '#f6cfcb', a3: '#e9cf3c', a3d: '#b29a12', a3s: '#faf2c8', a3ink: '#2a2600', g1: '#c3e8d6', g2: '#dcefe3', g3: '#f6eebf', heroink: '#1b2b24' }, d: { bg: '#18241f', surface: '#1f2e28', 'surface-2': '#273a32', ink: '#eef3ea', 'ink-2': '#aebdb3', line: '#33493f', a1: '#8fd3b0', a1s: '#22433a', a2: '#f2a7a0', a2s: '#4a2d2b', a3: '#f4e27a', a3d: '#c2b14a', a3s: '#3b3a22', a3ink: '#2a2600', g1: '#1e3a30', g2: '#25463a', g3: '#2f5446', heroink: '#f4f7f1' } },
   { n: 'Terminal', l: { bg: '#f3f8f4', surface: '#fff', 'surface-2': '#e5f0e8', ink: '#0f2a1a', 'ink-2': '#4b6b57', line: '#cfe3d5', a1: '#15803d', a1s: '#c6efd4', a2: '#0369a1', a2s: '#c9e8f7', a3: '#84cc16', a3d: '#5b8c0e', a3s: '#ecf8d0', a3ink: '#0b1400', g1: '#c6efd4', g2: '#cfe9f2', g3: '#e3f5c0', heroink: '#0f2a1a' }, d: { bg: '#0d1410', surface: '#121c16', 'surface-2': '#18261d', ink: '#d9f7e3', 'ink-2': '#8fb79c', line: '#1f3328', a1: '#4ade80', a1s: '#143322', a2: '#38bdf8', a2s: '#0f2c3a', a3: '#a3e635', a3d: '#6c9d1a', a3s: '#1d2a10', a3ink: '#0b1400', g1: '#0f2e1c', g2: '#123b2a', g3: '#1d4a20', heroink: '#d9f7e3' } },
 ];
-/* Stil „Hack the Grid“ (wie die FlowPad-Challenges des Informatik-9-Kurses): dunkler Raster-Kopf mit grünem Leuchten,
-   helle Seite, Aufgabenkarten mit farbiger Kante und Pixel-Schild „#1 · FORMEL“. Ersetzt die Farbpalette. */
+/* Stil „Hack“ (intern 'grid'; wie die FlowPad-Challenges des Informatik-9-Kurses): immer dunkel, Raster-Kopf mit grün
+   leuchtendem Pixel-Totenkopf (Standard-Kopfbild), Aufgabenkarten mit farbiger Kante und Pixel-Schild „#1 · FORMEL“.
+   Ersetzt Farbpalette und Hell/Dunkel. */
+const HACK_SKULL = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges"><path fill="#5fe08a" d="M4 2h8v1h1v1h1v5h-1v2h-2v2H5v-2H3V9H2V4h1V3h1zM5 6v2h2V6zm4 0v2h2V6zM7 9v1h2V9zM6 12h1v1H6zm3 0h1v1H9z"/></svg>');
 export const GRID_THEME = {
   hell: { bg: '#f5f3fb', surface: '#fff', 'surface-2': '#efebf8', ink: '#1d1a2e', 'ink-2': '#625c78', line: '#e2dcef', a1: '#3b63c4', a1s: '#c9d6f5', a2: '#c2477f', a2s: '#f5cfe0', a3: '#f6cf45', a3d: '#c99a06', a3s: '#fdf3c8', a3ink: '#2b2300', g1: '#15122a', g2: '#15122a', g3: '#15122a', heroink: '#eef', good: '#1f8f55', bad: '#c23b3b' },
   dunkel: { bg: '#12101f', surface: '#1d1a30', 'surface-2': '#26223d', ink: '#f1eefa', 'ink-2': '#b5aed0', line: '#36304f', a1: '#9db6f5', a1s: '#2c3a66', a2: '#f29cc2', a2s: '#4a2238', a3: '#f6cf45', a3d: '#e3b341', a3s: '#3d3112', a3ink: '#2b2300', g1: '#15122a', g2: '#15122a', g3: '#15122a', heroink: '#eef', good: '#78d29d', bad: '#ff8a8a' },
@@ -377,7 +379,7 @@ export function startPathFinder(opts = {}) {
   darkMQ?.addEventListener?.('change', () => { if (!schemePrev) { applyDesign(); render(); } });
   function applyDesign() {
     const p = PALETTES[doc.design.pal] || PALETTES[0], f = FONTS[doc.design.font] || FONTS.pixel, st = lp.style;
-    const sch = scheme(), grid = doc.design.theme === 'grid', cols = grid ? GRID_THEME[sch === 'dunkel' ? 'dunkel' : 'hell'] : sch === 'dunkel' ? p.d || p.l : p.l; lp.dataset.scheme = sch;
+    const grid = doc.design.theme === 'grid', sch = grid ? 'dunkel' : scheme(), cols = grid ? GRID_THEME.dunkel : sch === 'dunkel' ? p.d || p.l : p.l; lp.dataset.scheme = sch; // „Hack“ ist immer dunkel
     lp.dataset.theme = grid ? 'grid' : 'standard';
     for (const k in cols) st.setProperty('--' + k, cols[k]);
     st.setProperty('--font-display', f.d); st.setProperty('--display-weight', f.w); st.setProperty('--display-ls', f.ls); st.setProperty('--fz', fz);
@@ -405,11 +407,12 @@ export function startPathFinder(opts = {}) {
     if (!curSid || !doc.stations.some(s => s.id === curSid)) curSid = doc.stations[0]?.id;
     const d = doc.design, lines = doc.typeLines || [];
     const appLogo = opts.logo ? `<img src="${opts.logo}" alt="">` : esc(appName[0]);
-    const logo = ((d.hero === 'bild' || d.hero === 'gross') && d.heroImg ? `<img src="${d.heroImg}" alt="">` : appLogo) + (d.hero === 'gross' && lines.length ? `<div class="lp-typing">${E() ? esc(lines.join('\n')) : ''}</div>` : '');
+    const ownImg = (d.hero === 'bild' || d.hero === 'gross') && d.heroImg, hackImg = d.theme === 'grid' && !ownImg && d.hero !== 'hintergrund';
+    const logo = (ownImg ? `<img src="${d.heroImg}" alt="">` : hackImg ? `<img src="${HACK_SKULL}" alt="">` : appLogo) + (d.hero === 'gross' && lines.length ? `<div class="lp-typing">${E() ? esc(lines.join('\n')) : ''}</div>` : '');
     let h = `<div class="fontsize"><button data-fz="-" aria-label="Schrift kleiner">A−</button><button data-fz="+" aria-label="Schrift größer">A+</button></div>`;
     const goals = doc.goals || [];
     h += `<header class="lp-hero${d.hero === 'hintergrund' && d.heroImg ? ' has-bg' : ''}${d.hero === 'gross' && d.heroImg ? ' big' : ''}"${d.hero === 'hintergrund' && d.heroImg ? ` style="background-image:url(${d.heroImg})"` : ''}>`
-      + (d.hero !== 'hintergrund' ? `<div class="lp-logo${d.hero === 'logo' && opts.logo ? ' applogo' : ''}${d.hero !== 'logo' && d.heroImg ? ' own' : ''}"${E() ? ' title="Antippen: eigenes Bild oder GIF setzen"' : ''}>${logo}</div>` : '')
+      + (d.hero !== 'hintergrund' ? `<div class="lp-logo${d.hero === 'logo' && opts.logo && !hackImg ? ' applogo' : ''}${(d.hero !== 'logo' && d.heroImg) || hackImg ? ' own' : ''}"${E() ? ' title="Antippen: eigenes Bild oder GIF setzen"' : ''}>${logo}</div>` : '')
       + `<div style="min-width:0">${ce('$kicker', doc.kicker, 'Kopfzeile, z. B. Fach · Jahrgangsstufe', { tag: 'small' })}${ce('$title', doc.title, 'Titel des Lernpfads', { tag: 'h1', anim: doc.anim?.title })}${ce('$subtitle', doc.subtitle, 'Untertitel', { tag: 'p', rich: true, anim: doc.anim?.subtitle })}`
       + (goals.length ? `<ul class="lp-goals">${goals.map((g, i) => ce('$goals.' + i, g, 'Lernziel', { tag: 'li', rich: true })).join('')}</ul>` : '')
       + (doc.rank ? `<div class="lp-rank">${ce('$rank', doc.rank, 'Rang', { tag: 'span', rich: true })}</div>` : '')
@@ -542,7 +545,7 @@ export function startPathFinder(opts = {}) {
   }
   const ptsOf = b => Math.max(0, +(b.pts ?? 1) || 0);
   const ptsTag = b => !doc.pointsOn || !isCheck(b) ? '' : E() ? `<label class="pf-pts" title="Punkte für diese Aufgabe"><input type="number" min="0" step="1" inputmode="numeric" data-pts value="${ptsOf(b)}"><span>P.</span></label>` : `<span class="pf-pts">${ptsOf(b)} P.</span>`;
-  // Stil „Hack the Grid“: Aufgaben bekommen ein Schild „#1 · FORMEL“ (Art aus b.tag oder von der Erweiterung), Ort und XP
+  // Stil „Hack“: Aufgaben bekommen ein Schild „#1 · FORMEL“ (Art aus b.tag oder von der Erweiterung), Ort und XP
   let gridNo = null;
   function gridTag(b) {
     let t = def(b)?.tag?.(b) || null;
@@ -1150,12 +1153,13 @@ export function startPathFinder(opts = {}) {
         <label class="chk"><input type="checkbox" id="ptsIn"${doc.pointsOn ? ' checked' : ''}>Punkte für Aufgaben vergeben</label><span class="help">Die Punkte stehen links neben jeder Aufgabe, lassen sich dort anpassen und zählen im SCORM-Lernpaket.</span>
         </fieldset>
         <fieldset><legend>Aussehen</legend>
+        <label>Stil</label>${seg('theme', [['standard', 'Standard'], ['grid', '▦ Hack']], d.theme === 'grid' ? 'grid' : 'standard')}
+        <span class="help">${d.theme === 'grid' ? '„Hack“: immer dunkel, Raster-Kopf mit grünem Pixel-Totenkopf (eigenes Bild unter Kopf möglich), Aufgaben mit farbiger Kante und Schild (#1 · FORMEL). Farbpalette und Hell/Dunkel entfallen.' : 'Standard: Farben aus der Farbpalette, hell oder dunkel.'}</span>
+${d.theme === 'grid' ? '' : `
         <label>Vorschau</label>${seg('preview', [['hell', '☀ Hell'], ['dunkel', '☾ Dunkel']], scheme())}
-        <label>Stil</label>${seg('theme', [['standard', 'Standard'], ['grid', '▦ Hack the Grid']], d.theme === 'grid' ? 'grid' : 'standard')}
-        <span class="help">${d.theme === 'grid' ? '„Hack the Grid“: dunkler Raster-Kopf, Aufgaben mit farbiger Kante und Schild (#1 · FORMEL). Ersetzt die Farbpalette.' : 'Standard: Farben aus der Farbpalette.'}</span>
         <label>Farbpalette <span class="help">${esc(PALETTES[d.pal].n)} · ${scheme() === 'dunkel' ? 'dunkler' : 'heller'} Modus</span></label><div class="ed-sw">${PALETTES.map((p, i) => { const c = scheme() === 'dunkel' ? p.d || p.l : p.l; return `<button data-pal="${i}" title="${esc(p.n)}" aria-pressed="${i === d.pal}" style="background:${c.bg}"><span style="background:${c.a1}"></span><span style="background:${c.a2}"></span><span style="background:${c.a3}"></span></button>`; }).join('')}</div>
         <label>Für Schüler</label>${seg('scheme', [['auto', 'wie das Gerät'], ['hell', 'immer hell'], ['dunkel', 'immer dunkel']], d.scheme || 'auto')}
-        <span class="help">„wie das Gerät“: Der Lernpfad erscheint hell oder dunkel, je nachdem, wie das iPad eingestellt ist. Prüfe mit der Vorschau beide Modi – vor allem Bilder und Grafiken.</span>
+        <span class="help">„wie das Gerät“: Der Lernpfad erscheint hell oder dunkel, je nachdem, wie das iPad eingestellt ist. Prüfe mit der Vorschau beide Modi – vor allem Bilder und Grafiken.</span>`}
         <label>Schrift</label>${seg('font', Object.entries(FONTS).map(([k, f]) => [k, f.n]), d.font)}
         <label>Stationen</label>${seg('shape', [['eckig', '▢ eckig'], ['rund', '◯ rund'], ['skizze', '✎ skizziert']], d.shape)}
         <div class="row"><label>Animation Titel${sel('title', doc.anim?.title)}</label><label>Animation Untertitel${sel('subtitle', doc.anim?.subtitle)}</label></div>
@@ -1165,7 +1169,7 @@ export function startPathFinder(opts = {}) {
         <fieldset><legend>Kopf</legend>
         <label>Muster im Hintergrund</label><div class="ed-pat">${PATTERNS.map(([v, n, t]) => `<button data-pat="${esc(v)}" title="${esc(t)}" aria-pressed="${v === pat}">${esc(n)}</button>`).join('')}<input type="text" id="patIn" maxlength="2" placeholder="eigenes" value="${custom ? esc(pat) : ''}" aria-label="eigenes Zeichen oder Emoji"></div>
         ${pat !== 'keins' ? `<div class="row"><label>Dichte<input type="range" id="patK" min="0.5" max="2" step="0.1" value="${d.patDensity || 1}"><span class="help">weiter ← → dichter</span></label><label>Sichtbarkeit<input type="range" id="patO" min="0.15" max="2" step="0.05" value="${d.patOpacity ?? 1}"><span class="help">durchsichtiger ← → kräftiger</span></label></div>` : ''}
-        ${seg('hero', [['logo', 'App-Logo'], ['bild', 'eigenes Bild'], ['gross', 'großes Bild rechts'], ['hintergrund', 'Bild als Hintergrund']], d.hero)}
+        ${seg('hero', [['logo', d.theme === 'grid' ? 'Pixel-Totenkopf' : 'App-Logo'], ['bild', 'eigenes Bild'], ['gross', 'großes Bild rechts'], ['hintergrund', 'Bild als Hintergrund']], d.hero)}
         ${d.hero !== 'logo' ? `<div class="imgprev">${d.heroImg ? `<img src="${d.heroImg}" alt="">` : ''}<label class="take" style="display:inline-flex;align-items:center;cursor:pointer">🖼 ${d.heroImg ? 'Anderes Bild' : 'Bild/GIF wählen'}<input type="file" accept="image/*" id="heroFile" hidden></label></div>` : ''}
         <label>Lernziele</label><div class="list">${(doc.goals || []).map((g, i) => `<div class="it"><input type="text" data-goal="${i}" value="${esc(plain(g))}" placeholder="Lernziel ${i + 1}"><button data-gdel="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-gadd="1">＋ Lernziel</button></div>
         <label>Rang / Abzeichen (optional)<input type="text" id="rankIn" value="${esc(plain(doc.rank))}" placeholder="z. B. Dein Rang: HACKER NEWBIE"></label>

@@ -505,7 +505,7 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .lp[data-scheme="dunkel"] .lp-figur > img { background: #f4f2f8; }
 .lp[data-scheme="dunkel"] .lp-logo.own img { background: transparent; }
 
-/* ---------- Stil „Hack the Grid“ (doc.design.theme = 'grid') – wie die FlowPad-Challenges ---------- */
+/* ---------- Stil „Hack“ (doc.design.theme = 'grid', immer dunkel) – wie die FlowPad-Challenges ---------- */
 .lp[data-theme="grid"] { --hg-neon: #5fe08a; --hg-gold: #f6cf45; --hg-dark: #15122a; }
 .lp[data-theme="grid"] .lp-hero { background: var(--hg-dark); color: #eef; padding: 20px 18px 16px; }
 .lp[data-theme="grid"] .lp-hero::before { background-image: linear-gradient(rgba(95,224,138,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(95,224,138,.12) 1px, transparent 1px); background-size: 16px 16px; opacity: .5; }
