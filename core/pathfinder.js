@@ -1646,7 +1646,7 @@ export function startPathFinder(opts = {}) {
   async function appHtml(st) {
     const { d } = exportDoc(st), a = clone(doc); a.cert = { ...a.cert, on: !!st.cert }; a.pass = st.pass;
     stripHidden(a); // auch in der Fassung für die App: Verborgenes nicht mitliefern (sonst im Seitenquelltext lesbar)
-    return buildHtml(d, false, { plugin: plugins.find(p => p.bundle), doc: a });
+    return buildHtml(d, !!st.scorm, { plugin: plugins.find(p => p.bundle), doc: a });
   }
   // was die Lehrkraft verborgen hat, kommt gar nicht erst in die Datei
   function stripHidden(d) {
@@ -1839,7 +1839,7 @@ ${SC}
     solve: id => solve(id), render: () => render(),
     openDoc: d => openDoc(d), get current() { return doc; },
     /** Lernpfad als Datei für die App (Erweiterung eingebaut) – für „Fertig“ im Editor der App */
-    buildForApp: () => { if (pending) commit(); return appHtml({ pass: doc.pass || 80, cert: doc.cert?.on !== false }); },
+    buildForApp: (o = {}) => { if (pending) commit(); return appHtml({ pass: doc.pass || 80, cert: doc.cert?.on !== false, scorm: !!o.scorm }); }, // scorm: Lernpfad meldet an ein SCORM-API (z. B. die App als Lernpaket in Moodle)
     get dirty() { return hist.length > 1; },
     /** vorhandene HTML-Lernpfad-Seite öffnen (Originaldesign); liefert das Dokument oder null */
     importHtml: html => importPage(html), openFile: f => openFile(f),
