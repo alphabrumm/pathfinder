@@ -504,3 +504,41 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .lp[data-scheme="dunkel"] .lp-img img { background: #f4f2f8; }
 .lp[data-scheme="dunkel"] .lp-figur > img { background: #f4f2f8; }
 .lp[data-scheme="dunkel"] .lp-logo.own img { background: transparent; }
+
+/* ---------- Stil „Hack the Grid“ (doc.design.theme = 'grid') – wie die FlowPad-Challenges ---------- */
+.lp[data-theme="grid"] { --hg-neon: #5fe08a; --hg-gold: #f6cf45; --hg-dark: #15122a; }
+.lp[data-theme="grid"] .lp-hero { background: var(--hg-dark); color: #eef; padding: 20px 18px 16px; }
+.lp[data-theme="grid"] .lp-hero::before { background-image: linear-gradient(rgba(95,224,138,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(95,224,138,.12) 1px, transparent 1px); background-size: 16px 16px; opacity: .5; }
+.lp[data-theme="grid"] .lp-hero small { color: var(--hg-gold); opacity: 1; letter-spacing: .16em; }
+.lp[data-theme="grid"] .lp-hero h1 { color: var(--hg-neon); text-shadow: 0 0 10px rgba(95,224,138,.55); }
+.lp[data-theme="grid"] .lp-hero p { color: #cfd3ea; }
+.lp[data-theme="grid"] .lp-hero code { background: rgba(255,255,255,.12); color: #fff; }
+.lp[data-theme="grid"] .lp-logo { width: 72px; height: 72px; background: none; box-shadow: none; border-radius: 0; color: var(--hg-neon); filter: drop-shadow(0 0 8px rgba(95,224,138,.7)); }
+.lp[data-theme="grid"] .lp-logo img { object-fit: contain; image-rendering: pixelated; }
+.lp[data-theme="grid"] .lp-divider { background: var(--div, var(--hg-gold)); }
+.lp[data-theme="grid"] .lp-hud { background: var(--hg-dark); color: #cfd3ea; border-radius: 10px; font: 600 calc(14px * var(--fz)) "JetBrains Mono", ui-monospace, Menlo, monospace; }
+.lp[data-theme="grid"] .lp-hud span:first-child { color: var(--hg-gold); font-weight: 700; }
+.lp[data-theme="grid"] .lp-hud .bar { height: 12px; border-radius: 0; border: 2px solid var(--hg-neon); background: rgba(255,255,255,.12); }
+.lp[data-theme="grid"] .lp-hud .bar i { background: var(--hg-neon); }
+.lp[data-theme="grid"] .lp-stops a.cur { border-color: var(--hg-neon); color: var(--ink); box-shadow: 0 0 0 3px rgba(95,224,138,.35); }
+/* Aufgabenkarten: farbige Kante je Art, Schild in Pixelschrift */
+.lp[data-theme="grid"] .blk[data-kc] { --kc: #c99a06; }
+.lp[data-theme="grid"] .blk[data-kc="diagramm"] { --kc: #3b63c4; }
+.lp[data-theme="grid"] .blk[data-kc="lesen"] { --kc: #c2477f; }
+.lp[data-theme="grid"] .blk[data-kc="fill"] { --kc: #1f8f55; }
+.lp[data-theme="grid"] .blk[data-kc="quiz"] { --kc: #7a4fd0; }
+.lp[data-theme="grid"][data-scheme="dunkel"] .blk[data-kc] { --kc: #e3b341; }
+.lp[data-theme="grid"][data-scheme="dunkel"] .blk[data-kc="diagramm"] { --kc: #9db6f5; }
+.lp[data-theme="grid"][data-scheme="dunkel"] .blk[data-kc="lesen"] { --kc: #f29cc2; }
+.lp[data-theme="grid"][data-scheme="dunkel"] .blk[data-kc="fill"] { --kc: #78d29d; }
+.lp[data-theme="grid"][data-scheme="dunkel"] .blk[data-kc="quiz"] { --kc: #c2a6ff; }
+.lp[data-theme="grid"] .blk[data-kc] > .lp-card { background: var(--surface); border: 2px solid var(--line); border-left: 8px solid var(--kc); border-radius: 10px; padding: 10px 14px 12px; }
+.lp[data-theme="grid"] .blk[data-kc] > .lp-card.ok { border-color: var(--good); border-left-color: var(--good); box-shadow: 0 0 0 1px var(--good) inset; }
+.lp[data-theme="grid"] .lp-tagrow { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin-bottom: 4px; font: 700 calc(12px * var(--fz))/1.3 "Pixelify Sans", var(--font-display), monospace; letter-spacing: .08em; text-transform: uppercase; }
+.lp[data-theme="grid"] .lp-tag { color: #fff; background: var(--kc); padding: 3px 8px; }
+.lp[data-theme="grid"][data-scheme="dunkel"] .lp-tag { color: #12101f; }
+.lp[data-theme="grid"] .lp-tagrow .where { color: var(--ink-2); font: 400 calc(13px * var(--fz)) "Atkinson Hyperlegible", sans-serif; letter-spacing: 0; text-transform: none; background: none; padding: 0; margin: 0; }
+.lp[data-theme="grid"] .lp-tagrow .txp { margin-left: auto; color: var(--ink-2); }
+.lp[data-theme="grid"] .blk[data-kc] .hd .xp, .lp[data-theme="grid"] .blk[data-kc] .hd .where { display: none; }
+.lp[data-theme="grid"] .blk[data-kc] .lp-ctitle { color: var(--ink); font-size: 1.15em; }
+.lp[data-theme="grid"] .blk[data-kc] > .lp-card.ok .lp-ctitle::after { content: " ✓"; color: var(--good); }

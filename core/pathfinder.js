@@ -45,6 +45,13 @@ export const PALETTES = [
   { n: 'Tafel', l: { bg: '#f5f8f6', surface: '#fff', 'surface-2': '#e8f0eb', ink: '#1b2b24', 'ink-2': '#56695f', line: '#d5e3da', a1: '#2f8a63', a1s: '#c3e8d6', a2: '#d0544a', a2s: '#f6cfcb', a3: '#e9cf3c', a3d: '#b29a12', a3s: '#faf2c8', a3ink: '#2a2600', g1: '#c3e8d6', g2: '#dcefe3', g3: '#f6eebf', heroink: '#1b2b24' }, d: { bg: '#18241f', surface: '#1f2e28', 'surface-2': '#273a32', ink: '#eef3ea', 'ink-2': '#aebdb3', line: '#33493f', a1: '#8fd3b0', a1s: '#22433a', a2: '#f2a7a0', a2s: '#4a2d2b', a3: '#f4e27a', a3d: '#c2b14a', a3s: '#3b3a22', a3ink: '#2a2600', g1: '#1e3a30', g2: '#25463a', g3: '#2f5446', heroink: '#f4f7f1' } },
   { n: 'Terminal', l: { bg: '#f3f8f4', surface: '#fff', 'surface-2': '#e5f0e8', ink: '#0f2a1a', 'ink-2': '#4b6b57', line: '#cfe3d5', a1: '#15803d', a1s: '#c6efd4', a2: '#0369a1', a2s: '#c9e8f7', a3: '#84cc16', a3d: '#5b8c0e', a3s: '#ecf8d0', a3ink: '#0b1400', g1: '#c6efd4', g2: '#cfe9f2', g3: '#e3f5c0', heroink: '#0f2a1a' }, d: { bg: '#0d1410', surface: '#121c16', 'surface-2': '#18261d', ink: '#d9f7e3', 'ink-2': '#8fb79c', line: '#1f3328', a1: '#4ade80', a1s: '#143322', a2: '#38bdf8', a2s: '#0f2c3a', a3: '#a3e635', a3d: '#6c9d1a', a3s: '#1d2a10', a3ink: '#0b1400', g1: '#0f2e1c', g2: '#123b2a', g3: '#1d4a20', heroink: '#d9f7e3' } },
 ];
+/* Stil „Hack the Grid“ (wie die FlowPad-Challenges des Informatik-9-Kurses): dunkler Raster-Kopf mit grünem Leuchten,
+   helle Seite, Aufgabenkarten mit farbiger Kante und Pixel-Schild „#1 · FORMEL“. Ersetzt die Farbpalette. */
+export const GRID_THEME = {
+  hell: { bg: '#f5f3fb', surface: '#fff', 'surface-2': '#efebf8', ink: '#1d1a2e', 'ink-2': '#625c78', line: '#e2dcef', a1: '#3b63c4', a1s: '#c9d6f5', a2: '#c2477f', a2s: '#f5cfe0', a3: '#f6cf45', a3d: '#c99a06', a3s: '#fdf3c8', a3ink: '#2b2300', g1: '#15122a', g2: '#15122a', g3: '#15122a', heroink: '#eef', good: '#1f8f55', bad: '#c23b3b' },
+  dunkel: { bg: '#12101f', surface: '#1d1a30', 'surface-2': '#26223d', ink: '#f1eefa', 'ink-2': '#b5aed0', line: '#36304f', a1: '#9db6f5', a1s: '#2c3a66', a2: '#f29cc2', a2s: '#4a2238', a3: '#f6cf45', a3d: '#e3b341', a3s: '#3d3112', a3ink: '#2b2300', g1: '#15122a', g2: '#15122a', g3: '#15122a', heroink: '#eef', good: '#78d29d', bad: '#ff8a8a' },
+};
+const GRID_KINDS = { formel: 'formel', diagramm: 'diagramm', lesen: 'lesen', 'ausfüllen': 'fill', fill: 'fill', tabelle: 'fill', 'kopf-hack': 'quiz', quiz: 'quiz' };
 const FONTS = {
   pixel: { n: 'Pixel', d: '"Pixelify Sans", "Courier New", monospace', w: 700, ls: '0' },
   schlicht: { n: 'Schlicht', d: '"Atkinson Hyperlegible", -apple-system, system-ui, sans-serif', w: 700, ls: '-.01em' },
@@ -370,7 +377,8 @@ export function startPathFinder(opts = {}) {
   darkMQ?.addEventListener?.('change', () => { if (!schemePrev) { applyDesign(); render(); } });
   function applyDesign() {
     const p = PALETTES[doc.design.pal] || PALETTES[0], f = FONTS[doc.design.font] || FONTS.pixel, st = lp.style;
-    const sch = scheme(), cols = sch === 'dunkel' ? p.d || p.l : p.l; lp.dataset.scheme = sch;
+    const sch = scheme(), grid = doc.design.theme === 'grid', cols = grid ? GRID_THEME[sch === 'dunkel' ? 'dunkel' : 'hell'] : sch === 'dunkel' ? p.d || p.l : p.l; lp.dataset.scheme = sch;
+    lp.dataset.theme = grid ? 'grid' : 'standard';
     for (const k in cols) st.setProperty('--' + k, cols[k]);
     st.setProperty('--font-display', f.d); st.setProperty('--display-weight', f.w); st.setProperty('--display-ls', f.ls); st.setProperty('--fz', fz);
     lp.dataset.shape = doc.design.shape; lp.dataset.form = doc.form;
@@ -408,6 +416,7 @@ export function startPathFinder(opts = {}) {
       + (E() && (!goals.length || !doc.rank) ? `<div class="ed-hint" style="display:inline-block">Lernziele und Rang: ⚙ Einstellungen → Kopf</div>` : '')
       + `</div></header><div class="lp-divider" aria-hidden="true"></div>`;
     h += `<nav class="lp-trail"><div class="lp-trail-in"><div class="lp-stops" id="stops">${doc.stations.map((s, i) => `<a data-sid="${s.id}" class="${stationDone(s) ? 'done' : ''}${s.id === curSid ? ' cur' : ''}" title="${esc(s.title)}">${stationDone(s) ? '✓' : esc(s.nr || i + 1)}</a>`).join('')}${doc.cert.on ? '<a data-sid="cert" title="Abschluss">🏁</a>' : ''}</div><span class="lp-count">${doc.stations.filter(stationDone).length} / ${doc.stations.length}</span></div></nav>`;
+    gridNo = null; if (d.theme === 'grid') { gridNo = new Map(); let n = 0; for (const st of doc.stations) for (const b of st.blocks) if (isCheck(b)) gridNo.set(b.id, ++n); }
     h += `<main class="lp-main">`;
     if (doc.form === 'challenge') { const x = xpNow(), mx = xpMax() || 1; h += `<div class="lp-hud"><span>⚡ ${x} XP</span><span class="bar"><i style="width:${Math.round(100 * x / mx)}%"></i></span><span>von ${mx}</span></div>`; }
     doc.stations.forEach((s, si) => {
@@ -533,7 +542,21 @@ export function startPathFinder(opts = {}) {
   }
   const ptsOf = b => Math.max(0, +(b.pts ?? 1) || 0);
   const ptsTag = b => !doc.pointsOn || !isCheck(b) ? '' : E() ? `<label class="pf-pts" title="Punkte für diese Aufgabe"><input type="number" min="0" step="1" inputmode="numeric" data-pts value="${ptsOf(b)}"><span>P.</span></label>` : `<span class="pf-pts">${ptsOf(b)} P.</span>`;
-  const wrap = (b, inner, cls = '') => `<div class="blk ${cls}" data-id="${b.id}">${E() ? tools(b) : ''}${ptsTag(b)}${inner}</div>`;
+  // Stil „Hack the Grid“: Aufgaben bekommen ein Schild „#1 · FORMEL“ (Art aus b.tag oder von der Erweiterung), Ort und XP
+  let gridNo = null;
+  function gridTag(b) {
+    let t = def(b)?.tag?.(b) || null;
+    if (b.tag) t = { ...(t || {}), l: b.tag, k: GRID_KINDS[String(b.tag).toLowerCase()] || t?.k || 'quiz', ...(b.where ? { where: b.where } : {}) };
+    if (!t) t = b.type === 'quiz' ? { k: 'quiz', l: 'Quiz' } : b.type === 'gap' ? { k: 'fill', l: 'Lückentext' } : b.type === 'match' ? { k: 'quiz', l: 'Zuordnen' } : { k: 'quiz', l: 'Aufgabe' };
+    return t;
+  }
+  const wrap = (b, inner, cls = '') => {
+    const n = gridNo?.get(b.id);
+    if (!n) return `<div class="blk ${cls}" data-id="${b.id}">${E() ? tools(b) : ''}${ptsTag(b)}${inner}</div>`;
+    const t = gridTag(b), row = `<div class="lp-tagrow"><span class="lp-tag">#${n} · ${esc(t.l)}</span>${t.where ? `<span class="where">${esc(t.where)}</span>` : ''}${b.xp && doc.form === 'challenge' ? `<span class="txp">${+b.xp} XP</span>` : ''}</div>`;
+    inner = inner.replace(/<div class="lp-card[^"]*"[^>]*>/, m => m + row);
+    return `<div class="blk ${cls}" data-id="${b.id}" data-kc="${esc(t.k)}">${E() ? tools(b) : ''}${ptsTag(b)}${inner}</div>`;
+  };
   const imgHtml = (src, cap, size) => src ? `<figure class="lp-img"${size === 'klein' ? ' style="max-width:45%"' : ''}><img src="${src}" alt="">${cap ? `<figcaption>${esc(cap)}</figcaption>` : ''}</figure>` : '';
   const xpTag = b => doc.form === 'challenge' && b.xp ? `<span class="xp">+${b.xp} XP</span>` : '';
   /** Aufgabenkarte (auch für Aufgaben der Apps): Kopf, Bild, Auftrag, eigene Knöpfe, Tipps, Lösung */
@@ -1128,6 +1151,8 @@ export function startPathFinder(opts = {}) {
         </fieldset>
         <fieldset><legend>Aussehen</legend>
         <label>Vorschau</label>${seg('preview', [['hell', '☀ Hell'], ['dunkel', '☾ Dunkel']], scheme())}
+        <label>Stil</label>${seg('theme', [['standard', 'Standard'], ['grid', '▦ Hack the Grid']], d.theme === 'grid' ? 'grid' : 'standard')}
+        <span class="help">${d.theme === 'grid' ? '„Hack the Grid“: dunkler Raster-Kopf, Aufgaben mit farbiger Kante und Schild (#1 · FORMEL). Ersetzt die Farbpalette.' : 'Standard: Farben aus der Farbpalette.'}</span>
         <label>Farbpalette <span class="help">${esc(PALETTES[d.pal].n)} · ${scheme() === 'dunkel' ? 'dunkler' : 'heller'} Modus</span></label><div class="ed-sw">${PALETTES.map((p, i) => { const c = scheme() === 'dunkel' ? p.d || p.l : p.l; return `<button data-pal="${i}" title="${esc(p.n)}" aria-pressed="${i === d.pal}" style="background:${c.bg}"><span style="background:${c.a1}"></span><span style="background:${c.a2}"></span><span style="background:${c.a3}"></span></button>`; }).join('')}</div>
         <label>Für Schüler</label>${seg('scheme', [['auto', 'wie das Gerät'], ['hell', 'immer hell'], ['dunkel', 'immer dunkel']], d.scheme || 'auto')}
         <span class="help">„wie das Gerät“: Der Lernpfad erscheint hell oder dunkel, je nachdem, wie das iPad eingestellt ist. Prüfe mit der Vorschau beide Modi – vor allem Bilder und Grafiken.</span>
