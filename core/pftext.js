@@ -353,7 +353,7 @@ export function docToText(doc, env, out = {}) {
     if (!src) return '';
     if (bySrc.has(src)) return 'anhang:' + bySrc.get(src);
     const name = base + (att.length + 1); bySrc.set(src, name);
-    if (/^data:image\/svg\+xml/i.test(src)) { let code = ''; try { const m = src.match(/^data:image\/svg\+xml(;charset=[\w-]+)?(;base64)?,(.*)$/i); code = m[2] ? atob(m[3]) : decodeURIComponent(m[3]); } catch (e) { } att.push({ name, svg: code }); }
+    if (/^data:image\/svg\+xml/i.test(src) && !out.refs) { let code = ''; try { const m = src.match(/^data:image\/svg\+xml(;charset=[\w-]+)?(;base64)?,(.*)$/i); code = m[2] ? atob(m[3]) : decodeURIComponent(m[3]); } catch (e) { } att.push({ name, svg: code }); }
     else { att.push({ name, raster: true }); out.attachments[name] = src; }
     return 'anhang:' + name;
   };

@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-15d';
+const PF_BUILD = '2026-11-15e';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -260,6 +260,7 @@ export function startPathFinder(opts = {}) {
     if (!doc) doc = migrate(sample());
   }
   let mode = PLAYER ? 'preview' : 'edit', selId = null, curSid = null, single = false, fz = 1;
+  let aiEl = null, aiLog = [], aiDraft = '', aiScopeV = null; // KI-Assistent (schwebendes Fenster)
   let hist = [JSON.stringify(doc)], fut = [], pending = null;
   const freshProg = () => ({ solved: {}, quiz: {}, tips: {}, sol: {}, visited: {}, tries: {}, start: Date.now(), active: 0 });
   let prog = freshProg();
@@ -296,14 +297,14 @@ export function startPathFinder(opts = {}) {
   function commit() {
     clearTimeout(pending); pending = null;
     const s = JSON.stringify(doc); if (s === hist[hist.length - 1]) return;
-    hist.push(s); if (hist.length > (s.length > 300000 ? 25 : 200)) hist.shift(); fut = []; save(); updUndo();
+    hist.push(s); if (hist.length > (s.length > 300000 ? 25 : 200)) hist.shift(); fut = []; save(); updUndo(); aiSync();
     if (panelOpen && !panelEl.contains(document.activeElement) && Date.now() - panelTouched > 1500) drawPanel(); // im Lernpfad Geändertes auch rechts zeigen
   }
   function softCommit() { $('#saved').textContent = '…'; clearTimeout(pending); pending = setTimeout(commit, 500); }
-  function undo() { if (pending) commit(); if (hist.length < 2) return; fut.push(hist.pop()); doc = JSON.parse(hist[hist.length - 1]); save(); render(); updUndo(); drawPanel?.(); }
+  function undo() { if (pending) commit(); if (hist.length < 2) return; fut.push(hist.pop()); doc = JSON.parse(hist[hist.length - 1]); save(); render(); updUndo(); drawPanel?.(); aiSync(); }
   function redo() { if (!fut.length) return; const s = fut.pop(); hist.push(s); doc = JSON.parse(s); save(); render(); updUndo(); drawPanel?.(); }
   function updUndo() { if (!$('#bUndo')) return; $('#bUndo').disabled = hist.length < 2; $('#bRedo').disabled = !fut.length; }
-  function openDoc(d) { if (pending) commit(); if (panelOpen) { panelWhat = 'design'; hidePanel(); } doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); selId = null; curSid = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; drawPanel(); }
+  function openDoc(d) { if (pending) commit(); if (panelOpen) { panelWhat = 'design'; hidePanel(); } doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); selId = null; curSid = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; drawPanel(); aiSync(); }
 
   function findBlock(id) {
     for (const st of doc.stations) { const i = st.blocks.findIndex(b => b.id === id); if (i >= 0) return { st, i, b: st.blocks[i] }; }
@@ -1294,8 +1295,8 @@ ${d.theme === 'grid' ? '' : `
         msg.innerHTML = '<div class="help">Teste …</div>';
         try { const r = await A.test(v.key.trim(), v.model); msg.innerHTML = `<div class="good">✓ Verbindung klappt (${esc(A.modelInfo(v.model).name)}).</div>`; } catch (er) { msg.innerHTML = `<div class="bad">✗ ${esc(er.message)}</div>`; }
       }
-      if (a === 'del') { if (!confirm('API-Key aus diesem Browser löschen?')) return; A.forget(); w.remove(); toast('API-Key gelöscht'); onDone && onDone(); }
-      if (a === 'ok') { A.save(val()); w.remove(); toast(val().key.trim() ? '⚡ Claude ist eingerichtet' : 'Gespeichert'); onDone && onDone(); }
+      if (a === 'del') { if (!confirm('API-Key aus diesem Browser löschen?')) return; A.forget(); w.remove(); toast('API-Key gelöscht'); onDone && onDone(); aiFloat(); }
+      if (a === 'ok') { A.save(val()); w.remove(); toast(val().key.trim() ? '⚡ Claude ist eingerichtet' : 'Gespeichert'); onDone && onDone(); aiFloat(); }
     });
     document.body.appendChild(w); $('#apKey', w).focus();
   }
@@ -1325,6 +1326,121 @@ ${d.theme === 'grid' ? '' : `
       box.innerHTML = e.name === 'AbortError' ? '<div class="warn">Abgebrochen.</div>' : `<div class="bad">✗ ${esc(e.message)}</div>`;
       return null;
     } finally { apiBusy = null; }
+  }
+  /* ---------- KI-Assistent: schwebendes Fenster für Änderungswünsche (nur mit API-Key) ---------- */
+  const AIK = (opts.storage || 'pathfinder') + '.aifloat';
+  const hasApiKey = () => { try { return !!(JSON.parse(localStorage.getItem('pf-claude-api')) || {}).key; } catch (e) { return false; } };
+  function aiState() { try { return JSON.parse(LS.get(AIK)) || {}; } catch (e) { return {}; } }
+  function aiSave(o) { LS.set(AIK, JSON.stringify({ ...aiState(), ...o })); }
+  /** Fenster zeigen, verstecken oder auffrischen (z. B. nach Änderung des API-Keys) */
+  async function aiFloat() {
+    if (PLAYER) return;
+    let on = hasApiKey();
+    if (!on && !aiEl) { try { on = (await loadApi()).hasKey(); } catch (e) { } }
+    if (!on) { aiEl?.remove(); aiEl = null; return; }
+    if (!aiEl) {
+      aiEl = document.createElement('div'); aiEl.className = 'ai-float'; document.body.appendChild(aiEl);
+      aiEl.addEventListener('click', aiClick);
+      aiDrag();
+    }
+    aiDraw();
+  }
+  function aiDraw() {
+    const st = aiState(), docked = !!st.docked;
+    aiEl.classList.toggle('docked', docked);
+    if (docked) { aiEl.style.left = aiEl.style.top = ''; aiEl.innerHTML = `<button class="ai-tab" data-ai="undock" title="KI-Assistent öffnen">${KI_ICON}<span>KI</span></button>`; return; }
+    if (st.x != null) { aiEl.style.left = Math.max(4, Math.min(innerWidth - 120, st.x)) + 'px'; aiEl.style.top = Math.max(4, Math.min(innerHeight - 80, st.y)) + 'px'; aiEl.style.right = aiEl.style.bottom = 'auto'; }
+    const busy = !!aiEl.dataset.busy, keep = $('#aiIn', aiEl)?.value ?? aiDraft, scope = $('#aiScope', aiEl)?.value ?? aiScopeV ?? (curSid || '');
+    aiEl.innerHTML = `<div class="ai-head" data-drag="1">${KI_ICON}<b>KI-Assistent</b><button data-ai="dock" title="Links andocken (minimieren)">⇤</button></div>
+      <div class="ai-body">
+        ${busy ? `<div id="aiWait"></div>` : `
+        <label class="ai-l">Was soll ich ändern?<select id="aiScope">${aiOpts(scope)}</select></label>
+        <textarea id="aiIn" rows="3" placeholder="z. B. Mach Station 2 kürzer und ergänze ein Quiz mit 3 Fragen.">${esc(keep)}</textarea>
+        <div class="ai-btns"><button class="lp-btn sm" data-ai="go">⚡ Ändern</button>${hist.length > 1 ? '<button class="lp-btn alt sm" data-ai="undo" title="Letzte Änderung zurücknehmen">↶ Rückgängig</button>' : ''}<button class="lp-btn alt sm" data-ai="set" title="API-Einstellungen">⚙</button></div>`}
+        <div class="ai-log">${aiLog.slice(-4).map(x => `<div class="${x.c}">${x.h}</div>`).join('')}</div>
+      </div>`;
+  }
+  const aiOpts = scope => `<option value="">im ganzen Lernpfad</option>${doc.stations.map((s, i) => `<option value="${s.id}"${s.id === scope ? ' selected' : ''}>nur in Station ${i + 1}: ${esc(plain(s.title).slice(0, 40))}</option>`).join('')}`;
+  /** Stationsliste und Rückgängig-Knopf im Fenster aktuell halten (nach Änderungen am Lernpfad) */
+  function aiSync() {
+    if (!aiEl || aiEl.dataset.busy) return;
+    const sel = $('#aiScope', aiEl); if (sel && document.activeElement !== sel) { const v = sel.value; sel.innerHTML = aiOpts(doc.stations.some(s => s.id === v) ? v : ''); }
+    const u = $('[data-ai="undo"]', aiEl); if (!u && hist.length > 1 && $('.ai-btns', aiEl)) aiDraw();
+  }
+  function aiDrag() {
+    let sx, sy, ox, oy, moving = false;
+    aiEl.addEventListener('pointerdown', e => {
+      if (!e.target.closest('[data-drag]') || e.target.closest('button')) return;
+      const r = aiEl.getBoundingClientRect(); sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top; moving = true; aiEl.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    aiEl.addEventListener('pointermove', e => {
+      if (!moving) return; const x = Math.max(4, Math.min(innerWidth - 120, ox + e.clientX - sx)), y = Math.max(4, Math.min(innerHeight - 60, oy + e.clientY - sy));
+      aiEl.style.left = x + 'px'; aiEl.style.top = y + 'px'; aiEl.style.right = aiEl.style.bottom = 'auto';
+    });
+    const end = () => { if (!moving) return; moving = false; const r = aiEl.getBoundingClientRect(); if (r.left < 30) { aiSave({ docked: true }); aiDraw(); } else aiSave({ x: r.left, y: r.top }); };
+    aiEl.addEventListener('pointerup', end); aiEl.addEventListener('pointercancel', end);
+  }
+  function aiClick(e) {
+    const a = e.target.closest('[data-ai]')?.dataset.ai; if (!a) return;
+    if (a === 'dock') { aiSave({ docked: true }); aiDraw(); }
+    if (a === 'undock') { aiSave({ docked: false }); aiDraw(); $('#aiIn', aiEl)?.focus(); }
+    if (a === 'set') apiSettings();
+    if (a === 'undo') { undo(); aiLog.push({ c: 'help', h: '↶ Änderung zurückgenommen' }); aiDraw(); }
+    if (a === 'go') aiRun();
+  }
+  async function aiRun() {
+    const wish = $('#aiIn', aiEl).value.trim(); if (!wish) { toast('Schreib zuerst, was geändert werden soll'); return; }
+    if (doc.skin) { toast('Lernpfade im Originaldesign kann der KI-Assistent nicht ändern'); return; }
+    if (pending) commit();
+    const sid = $('#aiScope', aiEl).value, st = sid ? doc.stations.find(s => s.id === sid) : null;
+    const [T, A] = await Promise.all([loadText(), loadApi()]); const env = textEnv();
+    // Text des Lernpfads (bzw. der Station): Bilder nur als Verweis, große HTML-Bausteine als Platzhalter
+    const keepHtml = {}, src = JSON.parse(JSON.stringify(st ? { ...doc, stations: [st] } : doc));
+    for (const s of src.stations) for (const b of s.blocks) if (b.type === 'html' && (b.html || '').length > 1500) { const k = 'h' + (Object.keys(keepHtml).length + 1); keepHtml[k] = b.html; b.html = `<!-- pf-keep:${k} -->`; }
+    const out = { refs: true }, text = T.docToText(src, env, out);
+    if (/%% (Baustein|Datei) /.test(text)) { toast('Der Lernpfad enthält Bausteine, die der KI-Assistent nicht bearbeiten kann – wähle eine Station ohne sie'); return; }
+    const att = Object.fromEntries(Object.entries(out.attachments).map(([k, v]) => [k.toLowerCase(), v]));
+    const where = st ? `NUR die Station „${plain(st.title)}“. Gib den Kopf (# Titel, Kopfzeile …) unverändert und danach nur diese Station aus (bei Bedarf auch mehrere Stationen, falls der Wunsch das verlangt).` : 'den ganzen Lernpfad. Gib ihn vollständig aus.';
+    const prompt = `Du überarbeitest einen bestehenden Lernpfad für die Plattform PathFinder. Bearbeitet wird ${where}
+
+ÄNDERUNGSWUNSCH DER LEHRKRAFT: ${wish}
+
+REGELN
+- Setze genau diesen Wunsch um. Alles andere bleibt unverändert: Texte, Reihenfolge, Aufgaben, Antworten, Tipps, Sperren, XP.
+- Bilder stehen als Verweise wie „anhang:bild1“. Lass vorhandene Verweise unverändert stehen – die Bilder bleiben so erhalten. Neue Bilder zeichnest du als SVG im Abschnitt ## Anhang am Ende.
+- HTML-Bausteine, die nur „<!-- pf-keep:… -->“ enthalten, unverändert lassen.
+- Halte dich exakt an das PathFinder-Textformat. Antworte nur mit dem Ergebnis in einem Codeblock, der mit vier Backticks und „text“ beginnt (\`\`\`\`text) und mit vier Backticks endet.
+
+${T.formatHelp(env)}
+${st ? 'STATION' : 'LERNPFAD'}:
+${text}`;
+    aiDraft = wish; aiScopeV = sid; aiEl.dataset.busy = '1'; aiDraw();
+    const box = $('#aiWait', aiEl), sink = document.createElement('textarea');
+    let r = await runDirect({ prompt, target: sink, box, maxTokens: 48000, what: st ? 'die Station' : 'den Lernpfad', title: 'Lernpfad wird umgebaut' });
+    const penv = { ...env, attachments: att };
+    let parsed = r != null ? T.parseText(r, penv) : null;
+    if (parsed && parsed.errors.length) { // einmal selbst reparieren lassen
+      const fix = 'Beim Einlesen gab es diese Fehler:\n' + parsed.errors.map(x => `- Zeile ${x.n}: ${x.m}`).join('\n') + '\n\nKorrigiere genau diese Stellen, lass alles andere unverändert und antworte nur mit dem vollständigen Text in einem Codeblock (vier Backticks, „text“).\n\n' + T.formatHelp(env) + '\nTEXT:\n' + r;
+      r = await runDirect({ prompt: fix, target: sink, box, maxTokens: 48000, what: 'die Korrektur', title: 'Fast fertig – kleine Reparatur' });
+      parsed = r != null ? T.parseText(r, penv) : null;
+    }
+    const cost = box.querySelector('.ki-done')?.textContent.match(/Kosten ca\. ([^(]+)/)?.[1]?.trim() || '';
+    delete aiEl.dataset.busy;
+    if (!parsed) { aiLog.push({ c: 'bad', h: box.textContent.trim() || 'Abgebrochen.' }); aiDraw(); return; }
+    if (parsed.errors.length) { aiLog.push({ c: 'bad', h: `✗ Die Antwort ließ sich nicht fehlerfrei einlesen (${parsed.errors.length} Fehler) – nichts geändert. Formuliere den Wunsch etwas anders.` }); aiDraw(); return; }
+    const nd = parsed.doc;
+    for (const s of nd.stations) for (const b of s.blocks) { const m = b.type === 'html' && (b.html || '').trim().match(/^<!--\s*pf-keep:(h\d+)\s*-->$/); if (m && keepHtml[m[1]]) b.html = keepHtml[m[1]]; }
+    if (st) {
+      const i = doc.stations.findIndex(s => s.id === sid); if (i < 0) return;
+      nd.stations[0].id = sid; // gleiche Station bleibt gleich
+      doc.stations.splice(i, 1, ...nd.stations);
+    } else {
+      doc = migrate({ ...nd, id: doc.id, design: { ...doc.design, ...nd.design }, cert: { ...doc.cert, on: nd.cert?.on ?? doc.cert?.on }, pass: doc.pass });
+    }
+    commit(); render(); drawPanel?.();
+    aiLog.push({ c: 'good', h: `✓ ${esc(wish.length > 60 ? wish.slice(0, 57) + '…' : wish)}${cost ? ` <span class="help">· ca. ${esc(cost)}</span>` : ''}` });
+    aiDraft = ''; aiDraw(); $('#aiIn', aiEl).value = '';
+    toast('✨ Änderung übernommen – „Rückgängig“ nimmt sie zurück');
   }
   /* ---------- Prüfung aus dem geladenen Lernpfad (Moodle-XML über eine fremde KI) ---------- */
   async function openExam() {
@@ -2092,6 +2208,7 @@ ${SC}
     importHtml: html => importPage(html), openFile: f => openFile(f),
   };
   save(); render(); updUndo();
+  aiFloat();
   host.attach?.(ctx);
   return ctx;
 }
