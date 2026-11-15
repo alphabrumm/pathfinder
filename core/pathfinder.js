@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-15e';
+const PF_BUILD = '2026-11-15f';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -669,7 +669,7 @@ export function startPathFinder(opts = {}) {
   const xpBlocks = () => doc.stations.flatMap(s => s.blocks.filter(isCheck));
   const xpMax = () => xpBlocks().reduce((a, b) => a + (+b.xp || 0), 0);
   const xpNow = () => xpBlocks().filter(b => prog.solved[b.id]).reduce((a, b) => a + (+b.xp || 0), 0);
-  const markSel = () => $$('.blk', lp).forEach(e => e.classList.toggle('sel', e.dataset.id === selId));
+  const markSel = () => { $$('.blk', lp).forEach(e => e.classList.toggle('sel', e.dataset.id === selId)); aiPick(); };
   const normAns = s => String(s).trim().toLowerCase().replace(/\s+/g, '').replace(',', '.');
   /** Antwort prüfen: Text ohne Groß/Klein und Leerzeichen, Zahlen auch mit Komma und kleinen Rundungsunterschieden */
   function isAnswer(expected, v) {
@@ -1280,7 +1280,7 @@ ${d.theme === 'grid' ? '' : `
       <label>API-Key<span class="ki-key"><input type="password" id="apKey" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" value="${esc(s.key)}"><button class="lp-btn alt sm" data-a="eye" title="Key zeigen">👁</button></span></label>
       <label>Modell<select id="apModel">${A.MODELS.map(m => `<option value="${m.id}"${m.id === s.model ? ' selected' : ''}>${esc(m.name)} – ${m.note} (${String(m.in).replace('.', ',')} $ / ${String(m.out).replace('.', ',')} $ je Mio. Token)</option>`).join('')}</select></label>
       <label class="chk"><input type="checkbox" id="apRem"${s.remember ? ' checked' : ''}>Key auf diesem Gerät merken (nicht auf geteilten Geräten)</label>
-      <div class="help">Ein Lernpfad kostet mit Sonnet grob 5–20 Cent, eine Prüfung ähnlich. Bisher über PathFinder ausgegeben: ca. ${A.usd(s.spent)}</div>
+      <div class="help">Ein neuer Lernpfad kostet mit Opus grob 30 Cent bis 1 €, mit Sonnet etwa die Hälfte. Kleine Änderungen über den KI-Assistenten kosten meist nur wenige Cent. Bisher über PathFinder ausgegeben: ca. ${A.usd(s.spent)}</div>
       <div id="apMsg" class="ki-res"></div>
       <div class="ki-btns" style="justify-content:center"><button class="lp-btn alt" data-a="test">Verbindung testen</button>${s.key ? '<button class="lp-btn alt" data-a="del">Key löschen</button>' : ''}<button class="lp-btn" data-a="ok">Speichern</button></div>
     </div>`;
@@ -1306,7 +1306,7 @@ ${d.theme === 'grid' ? '' : `
    */
   let apiBusy = null;
   const PFADI_WAIT = `<svg class="pfadi-wait" viewBox="0 0 100 100" aria-hidden="true"><ellipse class="pw-shadow" cx="46" cy="90" rx="26" ry="5" fill="#000" opacity=".1"/><g class="pw-body"><g class="pw-ant"><path d="M30 30q-4-9 2-12M60 30q4-9-2-12" fill="none" stroke="#3d2a73" stroke-width="3.5" stroke-linecap="round"/><circle cx="32" cy="18" r="3.5" fill="#FFD54A" stroke="#3d2a73" stroke-width="2.5"/><circle cx="58" cy="18" r="3.5" fill="#FFD54A" stroke="#3d2a73" stroke-width="2.5"/></g><path d="M46 26c21 0 32 15 32 33s-10 28-32 28-32-10-32-28 11-33 32-33z" fill="#9B8AFB" stroke="#3d2a73" stroke-width="3.5"/><path d="M30 70c4 9 28 9 32 0" fill="#C9C0FF" opacity=".7"/><g class="pw-eyes"><ellipse cx="36" cy="54" rx="7" ry="8" fill="#fff" stroke="#3d2a73" stroke-width="2.5"/><ellipse cx="56" cy="54" rx="7" ry="8" fill="#fff" stroke="#3d2a73" stroke-width="2.5"/><g class="pw-pupils"><circle cx="36" cy="55" r="3.2" fill="#3d2a73"/><circle cx="56" cy="55" r="3.2" fill="#3d2a73"/></g></g><path d="M41 71q5 3 10 0" fill="none" stroke="#3d2a73" stroke-width="3" stroke-linecap="round"/><ellipse cx="27" cy="66" rx="4" ry="2.5" fill="#ff8fb1" opacity=".55"/><ellipse cx="65" cy="66" rx="4" ry="2.5" fill="#ff8fb1" opacity=".55"/></g></svg>`;
-  async function runDirect({ prompt, target, box, maxTokens, onDone, what = 'den Lernpfad', title = 'Lernpfad wird gebaut' }) {
+  async function runDirect({ prompt, system, target, box, maxTokens, onDone, what = 'den Lernpfad', title = 'Lernpfad wird gebaut' }) {
     const A = await loadApi();
     if (!A.hasKey()) { apiSettings(); return null; }
     if (apiBusy) { toast('Claude arbeitet noch …'); return null; }
@@ -1317,7 +1317,7 @@ ${d.theme === 'grid' ? '' : `
     const tick = n => { const l = box.querySelector('#liveTxt'); if (l) l.textContent = `Claude schreibt ${what} … ${n.toLocaleString('de-DE')} Zeichen · ${Math.round((Date.now() - t0) / 1000)} s`; };
     box.scrollIntoView({ block: 'center', behavior: 'smooth' });
     try {
-      const r = await A.ask({ prompt, maxTokens, signal: ac.signal, onText: t => { target.value = t; tick(t.length); target.scrollTop = target.scrollHeight; } });
+      const r = await A.ask({ prompt, system, maxTokens, signal: ac.signal, onText: t => { target.value = t; tick(t.length); target.scrollTop = target.scrollHeight; } });
       target.value = r.text;
       box.innerHTML = `<div class="ki-done">✓ Fertig in ${Math.round((Date.now() - t0) / 1000)} s · Kosten ca. ${A.usd(r.usd)} (${(r.usage.input_tokens || 0).toLocaleString('de-DE')} Token rein, ${(r.usage.output_tokens || 0).toLocaleString('de-DE')} raus) · insgesamt bisher ca. ${A.usd(A.settings().spent)}</div>`
         + (r.stop === 'max_tokens' ? '<div class="warn">Die Antwort wurde wegen ihrer Länge abgeschnitten – wähle einen kleineren Umfang oder lass sie korrigieren.</div>' : '');
@@ -1350,22 +1350,33 @@ ${d.theme === 'grid' ? '' : `
     aiEl.classList.toggle('docked', docked);
     if (docked) { aiEl.style.left = aiEl.style.top = ''; aiEl.innerHTML = `<button class="ai-tab" data-ai="undock" title="KI-Assistent öffnen">${KI_ICON}<span>KI</span></button>`; return; }
     if (st.x != null) { aiEl.style.left = Math.max(4, Math.min(innerWidth - 120, st.x)) + 'px'; aiEl.style.top = Math.max(4, Math.min(innerHeight - 80, st.y)) + 'px'; aiEl.style.right = aiEl.style.bottom = 'auto'; }
-    const busy = !!aiEl.dataset.busy, keep = $('#aiIn', aiEl)?.value ?? aiDraft, scope = $('#aiScope', aiEl)?.value ?? aiScopeV ?? (curSid || '');
+    const busy = !!aiEl.dataset.busy, keep = $('#aiIn', aiEl)?.value ?? aiDraft, scope = $('#aiScope', aiEl)?.value ?? aiScopeV ?? (selId ? 'b:' + selId : curSid || doc.stations[0]?.id || '');
     aiEl.innerHTML = `<div class="ai-head" data-drag="1">${KI_ICON}<b>KI-Assistent</b><button data-ai="dock" title="Links andocken (minimieren)">⇤</button></div>
       <div class="ai-body">
         ${busy ? `<div id="aiWait"></div>` : `
         <label class="ai-l">Was soll ich ändern?<select id="aiScope">${aiOpts(scope)}</select></label>
-        <textarea id="aiIn" rows="3" placeholder="z. B. Mach Station 2 kürzer und ergänze ein Quiz mit 3 Fragen.">${esc(keep)}</textarea>
+        <textarea id="aiIn" rows="3" placeholder="Tipp: Baustein im Lernpfad antippen – dann geht nur er an Claude. Z. B. „Die Kraftpfeile sollen im Gleichgewicht gleich lang sein.“">${esc(keep)}</textarea>
         <div class="ai-btns"><button class="lp-btn sm" data-ai="go">⚡ Ändern</button>${hist.length > 1 ? '<button class="lp-btn alt sm" data-ai="undo" title="Letzte Änderung zurücknehmen">↶ Rückgängig</button>' : ''}<button class="lp-btn alt sm" data-ai="set" title="API-Einstellungen">⚙</button></div>`}
         <div class="ai-log">${aiLog.slice(-4).map(x => `<div class="${x.c}">${x.h}</div>`).join('')}</div>
       </div>`;
   }
-  const aiOpts = scope => `<option value="">im ganzen Lernpfad</option>${doc.stations.map((s, i) => `<option value="${s.id}"${s.id === scope ? ' selected' : ''}>nur in Station ${i + 1}: ${esc(plain(s.title).slice(0, 40))}</option>`).join('')}`;
+  const aiOpts = scope => {
+    const r = selId ? findBlock(selId) : null;
+    if (scope?.startsWith('b:') && (!r || scope !== 'b:' + r.b.id)) scope = r ? 'b:' + r.b.id : '';
+    return (r ? `<option value="b:${r.b.id}"${scope === 'b:' + r.b.id ? ' selected' : ''}>nur im ausgewählten Baustein: ${esc(blkName(r.b))}</option>` : '')
+      + doc.stations.map((s, i) => `<option value="${s.id}"${s.id === scope ? ' selected' : ''}>nur in Station ${i + 1}: ${esc(plain(s.title).slice(0, 40))}</option>`).join('')
+      + `<option value=""${scope === '' ? ' selected' : ''}>im ganzen Lernpfad</option>`;
+  };
   /** Stationsliste und Rückgängig-Knopf im Fenster aktuell halten (nach Änderungen am Lernpfad) */
   function aiSync() {
     if (!aiEl || aiEl.dataset.busy) return;
-    const sel = $('#aiScope', aiEl); if (sel && document.activeElement !== sel) { const v = sel.value; sel.innerHTML = aiOpts(doc.stations.some(s => s.id === v) ? v : ''); }
+    const sel = $('#aiScope', aiEl); if (sel && document.activeElement !== sel) { const v = sel.value; sel.innerHTML = aiOpts(v.startsWith('b:') || doc.stations.some(s => s.id === v) ? v : (curSid || '')); }
     const u = $('[data-ai="undo"]', aiEl); if (!u && hist.length > 1 && $('.ai-btns', aiEl)) aiDraw();
+  }
+  /** Wird im Lernpfad ein Baustein gewählt, bezieht sich das Fenster darauf */
+  function aiPick() {
+    if (!aiEl || aiEl.dataset.busy) return; const sel = $('#aiScope', aiEl); if (!sel) return;
+    sel.innerHTML = aiOpts(selId ? 'b:' + selId : (sel.value.startsWith('b:') ? (curSid || '') : sel.value));
   }
   function aiDrag() {
     let sx, sy, ox, oy, moving = false;
@@ -1388,59 +1399,162 @@ ${d.theme === 'grid' ? '' : `
     if (a === 'undo') { undo(); aiLog.push({ c: 'help', h: '↶ Änderung zurückgenommen' }); aiDraw(); }
     if (a === 'go') aiRun();
   }
+  /** Kurzname eines Bausteins für Auswahl und Prompt */
+  const blkName = b => (b.type === 'info' ? (INFO_KINDS[b.kind]?.[1] || 'Kasten') : T[b.type]?.n || b.type) + (b.title ? ' „' + plain(b.title).slice(0, 30) + '“' : b.type === 'image' && b.caption ? ' „' + plain(b.caption).slice(0, 30) + '“' : '');
+  const svgOf = src => { const m = /^data:image\/svg\+xml((?:;[\w.+-]+(?:=[\w.+-]+)?)*),(.*)$/s.exec(src || ''); if (!m) return null; try { return /;base64/i.test(m[1]) ? decodeURIComponent(escape(atob(m[2]))) : decodeURIComponent(m[2]); } catch (e) { return null; } };
+  const svgSrc = code => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(code.trim());
+  // HTML-Baustein, der nur eine eingebettete Seite (iframe srcdoc) enthält: für die KI ausgepackt, danach wieder eingepackt
+  const IFR = /^(\s*<iframe\b[^>]*?\ssrcdoc=")([^"]*)("[^>]*>\s*<\/iframe>\s*)$/i;
+  const unent = t => { const x = document.createElement('textarea'); x.innerHTML = t; return x.value; };
+  const ent = t => t.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const htmlGet = h => { const m = IFR.exec(h || ''); return m ? unent(m[2]) : h; };
+  const htmlSet = (b, code) => { const m = IFR.exec(b.html || ''); b.html = m ? m[1] + ent(code) + m[3] : code; };
+  /**
+   * Sparsamer KI-Assistent: Claude bekommt nur den gewählten Baustein (oder die Station) und schickt
+   * nur zurück, was sich ändert – als Ersetzen, Neu, Löschen oder Suchen/Ersetzen in großem Code.
+   */
   async function aiRun() {
     const wish = $('#aiIn', aiEl).value.trim(); if (!wish) { toast('Schreib zuerst, was geändert werden soll'); return; }
     if (doc.skin) { toast('Lernpfade im Originaldesign kann der KI-Assistent nicht ändern'); return; }
     if (pending) commit();
-    const sid = $('#aiScope', aiEl).value, st = sid ? doc.stations.find(s => s.id === sid) : null;
-    const [T, A] = await Promise.all([loadText(), loadApi()]); const env = textEnv();
-    // Text des Lernpfads (bzw. der Station): Bilder nur als Verweis, große HTML-Bausteine als Platzhalter
-    const keepHtml = {}, src = JSON.parse(JSON.stringify(st ? { ...doc, stations: [st] } : doc));
-    for (const s of src.stations) for (const b of s.blocks) if (b.type === 'html' && (b.html || '').length > 1500) { const k = 'h' + (Object.keys(keepHtml).length + 1); keepHtml[k] = b.html; b.html = `<!-- pf-keep:${k} -->`; }
-    const out = { refs: true }, text = T.docToText(src, env, out);
-    if (/%% (Baustein|Datei) /.test(text)) { toast('Der Lernpfad enthält Bausteine, die der KI-Assistent nicht bearbeiten kann – wähle eine Station ohne sie'); return; }
-    const att = Object.fromEntries(Object.entries(out.attachments).map(([k, v]) => [k.toLowerCase(), v]));
-    const where = st ? `NUR die Station „${plain(st.title)}“. Gib den Kopf (# Titel, Kopfzeile …) unverändert und danach nur diese Station aus (bei Bedarf auch mehrere Stationen, falls der Wunsch das verlangt).` : 'den ganzen Lernpfad. Gib ihn vollständig aus.';
-    const prompt = `Du überarbeitest einen bestehenden Lernpfad für die Plattform PathFinder. Bearbeitet wird ${where}
+    const scope = $('#aiScope', aiEl).value;
+    const [T2, A] = await Promise.all([loadText(), loadApi()]); const env = textEnv();
+    // Bereich bestimmen: ein Baustein (b:ID), eine Station (ID) oder alles ('')
+    let items = []; // { label, st, b }
+    const one = scope.startsWith('b:') ? findBlock(scope.slice(2)) : null;
+    const stSel = !one && scope ? doc.stations.find(s => s.id === scope) : null;
+    if (scope && !one && !stSel) { toast('Der gewählte Bereich existiert nicht mehr'); aiDraw(); return; }
+    const stations = one ? [one.st] : stSel ? [stSel] : doc.stations;
+    let n = 0;
+    for (const st of stations) for (const b of st.blocks) if (!one || b === one.b) items.push({ label: 'B' + (++n), st, b });
+    const byLabel = Object.fromEntries(items.map(x => [x.label, x]));
+    const stLabel = new Map(doc.stations.map((s, i) => [s, 'S' + (i + 1)]));
+    // Bausteine als Text: großer Code nur, wenn der Baustein einzeln gewählt ist
+    const att = {};
+    // HTML-Experimente und SVG-Animationen gehen als Code mit, solange es nicht zu viel wird (sonst nur bei Einzelauswahl)
+    let budget = one ? Infinity : stSel ? 80000 : 30000;
+    const fits = len => { if (len > budget) return false; budget -= len; return true; };
+    const blockText = (st, b) => {
+      const svg = b.type === 'image' ? svgOf(b.src) : null;
+      if (b.type === 'html') { const h = htmlGet(b.html); return fits(h.length) ? 'HTML-Baustein (Experiment, Simulation o. Ä.):\n```html\n' + h + '\n```' : '(großer HTML-Baustein, z. B. eine Simulation – zum Ändern bitte einzeln oder nur seine Station auswählen)'; }
+      if (svg != null && fits(svg.length)) return `Bild/Animation „${plain(b.caption || b.alt || '')}“ als SVG:\n\`\`\`svg\n${svg}\n\`\`\``;
+      const out = { refs: true };
+      const t = T2.docToText({ ...doc, stations: [{ ...st, blocks: [b] }] }, env, out);
+      Object.assign(att, Object.fromEntries(Object.entries(out.attachments).map(([k, v]) => [k.toLowerCase(), v])));
+      const L = t.split('\n'), i = L.findIndex(l => /^## Station:/.test(l));
+      let body = L.slice(i + 1); const j = body.findIndex(l => /^## (Anhang|Bilder)\s*$/.test(l)); if (j >= 0) body = body.slice(0, j);
+      return body.join('\n').trim() + (svg != null ? '\n(Bild/Animation als großes SVG – zum Ändern bitte einzeln oder nur seine Station auswählen)' : '');
+    };
+    if (one && !['html', 'image'].includes(one.b.type) && /%% (Baustein|Datei) /.test(blockText(one.st, one.b))) { toast('Diesen Baustein kann der KI-Assistent nicht bearbeiten'); return; }
+    let ctx = `LERNPFAD: „${plain(doc.title)}“${doc.kicker ? ' (' + plain(doc.kicker) + ')' : ''}\n`;
+    let lastSt = null;
+    for (const x of items) {
+      if (x.st !== lastSt) { ctx += `\n##### STATION ${stLabel.get(x.st)}: ${plain(x.st.title)}${x.st.sub ? ' | ' + plain(x.st.sub) : ''}\n`; lastSt = x.st; }
+      ctx += `\n===== ${x.label} (${blkName(x.b)})\n${blockText(x.st, x.b)}\n`;
+    }
+    const big = /```(html|svg)/.test(ctx);
+    const system = `Du hilfst einer Lehrkraft, einen Lernpfad in PathFinder zu ändern. Du bekommst nur die betroffenen Bausteine, jeweils mit Kennung (B1, B2 …).
 
-ÄNDERUNGSWUNSCH DER LEHRKRAFT: ${wish}
+ANTWORTE NUR MIT ÄNDERUNGEN, nichts Unverändertes wiederholen. Mögliche Anweisungen, jede auf einer eigenen Zeile:
+=== ERSETZE B3          danach der vollständige neue Baustein im PathFinder-Textformat (bei Bildern: \`\`\`svg … \`\`\`, bei HTML: \`\`\`html … \`\`\`)
+=== ÄNDERE B3           für HTML-, SVG- und Code-Bausteine IMMER diese Form verwenden (spart viel): eine oder mehrere Ersetzungen
+<<<SUCHE
+genau vorhandener Text (kurz, aber eindeutig)
+===
+neuer Text
+>>>
+=== NEU NACH B3         danach ein oder mehrere neue Bausteine im PathFinder-Textformat
+=== NEU VOR B1          wie oben, vor dem Baustein
+=== LÖSCHE B3
+=== STATION S2          danach nur die Zeile „## Station: Titel | Untertitel“ (neuer Titel)
+=== HINWEIS             danach ein kurzer Satz an die Lehrkraft, z. B. wenn etwas nicht geht, weil ein Baustein nicht mitgeschickt wurde
 
 REGELN
-- Setze genau diesen Wunsch um. Alles andere bleibt unverändert: Texte, Reihenfolge, Aufgaben, Antworten, Tipps, Sperren, XP.
-- Bilder stehen als Verweise wie „anhang:bild1“. Lass vorhandene Verweise unverändert stehen – die Bilder bleiben so erhalten. Neue Bilder zeichnest du als SVG im Abschnitt ## Anhang am Ende.
-- HTML-Bausteine, die nur „<!-- pf-keep:… -->“ enthalten, unverändert lassen.
-- Halte dich exakt an das PathFinder-Textformat. Antworte nur mit dem Ergebnis in einem Codeblock, der mit vier Backticks und „text“ beginnt (\`\`\`\`text) und mit vier Backticks endet.
+- Setze genau den Wunsch um und ändere sonst nichts.
+- In HTML-Experimenten und SVG-Animationen nur die nötigen Stellen per ÄNDERE ersetzen; Suchtext muss genau einmal vorkommen (Leerzeichen und Zeilenumbrüche exakt übernehmen). Physikalisch und fachlich korrekt bleiben.
+- Bilder stehen als Verweise wie „anhang:bild1“: Verweise unverändert lassen.
+- Bausteine im PathFinder-Textformat beginnen mit ### (z. B. „### Quiz“) – außer normalem Text, Kästen [Merke] … und Bildern ![…](…).
+- Keine Erklärungen außerhalb von HINWEIS. Kein Codeblock um die ganze Antwort.
 
-${T.formatHelp(env)}
-${st ? 'STATION' : 'LERNPFAD'}:
-${text}`;
-    aiDraft = wish; aiScopeV = sid; aiEl.dataset.busy = '1'; aiDraw();
+${T2.formatHelp(env)}`;
+    const prompt = `ÄNDERUNGSWUNSCH: ${wish}\n\n${ctx}`;
+    aiDraft = wish; aiScopeV = scope; aiEl.dataset.busy = '1'; aiDraw();
     const box = $('#aiWait', aiEl), sink = document.createElement('textarea');
-    let r = await runDirect({ prompt, target: sink, box, maxTokens: 48000, what: st ? 'die Station' : 'den Lernpfad', title: 'Lernpfad wird umgebaut' });
-    const penv = { ...env, attachments: att };
-    let parsed = r != null ? T.parseText(r, penv) : null;
-    if (parsed && parsed.errors.length) { // einmal selbst reparieren lassen
-      const fix = 'Beim Einlesen gab es diese Fehler:\n' + parsed.errors.map(x => `- Zeile ${x.n}: ${x.m}`).join('\n') + '\n\nKorrigiere genau diese Stellen, lass alles andere unverändert und antworte nur mit dem vollständigen Text in einem Codeblock (vier Backticks, „text“).\n\n' + T.formatHelp(env) + '\nTEXT:\n' + r;
-      r = await runDirect({ prompt: fix, target: sink, box, maxTokens: 48000, what: 'die Korrektur', title: 'Fast fertig – kleine Reparatur' });
-      parsed = r != null ? T.parseText(r, penv) : null;
+    const ask = (p, title) => runDirect({ prompt: p, system, target: sink, box, maxTokens: big ? 24000 : 12000, what: 'die Änderung', title });
+    let usd = 0; const track = () => { const m = box.querySelector('.ki-done')?.textContent.match(/Kosten ca\. ([<\d,\s]+)\$/); if (m) usd += parseFloat(m[1].replace('<', '').replace(',', '.')) || 0; };
+    let ans = await ask(prompt, 'Lernpfad wird umgebaut'); track();
+    let res = ans != null ? aiPatch(ans, { byLabel, stLabel, att, T2, env }) : null;
+    if (res && res.errors.length) {
+      ans = await ask(`${prompt}\n\nDEINE LETZTE ANTWORT:\n${ans}\n\nDabei gab es diese Fehler:\n${res.errors.map(e => '- ' + e).join('\n')}\nGib die korrigierte, vollständige Liste der Änderungen aus.`, 'Fast fertig – kleine Reparatur'); track();
+      res = ans != null ? aiPatch(ans, { byLabel, stLabel, att, T2, env }) : null;
     }
-    const cost = box.querySelector('.ki-done')?.textContent.match(/Kosten ca\. ([^(]+)/)?.[1]?.trim() || '';
     delete aiEl.dataset.busy;
-    if (!parsed) { aiLog.push({ c: 'bad', h: box.textContent.trim() || 'Abgebrochen.' }); aiDraw(); return; }
-    if (parsed.errors.length) { aiLog.push({ c: 'bad', h: `✗ Die Antwort ließ sich nicht fehlerfrei einlesen (${parsed.errors.length} Fehler) – nichts geändert. Formuliere den Wunsch etwas anders.` }); aiDraw(); return; }
-    const nd = parsed.doc;
-    for (const s of nd.stations) for (const b of s.blocks) { const m = b.type === 'html' && (b.html || '').trim().match(/^<!--\s*pf-keep:(h\d+)\s*-->$/); if (m && keepHtml[m[1]]) b.html = keepHtml[m[1]]; }
-    if (st) {
-      const i = doc.stations.findIndex(s => s.id === sid); if (i < 0) return;
-      nd.stations[0].id = sid; // gleiche Station bleibt gleich
-      doc.stations.splice(i, 1, ...nd.stations);
-    } else {
-      doc = migrate({ ...nd, id: doc.id, design: { ...doc.design, ...nd.design }, cert: { ...doc.cert, on: nd.cert?.on ?? doc.cert?.on }, pass: doc.pass });
+    const cost = usd ? ` <span class="help">· ca. ${usd < 0.01 ? '< 0,01' : usd.toFixed(2).replace('.', ',')} $</span>` : '';
+    if (!res) { aiLog.push({ c: 'bad', h: esc(box.textContent.trim() || 'Abgebrochen.') }); aiDraw(); return; }
+    if (res.errors.length) { aiLog.push({ c: 'bad', h: `✗ Die Änderung ließ sich nicht übernehmen – nichts geändert.${cost}<br>${res.errors.slice(0, 3).map(esc).join('<br>')}` }); aiDraw(); return; }
+    if (res.ops) { res.apply(); commit(); render(); drawPanel?.(); }
+    aiLog.push({ c: res.ops ? 'good' : 'help', h: `${res.ops ? '✓' : 'ℹ'} ${esc(wish.length > 60 ? wish.slice(0, 57) + '…' : wish)}${cost}${res.notes.length ? '<br>' + res.notes.map(esc).join('<br>') : ''}` });
+    aiDraft = res.ops ? '' : wish; aiDraw(); if (res.ops) { $('#aiIn', aiEl).value = ''; toast('✨ Änderung übernommen – „Rückgängig“ nimmt sie zurück'); }
+  }
+  /** Antwort mit Änderungsanweisungen prüfen; liefert { errors, notes, ops, apply } */
+  function aiPatch(ans, { byLabel, stLabel, att, T2, env }) {
+    const errors = [], notes = [], ops = [];
+    const txt = ans.replace(/^\s*```+[\w-]*\s*\n/, '').replace(/\n```+\s*$/, '');
+    const parts = txt.split(/^===\s+(?=(?:ERSETZE|ÄNDERE|AENDERE|NEU NACH|NEU VOR|LÖSCHE|LOESCHE|STATION|HINWEIS)\b)/m).slice(1);
+    if (!parts.length) { errors.push('Keine Anweisung (=== ERSETZE …, === NEU NACH … usw.) gefunden.'); return { errors, notes, ops: 0, apply: () => { } }; }
+    const penv = { ...env, attachments: att };
+    const parseBlocks = (body, label) => {
+      const code = body.match(/^```(svg|html)\s*\n([\s\S]*?)\n```\s*$/);
+      if (code) return { code: code[1], text: code[2] };
+      const r = T2.parseText(`# X\n\n## Station: X\n\n${body}`, penv);
+      if (r.errors.length) { r.errors.forEach(e => errors.push(`${label}: ${e.m}`)); return null; }
+      const bl = r.doc.stations[0]?.blocks || []; if (!bl.length) { errors.push(`${label}: kein Baustein erkannt.`); return null; }
+      return { blocks: bl };
+    };
+    const stByLabel = Object.fromEntries([...stLabel].map(([s, l]) => [l, s]));
+    for (const part of parts) {
+      const nl = part.indexOf('\n'), head = (nl < 0 ? part : part.slice(0, nl)).trim(), body = nl < 0 ? '' : part.slice(nl + 1).trim();
+      const m = head.match(/^(ERSETZE|ÄNDERE|AENDERE|NEU NACH|NEU VOR|LÖSCHE|LOESCHE|STATION|HINWEIS)\s*([BS]\d+)?/);
+      const op = m[1].replace('AENDERE', 'ÄNDERE').replace('LOESCHE', 'LÖSCHE'), lab = m[2];
+      if (op === 'HINWEIS') { if (body || head.slice(7).trim()) notes.push((head.slice(7).trim() + ' ' + body).trim()); continue; }
+      if (op === 'STATION') {
+        const st = stByLabel[lab]; const t = body.match(/^##\s*Station:\s*([^|\n]+?)(?:\s*\|\s*(.+))?$/m);
+        if (!st || !t) { errors.push(`${head}: Station oder Titelzeile nicht erkannt.`); continue; }
+        ops.push(() => { st.title = esc(t[1].trim()); if (t[2] != null) st.sub = esc(t[2].trim()); }); continue;
+      }
+      const x = byLabel[lab]; if (!x) { errors.push(`${head}: Baustein ${lab || '?'} gibt es nicht.`); continue; }
+      if (op === 'LÖSCHE') { ops.push(() => { const i = x.st.blocks.indexOf(x.b); if (i >= 0) x.st.blocks.splice(i, 1); }); continue; }
+      if (op === 'ÄNDERE') {
+        const field = x.b.type === 'html' ? 'html' : x.b.type === 'code' ? 'code' : x.b.type === 'image' ? 'svg' : null;
+        if (!field) { errors.push(`${head}: Suchen/Ersetzen geht nur bei HTML, SVG oder Code – bitte ERSETZE verwenden.`); continue; }
+        let cur = field === 'svg' ? svgOf(x.b.src) : field === 'html' ? htmlGet(x.b.html) : x.b[field]; if (cur == null) { errors.push(`${head}: Bild ist kein SVG.`); continue; }
+        const reps = [...body.matchAll(/<<<\s*SUCHE\s*\n([\s\S]*?)\n===\s*\n([\s\S]*?)\n>>>/g)];
+        if (!reps.length) { errors.push(`${head}: keine Ersetzung <<<SUCHE … === … >>> gefunden.`); continue; }
+        let ok = true;
+        for (const [, a, b2] of reps) { const k = cur.split(a).length - 1; if (k !== 1) { errors.push(`${head}: Suchtext ${k ? 'kommt mehrfach vor' : 'nicht gefunden'}: „${a.slice(0, 60)}“`); ok = false; break; } cur = cur.replace(a, () => b2); }
+        if (ok) ops.push(() => { if (field === 'svg') x.b.src = svgSrc(cur); else if (field === 'html') htmlSet(x.b, cur); else x.b[field] = cur; });
+        continue;
+      }
+      const p = parseBlocks(body, head); if (!p) continue;
+      if (p.code) {
+        if (op !== 'ERSETZE') { errors.push(`${head}: Code-Blöcke nur mit ERSETZE.`); continue; }
+        if (p.code === 'svg' && x.b.type === 'image') ops.push(() => { x.b.src = svgSrc(p.text); });
+        else if (p.code === 'html' && x.b.type === 'html') ops.push(() => { htmlSet(x.b, p.text); });
+        else errors.push(`${head}: ${p.code.toUpperCase()} passt nicht zu diesem Baustein.`);
+        continue;
+      }
+      if (op === 'ERSETZE') ops.push(() => { const i = x.st.blocks.indexOf(x.b); if (i < 0) return; const nb = p.blocks.map(b => b.type === 'lock' ? b : b); if (nb.length === 1 && nb[0].type === x.b.type) nb[0].id = x.b.id; x.st.blocks.splice(i, 1, ...nb); });
+      if (op === 'NEU NACH' || op === 'NEU VOR') ops.push(() => { const i = x.st.blocks.indexOf(x.b); if (i < 0) return; x.st.blocks.splice(op === 'NEU NACH' ? i + 1 : i, 0, ...p.blocks); });
     }
-    commit(); render(); drawPanel?.();
-    aiLog.push({ c: 'good', h: `✓ ${esc(wish.length > 60 ? wish.slice(0, 57) + '…' : wish)}${cost ? ` <span class="help">· ca. ${esc(cost)}</span>` : ''}` });
-    aiDraft = ''; aiDraw(); $('#aiIn', aiEl).value = '';
-    toast('✨ Änderung übernommen – „Rückgängig“ nimmt sie zurück');
+    return {
+      errors, notes, ops: ops.length,
+      apply: () => {
+        ops.forEach(f => f());
+        // Sperren warten immer auf den Baustein direkt davor
+        for (const st of doc.stations) st.blocks.forEach((b, i) => { if (b.type === 'lock') { const prev = st.blocks.slice(0, i).reverse().find(x => x.type !== 'lock'); if (prev) b.after = prev.id; } });
+        doc = migrate(doc);
+      }
+    };
   }
   /* ---------- Prüfung aus dem geladenen Lernpfad (Moodle-XML über eine fremde KI) ---------- */
   async function openExam() {

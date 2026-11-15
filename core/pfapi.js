@@ -2,8 +2,8 @@
 // Der Key bleibt im Browser (localStorage oder nur für diese Sitzung) und geht nur an api.anthropic.com.
 
 export const MODELS = [
-  { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', note: 'empfohlen', in: 2, out: 10 },
-  { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', note: 'beste Qualität', in: 4, out: 20 },
+  { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', note: 'beste Qualität, empfohlen', in: 4, out: 20 },
+  { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', note: 'günstiger', in: 2, out: 10 },
   { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5', note: 'sehr günstig', in: 0.1, out: 0.5, inHi: 0.5, outHi: 2.5 }
 ];
 const STORE = 'pf-claude-api';
@@ -28,9 +28,9 @@ export const modelInfo = id => MODELS.find(m => m.id === id) || MODELS[0];
 
 /** Kosten in US-Dollar für eine Antwort (usage aus der API) */
 export function cost(model, u) {
-  const m = modelInfo(model), inTok = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0);
-  const hi = m.inHi && inTok > 100000;
-  return (inTok * (hi ? m.inHi : m.in) + (u.output_tokens || 0) * (hi ? m.outHi : m.out)) / 1e6;
+  const m = modelInfo(model), cw = u.cache_creation_input_tokens || 0, cr = u.cache_read_input_tokens || 0, inTok = (u.input_tokens || 0) + cw + cr;
+  const hi = m.inHi && inTok > 100000, pin = hi ? m.inHi : m.in;
+  return ((u.input_tokens || 0) * pin + cw * pin * 1.25 + cr * pin * 0.1 + (u.output_tokens || 0) * (hi ? m.outHi : m.out)) / 1e6;
 }
 function addSpent(usd) { const s = read(); s.spent = (+s.spent || 0) + usd; write(s); }
 export const usd = x => (x < 0.01 ? '< 0,01' : x.toFixed(2).replace('.', ',')) + ' $';
