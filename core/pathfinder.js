@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-15i';
+const PF_BUILD = '2026-11-15j';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1768,7 +1768,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       $('#kiFrei', el).hidden = info.fsel !== '*';
       const sel = $('#kiLb', el), list = L.lernbereiche(info.fsel, +info.jg || 0), hint = $('#kiLpHint', el);
       if (!info.jg || !info.fsel) { sel.innerHTML = opt('', '– zuerst Jahrgangsstufe und Fach wählen –', ''); sel.disabled = true; hint.textContent = ''; }
-      else if (!list.length) { sel.innerHTML = opt('', '– eigenes Thema (kein Lehrplan hinterlegt) –', ''); sel.disabled = true; hint.textContent = info.fsel === '*' ? 'Für andere Fächer gibt es noch keine Lehrplan-Auswahl – beschreibe das Thema unten.' : `Für ${info.fsel} in Jahrgangsstufe ${info.jg} gibt es am Gymnasium keinen eigenen Fachlehrplan.`; }
+      else if (!list.length) { sel.innerHTML = opt('', '– eigenes Thema (kein Lehrplan hinterlegt) –', ''); sel.disabled = true; hint.textContent = info.fsel === '*' ? 'Für andere Fächer gibt es noch keine Lehrplan-Auswahl – beschreibe das Thema unten.' : `Für ${info.fsel} in Jahrgangsstufe ${info.jg} ist (noch) kein Fachlehrplan hinterlegt – beschreibe das Thema unten.`; }
       else {
         sel.disabled = false;
         if (!list.some(x => x.id === info.lb)) info.lb = '';

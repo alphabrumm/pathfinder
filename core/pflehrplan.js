@@ -7,9 +7,10 @@
 export const SOURCE = 'LehrplanPLUS Bayern, Gymnasium, Fachlehrpläne';
 export const URL = (fach, jgst) => {
   jgst = +jgst;
-  let f = ({ Mathematik: 'mathematik', Physik: 'physik', Informatik: 'informatik', Deutsch: 'deutsch' })[fach] || '';
+  let f = ({ Mathematik: 'mathematik', Physik: 'physik', Informatik: 'informatik', Deutsch: 'deutsch', Geschichte: 'geschichte', Latein: 'latein' })[fach] || '';
   if ((fach === 'Physik' && (jgst === 5 || jgst === 7)) || (fach === 'Informatik' && jgst < 8)) f = 'nt_gym';
-  else if ((fach === 'Physik' || fach === 'Informatik') && jgst >= 12) f += '/grundlegend';
+  else if ((fach === 'Physik' || fach === 'Informatik' || fach === 'Geschichte') && jgst >= 12 || fach === 'Latein' && jgst === 12) f += '/grundlegend';
+  else if (fach === 'Latein' && jgst >= 6 && jgst <= 8) f += '/1-fremdsprache';
   else if (fach === 'Informatik' && jgst === 11) f += '/ntg';
   else if (fach === 'Mathematik' && jgst === 12) f += '/regulaer';
   return `https://www.lehrplanplus.bayern.de/fachlehrplan/gymnasium/${jgst}/${f}`;
@@ -17,6 +18,7 @@ export const URL = (fach, jgst) => {
 
 const NT = 'Natur und Technik';
 const GA = 'grundlegendes Anforderungsniveau', EA = 'erhöhtes Anforderungsniveau';
+const L1 = 'Latein als 1. Fremdsprache', L2 = 'Latein als 2. Fremdsprache';
 
 const DEUTSCH_SEK1_TITEL = {
   '1.1': 'Verstehend zuhören', '1.2': 'Zu und vor anderen sprechen', '1.3': 'Mit anderen sprechen', '1.4': 'Szenisch spielen',
@@ -237,6 +239,120 @@ export const LP = {
     ]
   },
 
+  Geschichte: {
+    6: [
+      ['1', 'Der Mensch und seine Geschichte', ['Zeit als zentrale Dimension', 'Formen geschichtlicher Überlieferung', 'Jäger und Sammler der Altsteinzeit', 'Bauern der Jungsteinzeit']],
+      ['2', 'Ägypten – eine frühe Hochkultur', ['Nutzung der Stromlandschaft', 'Herrschaft, Religion und Gesellschaft']],
+      ['3', 'Die griechische Antike', ['Landesnatur, Polis, Kolonisation', 'Mythen, Epen, Spiele, Theater', 'Attische Polis ab Solon', 'Blütezeit Athens unter Perikles']],
+      ['4', 'Menschen machen Geschichte (Längsschnitt)', ['Porträt einer Herrscherin', 'Politik und Strategie', 'Feldherr und Eroberer']],
+      ['5', 'Das Imperium Romanum', ['Anfänge Roms', 'Römische Republik: Gesellschaft und Macht', 'Von der Republik zum Prinzipat', 'Römische Herrschaft in den Provinzen', 'Jüdisches Leben im Römischen Reich', 'Christen im Römischen Reich']],
+      ['6', 'Von der Antike zum Mittelalter', ['„Völkerwanderung“, Zerfall des Römischen Reichs', 'Ausbreitung des Islam', 'Reichsbildung der Franken', 'Entstehung des mittelalterlichen Kaisertums']],
+      ['7', 'Leben in der Familie (Längsschnitt)', ['Geschlechterrollen in Athen', 'Die römische „familia“', 'Neue Rollenbilder heute']]
+    ],
+    7: [
+      ['1', 'König und Reich: Herrschaft im Mittelalter', ['Entstehung des Ottonischen Reichs', 'Reichskirche, Investiturstreit', 'Wahlkönigtum, Lehnswesen, Territorialisierung']],
+      ['2', 'Leben und Kultur im Mittelalter', ['Stände, Grundherrschaft', 'Rolle der Klöster', 'Rittertum, Romanik, Gotik', 'Stadt im Mittelalter', 'Äußere Bedrohungen']],
+      ['3', 'Neue räumliche und geistige Horizonte', ['Kreuzzüge: Konfrontation und Kulturbegegnung', 'Eroberung Konstantinopels', 'Renaissance, Humanismus, Buchdruck', 'Entdeckungsfahrten und ihre Folgen']],
+      ['4', 'Wirtschaft und Handel gestern und heute (Längsschnitt)', ['Handel am Limes', 'Handelsmacht China im Mittelalter', 'Hanse oder Fugger', 'Welthandel heute']],
+      ['5', 'Das konfessionelle Zeitalter', ['Krisen im 16. Jh., Hexenverfolgung', 'Reformation, Bauernkrieg, Spaltung', 'Dreißigjähriger Krieg']],
+      ['6', 'Absolutismus und Barock', ['Absolutismus in Frankreich', 'Barock als Repräsentation', 'Absolutismus an einem Landesbeispiel', 'Hegemonie und „balance of power“']],
+      ['7', 'Bauwerke als Ausdruck politischen Denkens (Längsschnitt)', ['Bauwerk der griechischen Antike', 'Kaiserpfalz Aachen', 'Barocker Repräsentationsbau', 'Modernes Bauwerk, z. B. Reichstag']]
+    ],
+    8: [
+      ['1', 'Aufklärung, Französische Revolution und Napoleon', ['Ursachen der Französischen Revolution', 'Verlauf der Revolution bis 1794', 'Kaisertum Napoleons', 'Montgelas’ Reformen in Bayern']],
+      ['2', 'Deutschland zwischen Restauration und Revolution', ['Nationalidee, Befreiungskriege', 'Wiener Kongress, Deutscher Bund', 'Liberale und nationale Bewegung', 'Revolution von 1848/49']],
+      ['3', 'Bayern – Identität, Staatsgebiet und kulturelles Erbe (Längsschnitt)', ['Bevölkerungsgruppen und Zuwanderung', 'Territoriale Entwicklung Bayerns', 'Städte und Baudenkmäler']],
+      ['4', 'Industrialisierung und Soziale Frage', ['Industrialisierung in England', 'Industrialisierung in Deutschland und Bayern', 'Arbeits- und Lebensbedingungen', 'Soziale Frage und Lösungsansätze']],
+      ['5', 'Das Deutsche Kaiserreich', ['Reichsgründung 1871', 'Verfassung, Parteien, Sozialdemokratie', 'Obrigkeitsstaat, Militarismus, Nationalismus', 'Massengesellschaft, Frauenbewegung']],
+      ['6', 'Imperialismus und Erster Weltkrieg', ['Imperialistische Politik', 'Weg in den Ersten Weltkrieg', 'Neue Dimension des Krieges', 'Epochenjahr 1917', 'Friedensverträge, Kriegsschuldfrage']]
+    ],
+    9: [
+      ['1', 'Weimarer Republik – die erste deutsche Demokratie', ['Novemberrevolution, Reichsverfassung', 'Belastungen der Republik', 'Krisenjahre bis 1923', 'Stabilisierung', 'Weltwirtschaftskrise und Ende']],
+      ['2', 'Nationalsozialismus, Zweiter Weltkrieg und Holocaust', ['NS-Ideologie', 'Machtausbau', 'NS in Bayern', 'Leben im totalitären Staat', 'Eroberungspolitik', 'Entrechtung, Verfolgung, Ermordung', 'Widerstand', 'Kriegsende in Europa und Asien']],
+      ['3', 'Rechte des Menschen gestern und heute (Längsschnitt)', ['Ständegesellschaft', 'Aufklärung, Menschenrechtserklärungen', 'Grundrechte in vier Epochen', 'UN-Charta, Europäische Menschenrechtskonvention']],
+      ['4', 'Deutschland und die Siegermächte 1945–1949', ['Potsdamer Konferenz', 'Das besiegte Deutschland', 'Zerfall der Anti-Hitler-Koalition', 'Doppelte Staatsgründung']],
+      ['5', 'Weltpolitik im Kalten Krieg', ['Blockbildung', 'Kuba-Krise', 'Vietnamkrieg', 'Entspannung und Ende des Ost-West-Konflikts', 'Entkolonialisierung']]
+    ],
+    10: [
+      ['1', 'Das geteilte Deutschland und die Wiedervereinigung', ['SED-Diktatur und Alltag in der DDR', 'Widerstand und Unterdrückung in der DDR', 'Ära Adenauer', 'Bundesrepublik ab den 1960ern', 'Jüdisches Leben nach 1945', 'Deutsch-deutsche Beziehungen', 'Wiedervereinigung']],
+      ['2', 'Europäische Integration und globalisierte Welt', ['Europäische Integration bis 2009', 'Weltpolitische Akteure nach 1990', 'Globalisierung, Terrorismus', 'Rolle der Bundesrepublik nach 1990']]
+    ],
+    11: [
+      ['1', 'Geschichte erinnern', ['Mittelalter in der Populärkultur', 'Deutsche Kolonialgeschichte', 'Erinnern an Holocaust/Shoa', 'Manipulativer Umgang mit der NS-Zeit', 'Zeitzeugen zur DDR', 'Geschichte als Erzählung, Gedächtnis', 'Historische Verantwortung heute']],
+      ['2', 'Migration in Bayern (Frühe Neuzeit bis 20. Jh.)', ['Religiös motivierte Migration', 'Arbeits- und politische Migration im 19. Jh.', 'Gewaltmigration im Nationalsozialismus', 'Immigration und Integration nach 1945']]
+    ],
+    12: [
+      ['1.1', 'Revolution 1848/49 und bürgerliche Gesellschaft', ['Vormärz', 'Voraussetzungen der Revolution', 'Märzereignisse, Paulskirche', 'Bilanz und Wirkungen'], GA],
+      ['1.2', 'Modernisierung in Kaiserreich und Weimarer Republik', ['Wandel von Bürgertum und Adel', 'Politisches System des Kaiserreichs', 'Soziale Frage, Arbeiterbewegung', 'Novemberrevolution 1918', 'Weimarer Reichsverfassung', 'Frauenbewegung, Medien, jüdische Bevölkerung'], GA],
+      ['2.1', 'Scheitern der Weimarer Republik – NS-Diktatur und Völkermord', ['Krise der Demokratie', 'NS-Weltanschauung, Propaganda', 'Entrechtung und Verfolgung', 'Holocaust/Shoa', 'Rolle der nichtjüdischen Bevölkerung'], GA],
+      ['2.2', 'Bundesrepublik Deutschland und DDR', ['Staatsgründungen im Kalten Krieg', 'Wirtschaft und Lebensverhältnisse', 'Wiedervereinigung, Bürgerrechtsbewegung'], GA],
+      ['2.3', 'Die Bundesrepublik 1990 bis 2009', ['Aufarbeitung der SED-Diktatur', 'Folgen der Wiedervereinigung', 'Extremismus und Terrorismus', 'Außenpolitische Rolle'], GA]
+    ],
+    13: [
+      ['1', 'Akteure internationaler Politik in historischer Perspektive', ['Diaspora und Zionismus', 'Gründung Israels', 'Nahostkonflikt bis 1967', 'Friedensbemühungen', 'USA im Kalten Krieg', 'Zerfall der Sowjetunion', 'Aufstieg Chinas', 'Großmächte in der UNO'], GA],
+      ['2', 'Historische Grundlagen politischer Ordnungen in Europa', ['Attische Demokratie', 'Herrschaft im Heiligen Römischen Reich', 'Politisches Denken der Aufklärung', 'Nationsvorstellungen um 1800', 'Nationalstaatsbildung im 19. Jh.', 'Deutsch-französische Selbst- und Fremdbilder', 'Überwindung des Nationalismus nach 1945'], GA]
+    ]
+  },
+
+  Latein: {
+    5: [
+      ['1', 'Texte', ['Lehrbuchtexte übersetzen', 'Rom, Politik, Alltag, Mythos', 'Texte vortragen'], L1],
+      ['2.2', 'Formenlehre', ['Grammatische Grundbegriffe', 'Nomina, Pronomina, Verben bestimmen', 'Zahlen 1 bis 12', 'Korrekte Wortformen bilden'], L1],
+      ['2.3', 'Satzlehre', ['Satzglieder, Kongruenz, Kasusfunktionen', 'Tempora, Satzarten', 'Adverbial- und Relativsätze', 'AcI (gleichzeitig, vorzeitig)', 'Satzbau Latein – Deutsch'], L1],
+      ['3', 'Kultureller Kontext', ['Topografie Roms', 'Römische Kunst und Architektur', 'Römische Werte, Senat', 'Alltag und Privatleben', 'Religion, Götter, Unterwelt', 'Herakles, Aeneas, Gründungsmythos', 'Geflügelte Worte'], L1]
+    ],
+    6: [
+      ['1', 'Texte', ['Pompeji, Herkulaneum, Vesuv', 'Rom und Karthago', 'Ständegesellschaft, fides', 'Religion und Mythos'], L1],
+      ['2.2', 'Formenlehre', ['3. Deklination; dives, pauper, vetus', 'hic, ille, iste, idem, ipse', 'Kardinalia bis 1000', 'Passiv aller Tempora', 'Konjunktiv Imperfekt/Plusquamperfekt', 'Partizip Präsens und Perfekt'], L1],
+      ['2.3', 'Satzlehre', ['Prädikativum', 'Doppelter Nominativ/Akkusativ', 'Genitivus subiectivus/obiectivus', 'Irrealis, Konjunktiv im Nebensatz', 'Final- und Konsekutivsätze, cum, ut', 'AcI passiv', 'Participium coniunctum'], L1],
+      ['3', 'Kultureller Kontext', ['Vesuvausbruch, Plinius d. J.', 'Republik, Punische Kriege', 'Attische Demokratie, Archimedes', 'Klientelwesen, Volkstribunat', 'Europa, Theseus, Daedalus und Ikarus', 'Trojanischer Krieg, Odysseus', 'Ovid als Mythenquelle'], L1],
+      ['1', 'Texte', ['Forum Romanum, Pompeji, Vesuv', 'Senat, pietas', 'Familie, Sklaven, Gladiatoren', 'Olympier, Trojanischer Krieg, Aeneas'], L2],
+      ['2.2', 'Formenlehre', ['1.–3. Deklination', 'Personal-, Possessiv-, Reflexivpronomen; is, qui', 'Zahlen 1 bis 12', 'Alle Konjugationen; esse, posse, velle, ire', 'Indikativ Aktiv aller Tempora', 'Perfektbildung, Stammformen'], L2],
+      ['2.3', 'Satzlehre', ['Satzglieder, Kongruenz (KNG)', 'Kasusfunktionen', 'Imperfekt und Perfekt', 'Relativsatz, Adverbialsätze', 'AcI (gleichzeitig, vorzeitig)'], L2],
+      ['3', 'Kultureller Kontext', ['Forum, Kolosseum, Thermen, Ostia', 'Vesuvausbruch 79 n. Chr.', 'Romulus und Remus, Königszeit', 'Ständekämpfe', 'Familie, Namen, Schule, Sklaven', 'Tempel, Orakel, Opfer', 'Herakles, Aeneas'], L2]
+    ],
+    7: [
+      ['1', 'Texte', ['Imperium Romanum, Weltwunder', 'Alexander, späte Republik, Augustus', 'Karriere, Militär, virtus', 'Delphi, Olympia, Ödipus und Antigone'], L1],
+      ['2.2', 'Formenlehre', ['Steigerung der Adjektive', 'Interrogativ- und Indefinitpronomen', 'Adverbbildung und Steigerung', 'Deponentien (a-/e-Konjugation), ferre', 'Konjunktiv Präsens/Perfekt', 'Partizip/Infinitiv Futur, Gerundium'], L1],
+      ['2.3', 'Satzlehre', ['Ablativus absolutus', 'Ablativ des Vergleichs', 'Begehrsätze', 'Optativ, Hortativ, Jussiv, Prohibitiv', 'Consecutio temporum', 'AcI nachzeitig'], L1],
+      ['3', 'Kultureller Kontext', ['Cumae, Delphi, Olympia, Sizilien', 'Provinzen und Verwaltung', 'Bürgerkriege, pax Augusta', 'Caesar, Kleopatra, Augustus, Cicero', 'Cursus honorum, Triumphzüge', 'Thebanischer Sagenkreis'], L1],
+      ['1', 'Texte', ['Ödipus, Antigone, Orpheus und Eurydike', 'Karthago, Alexander, Militär', 'fides, virtus', 'Imperium Romanum, Weltwunder'], L2],
+      ['2.2', 'Formenlehre', ['4. und 5. Deklination', 'hic, ille, iste, idem, ipse', 'Zahlen bis 1000', 'Passiv aller Tempora, ferre', 'Konjunktiv (alle Tempora)', 'Partizip Präsens und Perfekt'], L2],
+      ['2.3', 'Satzlehre', ['Prädikativum', 'Genitivus subiectivus/obiectivus', 'Irrealis, consecutio temporum', 'cum- und ut-Sätze', 'AcI passiv', 'Participium coniunctum, Ablativus absolutus'], L2],
+      ['3', 'Kultureller Kontext', ['Provinzen, Karthago, Theben', 'Punische Kriege, Bürgerkriege, Augustus', 'Alexander, Hellenismus, Diogenes', 'Cicero, Caesar, Horaz, Ovid', 'Cursus honorum, Triumphzüge', 'Europa, Theseus, Daedalus und Ikarus'], L2]
+    ],
+    8: [
+      ['1', 'Texte', ['Kaiserzeit, Christen, Germanen', 'Rechtswesen, iustitia', 'Mythos, Religion, Philosophie', 'Fabeln des Phaedrus'], L1],
+      ['2.2', 'Formenlehre', ['quidam, quisque; quisquis, quicumque', 'Korrelativa', 'Deponentien, Semideponentien', 'Perfektopräsentien, fieri', 'Gerundiv'], L1],
+      ['2.3', 'Satzlehre', ['Attributives und prädikatives Gerundiv', 'NcI', 'Genitiv des geteilten Ganzen, Dativ des Urhebers', 'Deliberativ, Potentialis', 'Konjunktiv im Relativsatz', 'Verschränkte Relativsätze'], L1],
+      ['3', 'Kultureller Kontext', ['Kaiserzeit, Christentum, „Caesarenwahn“', 'Limes, Germanen', 'Latein in Mittelalter und Humanismus', 'Römisches Recht heute', 'Stoiker, Epikureer, Seneca', 'interpretatio Romana'], L1],
+      ['1', 'Texte', ['Kaiserzeit, Christen, Germanen', 'Rechtswesen, iustitia', 'Delphi, Olympia', 'Fabeln des Phaedrus'], L2],
+      ['2.2', 'Formenlehre', ['Steigerung der Adjektive und Adverbien', 'aliquis, quidam, quisque, quisquis', 'Korrelativa', 'Partizip/Infinitiv Futur', 'Deponentien, Semideponentien, fieri', 'Gerundium, Gerundiv'], L2],
+      ['2.3', 'Satzlehre', ['Gerundiv, NcI', 'Genitiv/Ablativ der Beschaffenheit', 'Ablativ des Vergleichs', 'Hortativ, Jussiv, Optativ, Prohibitiv', 'Konjunktiv im Relativsatz', 'AcI nachzeitig'], L2],
+      ['3', 'Kultureller Kontext', ['Kaiserzeit, Christentum', 'Limes, Germanen', 'Verbreitung des Lateinischen', 'Römisches Recht', 'Delphi, Olympia, Philosophie', 'Weltbilder der Antike'], L2]
+    ],
+    9: [
+      ['1.1', 'Übergangslektüre', ['Fabeln (Phaedrus, Hygin)', 'Gellius, Noctes Atticae', 'Gesta Romanorum', 'Vespucci, Mundus novus', 'Vulgata: Joseph und seine Brüder', 'Biblische Gleichnisse']],
+      ['1.2', 'Macht und Politik', ['Nepos, Biografie', 'Caesar, De bello Gallico', 'Sueton über Caesar', 'Römische Wertbegriffe', 'Caesars Propaganda']],
+      ['1.3', 'Spott mit spitzer Feder', ['Martial, Epigramme', 'Elegisches Distichon, Metrik', 'Epigramm als Gattung', 'Menschliche Schwächen']],
+      ['2.2', 'Formen- und Satzlehre', ['Historisches Präsens', 'Oratio obliqua', 'Komplexe Satzstrukturen', 'Latein – Deutsch']]
+    ],
+    10: [
+      ['1', 'Texte und ihr kultureller Kontext', ['Cicero, Prozessreden', 'Plinius d. J., Briefe', 'Catull, Carmina', 'Ovid, Ars amatoria', 'Elegisches Distichon', 'Rhetorik', 'Rezeption: Einhard, Carmina Burana']],
+      ['2', 'Sprachliche Basis', ['Lektürewortschatz', 'Mehrdeutige Wörter, Wendungen', 'Komplexe Satzperioden', 'Sprachvergleich']]
+    ],
+    11: [
+      ['1', 'Texte und ihr kultureller Kontext', ['Sallust, Catilina', 'Cicero, Reden gegen Catilina', 'Ovid, Metamorphosen', 'Sokrates, Diogenes, Vorsokratiker', 'Epos, Hexameter', 'Späte Republik bis Kaiserzeit']],
+      ['2', 'Sprachliche Basis', ['Lektürewortschatz', 'Lateinische Wendungen', 'Komplexe Satzperioden', 'Sprachvergleich']]
+    ],
+    12: [
+      ['1', 'Texte und ihr kultureller Kontext', ['Cicero, De finibus', 'Seneca, Epistulae morales', 'Stoa und Epikureismus', 'Catull, satirische Gedichte', 'Petron, Cena Trimalchionis', 'Satire als Gesellschaftskritik'], GA],
+      ['2', 'Sprachliche Basis', ['Philosophische Fachbegriffe', 'Vulgärlatein, Sprachwandel', 'Komplexe Satzperioden'], GA],
+      ['1', 'Texte und ihr kultureller Kontext', ['Cicero, Lukrez, Seneca', 'Stoa und Epikureismus', 'Horaz, Ode 1,11', 'Petron, Cena Trimalchionis', 'Horaz’ Verssatire', 'Rezeption der Satire'], EA],
+      ['2', 'Sprachliche Basis', ['Philosophische Fachbegriffe', 'Milieusprache bei Petron', 'Vulgärlatein, Sprachwandel', 'Komplexe Satzperioden'], EA]
+    ]
+  },
+
   Deutsch: {
     5: D({
       '1.1': ['Aufmerksames Zuhören', 'Rückmeldung zu Beiträgen', 'Hörtexte'], '1.2': ['Gedichtvortrag', 'Erzählen, Informieren, Argumentieren', 'Plakate präsentieren', 'Stimme, Mimik, Gestik'],
@@ -319,7 +435,7 @@ export const LP = {
 };
 LP.Deutsch[13] = LP.Deutsch[12];
 
-export const FAECHER = Object.keys(LP);
+export const FAECHER = Object.keys(LP).sort((a, b) => a.localeCompare(b, "de"));
 export const UMFANG = [5, 10, 20, 30, 45, 60, 90];
 
 /** Lernbereiche für Fach und Jahrgangsstufe, mit Schlüssel und Hinweis */
@@ -333,5 +449,8 @@ export const HINWEIS = {
   'Informatik|6': 'Informatik ist in Jahrgangsstufe 6 Teil von Natur und Technik.',
   'Informatik|7': 'Informatik ist in Jahrgangsstufe 7 Teil von Natur und Technik.',
   'Deutsch|12': 'Der Fachlehrplan Deutsch gilt für 12 und 13 gemeinsam.',
-  'Deutsch|13': 'Der Fachlehrplan Deutsch gilt für 12 und 13 gemeinsam.'
+  'Deutsch|13': 'Der Fachlehrplan Deutsch gilt für 12 und 13 gemeinsam.',
+  'Latein|9': 'Ab Jahrgangsstufe 9 gilt ein gemeinsamer Lehrplan für Latein als 1. und 2. Fremdsprache.',
+  'Geschichte|12': 'Hinterlegt ist das grundlegende Anforderungsniveau.',
+  'Geschichte|13': 'Hinterlegt ist das grundlegende Anforderungsniveau.'
 };
