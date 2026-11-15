@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-15f';
+const PF_BUILD = '2026-11-15g';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -2101,7 +2101,8 @@ ${T2.formatHelp(env)}`;
       <button data-m="certcheck"><b>✓ Zertifikat prüfen</b><span>Prüfcode eines Schüler-Zertifikats nachrechnen</span></button>
       <button data-m="keys"><b>⌘ Tastenkürzel</b><span>für die iPad-Tastatur</span></button>
       <button data-m="del"><b>🗑 Diesen Lernpfad löschen</b><span>nur in diesem Browser</span></button>
-      <button data-m="export"><b>⇩ Export</b><span>HTML-Datei für Moodle · SCORM-Lernpaket</span></button></div>`;
+      <button data-m="export"><b>⇩ Export</b><span>HTML-Datei für Moodle · SCORM-Lernpaket</span></button></div>
+      <div class="ed-ver">PathFinder-Version ${PF_BUILD}</div>`;
     document.body.appendChild(pop); placePop(e.currentTarget);
     pop.onclick = ev => {
       const m = ev.target.closest('[data-m]')?.dataset.m; if (!m) return; closePop();
