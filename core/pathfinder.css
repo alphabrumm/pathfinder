@@ -642,3 +642,40 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 }
 
 .ed-pop .ed-ver { margin-top: 8px; text-align: center; font-size: 12px; opacity: .6; }
+
+/* Dunkelmodus: milchiger Grund unter der Kopf-Schrift, damit Muster und Emojis die Lesbarkeit nicht stören */
+.lp[data-scheme="dunkel"]:not([data-theme="grid"]) .lp-herotxt { background: color-mix(in srgb, var(--bg) 58%, transparent); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); border-radius: 14px; padding: 10px 14px; margin: -4px 0; }
+
+/* ---- Paletten mit eigenen Kopf-Effekten (data-fx) ---- */
+/* Comic: Rasterpunkte wie im Druck, dicke Konturen */
+.lp[data-fx="comic"] .lp-hero::before { background-image: radial-gradient(rgba(0,0,0,.17) 24%, transparent 26%), radial-gradient(rgba(0,0,0,.17) 24%, transparent 26%); background-size: 14px 14px; background-position: 0 0, 7px 7px; }
+.lp[data-fx="comic"][data-scheme="dunkel"] .lp-hero::before { background-image: radial-gradient(rgba(255,255,255,.1) 24%, transparent 26%), radial-gradient(rgba(255,255,255,.1) 24%, transparent 26%); }
+.lp[data-fx="comic"] .lp-hero { border-bottom: 4px solid #111; }
+.lp[data-fx="comic"] .lp-hero h1 { color: #fff; text-shadow: 3px 3px 0 #111, -1.5px -1.5px 0 #111, 1.5px -1.5px 0 #111, -1.5px 1.5px 0 #111, 1.5px 1.5px 0 #111; }
+.lp[data-fx="comic"] .lp-sh h2 { text-shadow: 2px 2px 0 var(--a3); }
+.lp[data-fx="comic"] .lp-hero:not(.has-bg)::after { content: "POW!"; position: absolute; right: 120px; top: 14px; z-index: 0; padding: 10px 16px; font: 900 22px/1 "Arial Black", Impact, sans-serif; color: #e4002b; background: #fff; border: 3px solid #111; transform: rotate(8deg); clip-path: polygon(0 18%, 14% 0, 30% 14%, 50% 0, 64% 16%, 86% 2%, 100% 24%, 90% 50%, 100% 78%, 80% 100%, 58% 86%, 38% 100%, 20% 84%, 0 92%, 8% 54%); opacity: .9; }
+@media (max-width: 1000px) { .lp[data-fx="comic"] .lp-hero:not(.has-bg)::after { display: none; } }
+/* Bauplan: Blaupause mit Haupt- und Hilfsraster, Zirkel-Skizze */
+.lp[data-fx="bauplan"] .lp-hero::before { background-image: linear-gradient(rgba(255,255,255,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.3) 1px, transparent 1px), linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px); background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px; }
+.lp[data-fx="bauplan"] .lp-hero:not(.has-bg)::after { content: ""; position: absolute; right: 3%; top: 50%; width: 170px; height: 170px; transform: translateY(-50%); opacity: .35; pointer-events: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='none' stroke='white' stroke-width='1.2'%3E%3Ccircle cx='50' cy='50' r='36'/%3E%3Ccircle cx='50' cy='50' r='2'/%3E%3Cpath d='M50 6v88M6 50h88' stroke-dasharray='4 3'/%3E%3Cpath d='M50 50 75 24'/%3E%3Cpath d='M14 92h72M14 88v8M86 88v8'/%3E%3Ctext x='50' y='89' font-size='7' fill='white' stroke='none' text-anchor='middle' font-family='monospace'%3E72 mm%3C/text%3E%3C/svg%3E") center / contain no-repeat; }
+.lp[data-fx="bauplan"] .lp-divider { background: repeating-linear-gradient(90deg, var(--div, var(--a3)) 0 14px, transparent 14px 20px); }
+/* Synthwave: Retro-Sonne und Gitter, das langsam auf einen zufährt */
+.lp[data-fx="synth"] .lp-hero::before { top: 58%; background-image: linear-gradient(rgba(255,90,220,.65) 2px, transparent 2px), linear-gradient(90deg, rgba(255,90,220,.5) 2px, transparent 2px); background-size: 100% 18px, 48px 100%; transform: perspective(140px) rotateX(55deg); transform-origin: top; animation: pf-synth 2.4s linear infinite; }
+@keyframes pf-synth { to { background-position: 0 18px, 0 0; } }
+.lp[data-fx="synth"] .lp-hero:not(.has-bg)::after { content: ""; position: absolute; right: 7%; top: 8%; width: 130px; height: 130px; border-radius: 50%; background: linear-gradient(#ffe259, #ff4f9a 75%); -webkit-mask: linear-gradient(#000 0 52%, transparent 52% 57%, #000 57% 67%, transparent 67% 71%, #000 71% 80%, transparent 80% 83%, #000 83%); mask: linear-gradient(#000 0 52%, transparent 52% 57%, #000 57% 67%, transparent 67% 71%, #000 71% 80%, transparent 80% 83%, #000 83%); opacity: .85; pointer-events: none; }
+.lp[data-fx="synth"] .lp-hero h1 { text-shadow: 0 0 12px rgba(255,90,220,.7); }
+/* Aquarell: weiche Farbflecken wie auf Papier */
+.lp[data-fx="aquarell"] .lp-hero::before { background-image: radial-gradient(closest-side, rgba(47,111,150,.32), transparent), radial-gradient(closest-side, rgba(194,63,81,.26), transparent), radial-gradient(closest-side, rgba(237,174,73,.34), transparent), radial-gradient(closest-side, rgba(47,158,134,.24), transparent); background-size: 46% 150%, 40% 130%, 34% 110%, 38% 120%; background-position: 4% 20%, 62% 80%, 96% 0%, 30% 110%; background-repeat: no-repeat; filter: blur(8px); }
+.lp[data-fx="aquarell"] .lp-divider { height: 8px; border-radius: 50%; filter: blur(1.2px); opacity: .8; }
+/* Weihnachten: Schneefall im Kopf, Schneedecke, Eiszapfen an den Stationen */
+.lp[data-fx="winter"] .lp-hero::before { background-image: radial-gradient(circle, #fff 1.6px, transparent 2.3px), radial-gradient(circle, rgba(255,255,255,.75) 1px, transparent 1.7px), radial-gradient(circle, #fff 2.6px, transparent 3.3px); background-size: 60px 60px, 37px 37px, 110px 110px; background-position: 0 0, 15px 20px, 40px 10px; animation: pf-snow 9s linear infinite; }
+/* Schrift hebt sich vom Schneefall ab */
+.lp[data-fx="winter"] .lp-herotxt { text-shadow: 0 1px 3px rgba(0,0,0,.5), 0 0 1px rgba(0,0,0,.6); }
+@keyframes pf-snow { to { background-position: 0 60px, 15px 94px, 40px 230px; } }
+.lp[data-fx="winter"] .lp-hero:not(.has-bg)::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 22px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='26' preserveAspectRatio='none'%3E%3Cpath d='M0 14q30-14 60-4t60 0 60-6 60 4V26H0z' fill='%23ffffff'/%3E%3C/svg%3E") 0 100% / 240px 26px repeat-x; pointer-events: none; }
+.lp[data-fx="winter"][data-scheme="dunkel"] .lp-hero:not(.has-bg)::after { opacity: .85; }
+.lp[data-fx="winter"] .lp-sh { position: relative; margin-bottom: 26px; }
+.lp[data-fx="winter"] .lp-sh::after { content: ""; position: absolute; left: 0; top: calc(100% + 2px); width: min(240px, 60%); height: 22px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='22'%3E%3Cpath d='M0 0h60v3l-4 0-2 12-2-12-5 0-2 18-2-18-6 0-2 9-2-9-5 0-2 15-2-15-6 0-2 7-2-7-5 0-2 13-2-13H0z' fill='%23e3f3ff' stroke='%23a9d4f5' stroke-width='1'/%3E%3C/svg%3E") 0 0 / 60px 22px repeat-x; pointer-events: none; }
+.lp[data-fx="winter"] .lp-nr { position: relative; }
+.lp[data-fx="winter"] .lp-nr::before { content: ""; position: absolute; left: -4px; right: -4px; top: -8px; height: 12px; background: #fff; border-radius: 12px 12px 8px 8px; box-shadow: 0 1px 2px rgba(0,0,0,.15); z-index: 1; }
+@media (prefers-reduced-motion: reduce) { .lp[data-fx] .lp-hero::before { animation: none; } }
