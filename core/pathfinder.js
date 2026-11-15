@@ -1483,7 +1483,7 @@ ${d.theme === 'grid' ? '' : `
     const save = () => { const p = kiPromptInfo(info, L); info.fach = p.fach; info.klasse = info.jg ? info.jg + '. Klasse' : ''; LS.set(KK, JSON.stringify(info)); };
     let parsed = null, lastAtt = {}, fileAtt = {}, tok = 0;
     const opt = (v, t, sel) => `<option value="${esc(v)}"${String(sel) === String(v) ? ' selected' : ''}>${esc(t)}</option>`;
-    el.innerHTML = `<header><b>${KI_ICON} KI-Lernpfad</b><button class="ok" data-x="1">Schließen</button></header>
+    el.innerHTML = `<header><b>${KI_ICON} KI-Lernpfad oder -Challenge</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
         <div class="ki-api" id="kiApi"></div>
         <div class="ki-step"><span class="n">1</span><b>Lernpfad beschreiben</b></div>
@@ -1854,7 +1854,7 @@ ${d.theme === 'grid' ? '' : `
   if ($('#bKI')) $('#bKI').onclick = e => { // nur in der eigenständigen WebApp: Auswahl der KI-Prompts
     closePop(); pop = document.createElement('div'); pop.className = 'ed-pop ki-menu';
     pop.innerHTML = `<h3>KI-Tools</h3><div class="ed-pal ed-pal1">
-      <button data-k="ki"><b>${KI_ICON} KI-Lernpfad</b><span>einen neuen Lernpfad von einer KI schreiben lassen</span></button>
+      <button data-k="ki"><b>${KI_ICON} KI-Lernpfad oder -Challenge</b><span>einen neuen Lernpfad oder eine Challenge von einer KI schreiben lassen</span></button>
       <button data-k="exam"><b>${KI_ICON} Prüfung aus offenem Lernpfad generieren</b><span>Fragensammlung für Moodle (Moodle-XML)</span></button></div>`;
     document.body.appendChild(pop); placePop(e.currentTarget);
     pop.onclick = ev => { const k = ev.target.closest('[data-k]')?.dataset.k; if (!k) return; closePop(); if (k === 'ki') openKI(); else openExam(); };
