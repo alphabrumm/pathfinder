@@ -410,7 +410,39 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .ki-step { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 16px; }
 .ki-step .n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #1f1b2e; color: #fff; font-weight: 700; font-size: 14px; }
 .ki-btns { display: flex; flex-wrap: wrap; gap: 8px; }
-.ki-btns [hidden] { display: none; }
+.ki-btns [hidden], .ki-btns[hidden] { display: none; }
+.ed-pop.ki-menu { width: min(500px, calc(100vw - 20px)); }
+.ed-pop.ki-menu .ed-pal.ed-pal1 { grid-template-columns: 1fr; width: auto; }
+.ed-pop.ki-menu .ed-pal button { width: 100%; }
+/* Arbeiten mit Prompt und fremder KI (bei API-Key zugeklappt) */
+.ki-manual { display: grid; gap: 12px; }
+.ki-manual > summary { display: none; }
+.ki-manual.col { border: 1.5px solid #dcd6ee; border-radius: 12px; padding: 0 12px; }
+.ki-manual.col[open] { padding-bottom: 12px; }
+.ki-manual.col > summary { display: list-item; cursor: pointer; font-weight: 700; padding: 10px 0; color: #4b4560; }
+.ki-manual[open] > :not(summary) { margin-top: 10px; }
+/* Warten auf Claude: Pfadi schaut sich um */
+.ki-wait { display: grid; justify-items: center; gap: 6px; padding: 14px 10px 12px; border-radius: 14px; background: #f3f0fb; text-align: center; }
+.pfadi-wait { width: 110px; height: 110px; overflow: visible; }
+.pfadi-wait .pw-body { animation: pw-bob 2.4s ease-in-out infinite; transform-origin: 46px 88px; }
+.pfadi-wait .pw-pupils { animation: pw-look 4s ease-in-out infinite; }
+.pfadi-wait .pw-eyes { animation: pw-blink 4s infinite; transform-origin: 46px 54px; }
+.pfadi-wait .pw-ant { animation: pw-ant 1.2s ease-in-out infinite alternate; transform-origin: 46px 32px; }
+.pfadi-wait .pw-shadow { animation: pw-shadow 2.4s ease-in-out infinite; transform-origin: 46px 90px; }
+@keyframes pw-look { 0%, 18% { transform: translateX(0); } 25%, 45% { transform: translateX(-3.5px); } 52%, 68% { transform: translateX(0) translateY(-1px); } 75%, 95% { transform: translateX(3.5px); } 100% { transform: translateX(0); } }
+@keyframes pw-blink { 0%, 47%, 51%, 100% { transform: scaleY(1); } 49% { transform: scaleY(.1); } }
+@keyframes pw-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes pw-shadow { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(.9); } }
+@keyframes pw-ant { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
+.ki-wait-t { font-weight: 800; font-size: 18px; color: #3d2a73; }
+.ki-dots i { font-style: normal; display: inline-block; opacity: 0; }
+.ki-dots i:nth-child(1) { animation: ki-d1 1.8s infinite; }
+.ki-dots i:nth-child(2) { animation: ki-d2 1.8s infinite; }
+.ki-dots i:nth-child(3) { animation: ki-d3 1.8s infinite; }
+@keyframes ki-d1 { 0%, 10% { opacity: 0; transform: translateY(0); } 16%, 82% { opacity: 1; transform: translateY(-3px); } 90%, 100% { opacity: 0; } }
+@keyframes ki-d2 { 0%, 30% { opacity: 0; } 36%, 82% { opacity: 1; transform: translateY(-3px); } 90%, 100% { opacity: 0; } }
+@keyframes ki-d3 { 0%, 50% { opacity: 0; } 56%, 82% { opacity: 1; transform: translateY(-3px); } 90%, 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pfadi-wait *, .ki-dots i { animation-duration: 6s !important; } }
 .lp-btn.sm { min-height: 34px; padding: 4px 12px; font-size: 14px; }
 /* direkte KI-Nutzung (API-Key) */
 .ki-api { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: 12px; background: #f3f0fb; }
@@ -518,6 +550,10 @@ body.pf-player { background: var(--bg, #fdf8f3); }
   body:not(.pf-player) .ki-api { background: var(--dk-surf2); }
   body:not(.pf-player) .ki-api-on { color: #b9a8ff; }
   body:not(.pf-player) .ki-live { background: #22304a; color: #cfe0ff; }
+  body:not(.pf-player) .ki-wait { background: var(--dk-surf2); }
+  body:not(.pf-player) .ki-wait-t { color: #cbbfff; }
+  body:not(.pf-player) .ki-manual.col { border-color: var(--dk-line); }
+  body:not(.pf-player) .ki-manual.col > summary { color: var(--dk-ink); }
   body:not(.pf-player) .ki-done { color: #7fd69c; }
   body:not(.pf-player) .ki-fmt { background: var(--dk-bg); color: var(--dk-ink); }
   body:not(.pf-player) .ki-res .good { color: #7fd69c; } body:not(.pf-player) .ki-res .bad { color: #ff8f80; } body:not(.pf-player) .ki-res .warn { color: #f6c35a; }

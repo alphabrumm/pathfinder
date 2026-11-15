@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-15b';
+const PF_BUILD = '2026-11-15c';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1304,15 +1304,17 @@ ${d.theme === 'grid' ? '' : `
    * Ergebnis: Antworttext oder null (abgebrochen/Fehler)
    */
   let apiBusy = null;
-  async function runDirect({ prompt, target, box, maxTokens, onDone, what = 'den Lernpfad' }) {
+  const PFADI_WAIT = `<svg class="pfadi-wait" viewBox="0 0 100 100" aria-hidden="true"><ellipse class="pw-shadow" cx="46" cy="90" rx="26" ry="5" fill="#000" opacity=".1"/><g class="pw-body"><g class="pw-ant"><path d="M30 30q-4-9 2-12M60 30q4-9-2-12" fill="none" stroke="#3d2a73" stroke-width="3.5" stroke-linecap="round"/><circle cx="32" cy="18" r="3.5" fill="#FFD54A" stroke="#3d2a73" stroke-width="2.5"/><circle cx="58" cy="18" r="3.5" fill="#FFD54A" stroke="#3d2a73" stroke-width="2.5"/></g><path d="M46 26c21 0 32 15 32 33s-10 28-32 28-32-10-32-28 11-33 32-33z" fill="#9B8AFB" stroke="#3d2a73" stroke-width="3.5"/><path d="M30 70c4 9 28 9 32 0" fill="#C9C0FF" opacity=".7"/><g class="pw-eyes"><ellipse cx="36" cy="54" rx="7" ry="8" fill="#fff" stroke="#3d2a73" stroke-width="2.5"/><ellipse cx="56" cy="54" rx="7" ry="8" fill="#fff" stroke="#3d2a73" stroke-width="2.5"/><g class="pw-pupils"><circle cx="36" cy="55" r="3.2" fill="#3d2a73"/><circle cx="56" cy="55" r="3.2" fill="#3d2a73"/></g></g><path d="M41 71q5 3 10 0" fill="none" stroke="#3d2a73" stroke-width="3" stroke-linecap="round"/><ellipse cx="27" cy="66" rx="4" ry="2.5" fill="#ff8fb1" opacity=".55"/><ellipse cx="65" cy="66" rx="4" ry="2.5" fill="#ff8fb1" opacity=".55"/></g></svg>`;
+  async function runDirect({ prompt, target, box, maxTokens, onDone, what = 'den Lernpfad', title = 'Lernpfad wird gebaut' }) {
     const A = await loadApi();
     if (!A.hasKey()) { apiSettings(); return null; }
     if (apiBusy) { toast('Claude arbeitet noch …'); return null; }
     const ac = new AbortController(); apiBusy = ac; const t0 = Date.now();
     const s = A.settings();
-    box.innerHTML = `<div class="ki-live"><span class="ki-spin"></span><span id="liveTxt">Claude (${esc(A.modelInfo(s.model).name)}) schreibt ${what} …</span><button class="lp-btn alt sm" data-live="stop">Abbrechen</button></div>`;
+    box.innerHTML = `<div class="ki-wait">${PFADI_WAIT}<div class="ki-wait-t">${esc(title)}<span class="ki-dots"><i>.</i><i>.</i><i>.</i></span></div><div class="help" id="liveTxt">Claude (${esc(A.modelInfo(s.model).name)}) schreibt ${what} – das dauert meist ein bis drei Minuten.</div><button class="lp-btn alt sm" data-live="stop">Abbrechen</button></div>`;
     box.querySelector('[data-live]').onclick = () => ac.abort();
     const tick = n => { const l = box.querySelector('#liveTxt'); if (l) l.textContent = `Claude schreibt ${what} … ${n.toLocaleString('de-DE')} Zeichen · ${Math.round((Date.now() - t0) / 1000)} s`; };
+    box.scrollIntoView({ block: 'center', behavior: 'smooth' });
     try {
       const r = await A.ask({ prompt, maxTokens, signal: ac.signal, onText: t => { target.value = t; tick(t.length); target.scrollTop = target.scrollHeight; } });
       target.value = r.text;
@@ -1366,7 +1368,7 @@ ${d.theme === 'grid' ? '' : `
     const refreshApi = () => { direct = A.hasKey(); $('#kiApi', el).innerHTML = apiBarHtml(A); $$('[data-direct="exam"]', el).forEach(b => b.hidden = !direct); $('[data-copy="exam"]', el).classList.toggle('alt', direct); if (checked) check(); };
     const direktXml = async (prompt, what) => {
       const inp = $('#kiIn', el);
-      const t = await runDirect({ prompt, target: inp, box: $('#kiLive', el), maxTokens: 32000, what });
+      const t = await runDirect({ prompt, target: inp, box: $('#kiLive', el), maxTokens: 32000, what, title: 'Prüfung wird gebaut' });
       if (t != null) { inp.value = A.extractXml(t); check(); if (!checked?.errors.length) { const b = $('#exPrev', el); if (b.hidden) $('#exPv', el).click(); } }
     };
     const check = () => {
@@ -1500,18 +1502,28 @@ ${d.theme === 'grid' ? '' : `
         <label>Thema <span class="help">(optional – sonst der Lernbereich)</span><input type="text" data-k="thema" value="${esc(info.thema || '')}" placeholder="z. B. Relative Zellbezüge in der Tabellenkalkulation"></label>
         <label>Weitere Bemerkungen für die KI<textarea data-k="extra" rows="3" placeholder="z. B. mit Alltagsbeispiel Pausenverkauf, eine Station als Challenge, zwischen den Stationen eine Animation, die einen Aspekt erklärt">${esc(info.extra || '')}</textarea></label>
         <div class="row"><label>Umfang<select data-k="min">${L.UMFANG.map(m => opt(m, m + ' Minuten', info.min)).join('')}</select></label><span></span></div>
-        <div class="ki-btns"><button class="lp-btn" data-direct="ki" hidden>⚡ Direkt erstellen</button><button class="lp-btn" data-copy="prompt">${KI_ICON} KI-Prompt generieren</button><button class="lp-btn alt" data-copy="doc" title="Den geöffneten Lernpfad als Text – z. B. um ihn von der KI überarbeiten zu lassen">📋 Aktuellen Lernpfad als Text</button><button class="lp-btn alt" data-copy="show">Format ansehen</button></div>
-        <div class="ki-step"><span class="n">2</span><b>Antwort der KI hier einfügen</b></div>
+        <div class="ki-btns" id="kiDirRow" hidden><button class="lp-btn" data-direct="ki">⚡ Lernpfad direkt erstellen</button></div>
         <div id="kiLive" class="ki-res"></div>
+        <details class="ki-manual" id="kiManual" open><summary>Mit Prompt und Fremd-KI arbeiten</summary>
+        <div class="ki-btns"><button class="lp-btn" data-copy="prompt">${KI_ICON} KI-Prompt generieren</button><button class="lp-btn alt" data-copy="doc" title="Den geöffneten Lernpfad als Text – z. B. um ihn von der KI überarbeiten zu lassen">📋 Aktuellen Lernpfad als Text</button><button class="lp-btn alt" data-copy="show">Format ansehen</button></div>
+        <div class="ki-step"><span class="n">2</span><b>Antwort der KI hier einfügen</b></div>
         <textarea id="kiIn" rows="10" spellcheck="false" placeholder="# Titel des Lernpfads&#10;&#10;## Station: …"></textarea>
         <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Datei der KI laden<input type="file" id="kiFiles" multiple accept=".txt,.md,.svg,.png,.gif,.jpg,.jpeg,.webp,.zip" hidden></label><span class="help" style="align-self:center">statt Einfügen: lernpfad.txt – auch zusätzliche Bilder (.svg, .png, .gif, ZIP)</span></div>
         <div id="kiFileList" class="ki-res"></div>
         <div id="kiRes" class="ki-res"></div>
         <div class="ki-btns"><button class="lp-btn" id="kiOpen" disabled>＋ Als neuen Lernpfad öffnen</button></div>
+        </details>
       </div>`;
     const res = $('#kiRes', el), openB = $('#kiOpen', el);
+    let imgCheck = Promise.resolve();
     let direct = false;
-    const refreshApi = () => { direct = A.hasKey(); $('#kiApi', el).innerHTML = apiBarHtml(A); $$('[data-direct="ki"]', el).forEach(b => b.hidden = !direct); $('[data-copy="prompt"]', el).classList.toggle('alt', direct); if (parsed) check(); };
+    const refreshApi = () => {
+      const was = direct; direct = A.hasKey(); $('#kiApi', el).innerHTML = apiBarHtml(A);
+      $('#kiDirRow', el).hidden = !direct;
+      const m = $('#kiManual', el); m.classList.toggle('col', direct);
+      if (!direct) m.open = true; else if (!was && !$('#kiIn', el).value.trim()) m.open = false;
+      if (parsed) check();
+    };
     // Lernbereiche und Inhalte passend zu Jahrgangsstufe und Fach
     const drawLb = () => {
       $('#kiFrei', el).hidden = info.fsel !== '*';
@@ -1558,7 +1570,7 @@ ${d.theme === 'grid' ? '' : `
       openB.disabled = !!errors.length;
       // Bilder wirklich laden – erfundenes Base64 fällt erst hier auf
       const my = ++tok, bad = [];
-      Promise.all((parsed.images || []).map(im => new Promise(ok => { const x = new Image(); x.onload = () => ok(); x.onerror = () => { bad.push(im); ok(); }; x.src = im.src; }))).then(() => {
+      imgCheck = Promise.all((parsed.images || []).map(im => new Promise(ok => { const x = new Image(); x.onload = () => ok(); x.onerror = () => { bad.push(im); ok(); }; x.src = im.src; }))).then(() => {
         if (my !== tok || !bad.length) return;
         const all = new Set(bad.map(x => x.src));
         for (const st of parsed.doc.stations) for (const b of st.blocks) for (const k of ['src', 'img']) if (all.has(b[k])) b[k] = '';
@@ -1606,8 +1618,12 @@ ${d.theme === 'grid' ? '' : `
       if (t.dataset.direct === 'ki') {
         const p = ready(); if (!p) return;
         const inp = $('#kiIn', el); inp.value = ''; check();
-        const r = await runDirect({ prompt: T.promptFor(p, env), target: inp, box: $('#kiLive', el), maxTokens: 48000 });
-        if (r != null) { check(); res.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+        const r = await runDirect({ prompt: T.promptFor(p, env), target: inp, box: $('#kiLive', el), maxTokens: 48000, what: p.art === 'challenge' ? 'die Challenge' : 'den Lernpfad', title: p.art === 'challenge' ? 'Challenge wird gebaut' : 'Lernpfad wird gebaut' });
+        if (r != null) {
+          check(); await imgCheck;
+          if (parsed && !parsed.errors.length) { openB.click(); return; }
+          $('#kiManual', el).open = true; res.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
       }
       if (t.dataset.direct === 'fix' && parsed) {
         const inp = $('#kiIn', el), src = inp.value;
@@ -1615,8 +1631,9 @@ ${d.theme === 'grid' ? '' : `
           + parsed.errors.map(x => `- Zeile ${x.n}: ${x.m}`).join('\n')
           + '\n\nKorrigiere genau diese Stellen und lass alles andere unverändert. Antworte nur mit dem vollständigen Lernpfad in einem Codeblock (vier Backticks, „text“).\n\n'
           + T.formatHelp(env) + '\nLERNPFAD:\n' + src;
-        const r = await runDirect({ prompt, target: inp, box: $('#kiLive', el), maxTokens: 48000, what: 'die Korrektur' });
+        const r = await runDirect({ prompt, target: inp, box: $('#kiLive', el), maxTokens: 48000, what: 'die Korrektur', title: 'Lernpfad wird repariert' });
         if (r == null) inp.value = src; check();
+        if (r != null) { await imgCheck; if (parsed && !parsed.errors.length) { openB.click(); return; } }
       }
       if (t.dataset.copy === 'doc') { const o = {}; const txt = T.docToText(doc, env, o); lastAtt = Object.fromEntries(Object.entries(o.attachments).map(([k, v]) => [k.toLowerCase(), v])); }
       if (t.dataset.copy === 'doc') toast(await copyText('Überarbeite diesen Lernpfad. Behalte das Format genau bei und antworte nur mit dem vollständigen Lernpfad in einem Codeblock. Verweise wie anhang:bild1 ohne Eintrag im Anhang einfach stehen lassen.\n\n' + T.formatHelp(env) + '\nLERNPFAD:\n' + T.docToText(doc, env)) ? '📋 Lernpfad als Text kopiert (mit Formatbeschreibung)' : 'Kopieren ging nicht');
@@ -1835,10 +1852,10 @@ ${d.theme === 'grid' ? '' : `
   $('#bDesign').onclick = openDesign;
   $('#bOpen').onclick = e => openChooser(e.currentTarget);
   if ($('#bKI')) $('#bKI').onclick = e => { // nur in der eigenständigen WebApp: Auswahl der KI-Prompts
-    closePop(); pop = document.createElement('div'); pop.className = 'ed-pop';
-    pop.innerHTML = `<h3>KI-Prompts</h3><div class="ed-pal ed-pal1">
+    closePop(); pop = document.createElement('div'); pop.className = 'ed-pop ki-menu';
+    pop.innerHTML = `<h3>KI-Tools</h3><div class="ed-pal ed-pal1">
       <button data-k="ki"><b>${KI_ICON} KI-Lernpfad</b><span>einen neuen Lernpfad von einer KI schreiben lassen</span></button>
-      <button data-k="exam"><b>${KI_ICON} Prüfung aus geladenem Lernpfad generieren</b><span>Fragensammlung für Moodle (Moodle-XML)</span></button></div>`;
+      <button data-k="exam"><b>${KI_ICON} Prüfung aus offenem Lernpfad generieren</b><span>Fragensammlung für Moodle (Moodle-XML)</span></button></div>`;
     document.body.appendChild(pop); placePop(e.currentTarget);
     pop.onclick = ev => { const k = ev.target.closest('[data-k]')?.dataset.k; if (!k) return; closePop(); if (k === 'ki') openKI(); else openExam(); };
   };
