@@ -474,7 +474,24 @@ ${extra.length ? '\nZUSÄTZLICH IN DIESER APP:\n' + extra.join('\n\n') + '\n' : 
 }
 export function promptFor(info, env) {
   const f = (k, d) => (info[k] || '').trim() || d;
-  return `Du erstellst einen interaktiven Lernpfad für die Plattform PathFinder${env.appName && env.appName !== 'PathFinder' ? ` (App: ${env.appName})` : ''}.
+  const ch = info.art === 'challenge', mix = info.mix || [40, 40, 20];
+  const app = env.appName && env.appName !== 'PathFinder' ? ` (App: ${env.appName})` : '';
+  const intro = ch
+    ? `Du erstellst eine CHALLENGE (Übungsaufgaben) für die Plattform PathFinder${app}. Eine Challenge bringt nichts Neues bei: Sie greift auf das Vorwissen der Schüler zurück und lässt sie es an abwechslungsreichen Aufgaben anwenden, üben und vertiefen.`
+    : `Du erstellst einen interaktiven LERNPFAD FÜR NEUES WISSEN für die Plattform PathFinder${app}. Der Lernpfad führt die Schüler Schritt für Schritt an ein neues Thema heran und festigt das Gelernte direkt mit Quiz, Aufgaben, Lückentexten und Zuordnungen.`;
+  const artRules = ch
+    ? `- Schreibe im Kopf die Zeile „Art: Challenge“ und „Punkte: ja“.
+- KEINE neuen Inhalte erklären. Höchstens ein kurzer [Merke]-Kasten pro Station zur Erinnerung an Bekanntes; der Schwerpunkt liegt ganz auf Aufgaben, Quiz, Lückentexten und Zuordnungen.
+- Schwierigkeitsmischung der Aufgaben: etwa ${mix[0]} % Grundlagen, ${mix[1]} % Fortgeschritten, ${mix[2]} % Experte. Ordne die Stationen von leicht nach schwer (z. B. „Station: Grundlagen“, „Station: Fortgeschritten“, „Station: Experte“; Stufen mit 0 % weglassen).
+- Schreibe die Stufe in den Titel jeder Aufgabe (z. B. „### Aufgabe: Grundlagen – …“) und vergib XP nach Stufe: Grundlagen 10, Fortgeschritten 20, Experte 30.
+- Grundlagen = direkte Anwendung des Gelernten; Fortgeschritten = Transfer, mehrere Schritte; Experte = offene, knifflige Probleme oder neue Zusammenhänge.
+- Tipps erinnern an das nötige Vorwissen, statt es neu zu erklären.
+`
+    : `- Schreibe im Kopf die Zeile „Art: Lernpfad“.
+- Jede Station: kurzer Einstieg, dann Erklärung des Neuen (mit Beispiel, gern einem Schaubild), dann mindestens eine Übung (Aufgabe, Quiz, Lückentext oder Zuordnen), die das Neue sofort festigt.
+- Von einfach zu schwer; jede Station baut auf der vorigen auf. Eine abschließende Station wiederholt das Wichtigste.
+`;
+  return `${intro}
 
 THEMA: ${f('thema', '[bitte Thema eintragen]')}
 ${info.fach?.trim() ? 'FACH: ' + info.fach.trim() + '\n' : ''}ZIELGRUPPE: ${f('klasse', '[Jahrgangsstufe / Schulart]')}
@@ -482,10 +499,10 @@ UMFANG: ${f('umfang', 'etwa 4 Stationen, ca. 45 Minuten')}
 ${info.lehrplan ? 'LEHRPLANBEZUG: ' + info.lehrplan + '\n' : ''}${info.inhalte?.length ? 'ZU BEHANDELNDE LEHRPLANINHALTE: ' + info.inhalte.join('; ') + '\n' : info.lehrplan && info.alleInhalte?.length ? 'INHALTE DES LERNBEREICHS (sinnvoll auswählen, passend zum Umfang): ' + info.alleInhalte.join('; ') + '\n' : ''}${info.extra?.trim() ? 'WEITERE WÜNSCHE DER LEHRKRAFT (bitte genau umsetzen): ' + info.extra.trim() + '\n' : ''}
 REGELN
 - WICHTIG – alles in EINEN kopierbaren Textblock: Der komplette Lernpfad samt Anhang mit allen Grafiken steht in einem einzigen Codeblock, damit die Lehrkraft nur einmal kopieren und einfügen muss. Beginne den Block mit vier Backticks und „text“ (\`\`\`\`text) und beende ihn mit vier Backticks (\`\`\`\`), damit Code-Beispiele darin den Block nicht vorzeitig schließen. Kein Text davor oder danach, nichts auf mehrere Blöcke oder Nachrichten verteilen.
+- Halte dich exakt an das unten beschriebene PathFinder-Textformat, damit der Lernpfad ohne Nacharbeit eingelesen werden kann.
 - Wenn du Dateien zum Herunterladen erzeugen kannst, liefere denselben Inhalt zusätzlich als eine Textdatei „lernpfad.txt“.
 - Sprache: Deutsch, Schüler werden mit „du“ angesprochen, kurze Sätze.
-${(info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')) ? `- Schreibe im Kopf die Zeile „Kopfzeile: ${info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')}“.\n` : ''}${info.lehrplan ? '- Bleib beim Lehrplanbezug: Inhalte, Fachbegriffe und Schwierigkeit passend zu dieser Jahrgangsstufe, nichts vorwegnehmen, was erst später im Lehrplan kommt.\n' : ''}- Jede Station: kurzer Einstieg, dann Erklärung, dann mindestens eine Übung (Aufgabe, Quiz, Lückentext oder Zuordnen).
-- Aufgaben mit eindeutiger Lösung bekommen eine „Antwort:“-Zeile, damit sie automatisch geprüft werden.
+${(info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')) ? `- Schreibe im Kopf die Zeile „Kopfzeile: ${info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')}“.\n` : ''}${info.lehrplan ? '- Bleib beim Lehrplanbezug: Inhalte, Fachbegriffe und Schwierigkeit passend zu dieser Jahrgangsstufe, nichts vorwegnehmen, was erst später im Lehrplan kommt.\n' : ''}${artRules}- Aufgaben mit eindeutiger Lösung bekommen eine „Antwort:“-Zeile, damit sie automatisch geprüft werden.
 - Tipps bauen aufeinander auf: zuerst ein kleiner Denkanstoß, zuletzt fast die Lösung.
 - Beim Quiz: 3–4 Antworten, genau eine oder mehrere mit [x], zu falschen Antworten eine kurze Rückmeldung.
 - Bilder und Animationen: Zeichne passende Abbildungen selbst als SVG – im Abschnitt ## Anhang am Ende als „name: <svg …> … </svg>“, oben mit anhang:name einbinden. SVG darf animiert sein (<animate>, <animateTransform>, <animateMotion> oder CSS-@keyframes in <style> innerhalb des SVG). Immer viewBox angeben, gut lesbare Schrift (font-family="sans-serif"), keine Skripte, keine externen Links, Schriften oder Bilder. Lieber wenige, aussagekräftige Grafiken (z. B. Schaubild, Ablauf, Beispiel-Tabelle) als Deko.

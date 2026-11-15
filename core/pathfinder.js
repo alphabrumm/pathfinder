@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-15a';
+const PF_BUILD = '2026-11-15b';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1453,7 +1453,10 @@ ${d.theme === 'grid' ? '' : `
     const lb = L.lernbereiche(info.fsel, jg).find(x => x.id === info.lb);
     const min = +info.min || 45;
     const ST = { 5: 'eine kurze Station', 10: '1–2 kurze Stationen', 20: '2 Stationen', 30: '3 Stationen', 45: 'etwa 4 Stationen', 60: 'etwa 5 Stationen', 90: '6–7 Stationen' };
+    const p1 = info.p1 ?? 40, p2 = info.p2 ?? 80;
     return {
+      art: info.art === 'challenge' ? 'challenge' : 'lernpfad',
+      mix: [p1, p2 - p1, 100 - p2],
       thema: (info.thema || '').trim() || (lb ? lb.t : ''),
       fach, klasse: jg ? `Gymnasium in Bayern, Jahrgangsstufe ${jg}` : '',
       kopf: [fach, jg ? jg + '. Klasse' : ''].filter(Boolean).join(' · '),
@@ -1482,6 +1485,12 @@ ${d.theme === 'grid' ? '' : `
       <div class="ed-form">
         <div class="ki-api" id="kiApi"></div>
         <div class="ki-step"><span class="n">1</span><b>Lernpfad beschreiben</b></div>
+        <label>Art des Lernpfades<select data-k="art">${opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad')}${opt('challenge', 'Challenge – Übungsaufgaben', info.art)}</select></label>
+        <div id="kiMix" hidden>
+          <label>Anteil der Aufgaben</label>
+          <div class="ex-tri"><div class="ex-bar" id="kiBar"></div><input type="range" id="kiP1" min="0" max="100" step="5" value="${info.p1 ?? 40}" aria-label="Grenze Grundlagen / Fortgeschritten"><input type="range" id="kiP2" min="0" max="100" step="5" value="${info.p2 ?? 80}" aria-label="Grenze Fortgeschritten / Experte"></div>
+          <div class="ex-lv" id="kiLv"></div>
+        </div>
         <div class="row"><label>Jahrgangsstufe<select data-k="jg">${opt('', '– wählen –', info.jg || '')}${[5, 6, 7, 8, 9, 10, 11, 12, 13].map(j => opt(j, j + '. Jahrgangsstufe', info.jg)).join('')}</select></label>
           <label>Fach<select data-k="fsel">${opt('', '– wählen –', info.fsel || '')}${L.FAECHER.map(f => opt(f, f, info.fsel)).join('')}${opt('*', 'anderes Fach …', info.fsel)}</select></label></div>
         <label id="kiFrei" hidden>Fach<input type="text" data-k="ffrei" value="${esc(info.ffrei || '')}" placeholder="z. B. Chemie"></label>
@@ -1528,6 +1537,13 @@ ${d.theme === 'grid' ? '' : `
         + lb.k.map(k => `<label class="chk"><input type="checkbox" data-kw="${esc(k)}"${info.inh.includes(k) ? ' checked' : ''}>${esc(k)}</label>`).join('');
     };
     drawLb();
+    const drawMix = () => {
+      const ch = info.art === 'challenge'; $('#kiMix', el).hidden = !ch; if (!ch) return;
+      const p1 = info.p1 ?? 40, p2 = info.p2 ?? 80;
+      $('#kiBar', el).style.background = `linear-gradient(90deg, #8fd19e 0 ${p1}%, #f6bf3a ${p1}% ${p2}%, #ef8a7a ${p2}% 100%)`;
+      $('#kiLv', el).innerHTML = `<span><i style="background:#8fd19e"></i>Grundlagen ${p1} %</span><span><i style="background:#f6bf3a"></i>Fortgeschritten ${p2 - p1} %</span><span><i style="background:#ef8a7a"></i>Experte ${100 - p2} %</span>`;
+    };
+    drawMix();
     const check = () => {
       const src = $('#kiIn', el).value;
       if (!src.trim()) { res.innerHTML = ''; openB.disabled = true; parsed = null; return; }
@@ -1568,7 +1584,13 @@ ${d.theme === 'grid' ? '' : `
         info[k] = t.value;
         if (k === 'jg' || k === 'fsel') { info.lb = ''; info.inh = []; drawLb(); }
         if (k === 'lb') { info.inh = []; drawInh(); }
+        if (k === 'art') drawMix();
         save();
+      }
+      if (t.id === 'kiP1' || t.id === 'kiP2') {
+        let p1 = +$('#kiP1', el).value, p2 = +$('#kiP2', el).value;
+        if (p1 > p2) { if (t.id === 'kiP1') p2 = p1; else p1 = p2; $('#kiP1', el).value = p1; $('#kiP2', el).value = p2; }
+        info.p1 = p1; info.p2 = p2; drawMix(); save();
       }
       if (t.dataset.kw != null) { info.inh = $$('[data-kw]', el).filter(x => x.checked).map(x => x.dataset.kw); const b = $('[data-inh]', el); const lb = L.lernbereiche(info.fsel, +info.jg || 0).find(x => x.id === info.lb); if (b && lb) b.textContent = info.inh.length === lb.k.length ? 'keine' : 'alle'; save(); }
       if (t.id === 'kiIn') check();
