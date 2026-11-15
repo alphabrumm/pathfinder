@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-15g';
+const PF_BUILD = '2026-11-15h';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1453,6 +1453,7 @@ ${d.theme === 'grid' ? '' : `
       ctx += `\n===== ${x.label} (${blkName(x.b)})\n${blockText(x.st, x.b)}\n`;
     }
     const big = /```(html|svg)/.test(ctx);
+    const codeOnly = items.every(x => x.b.type === 'html' || (x.b.type === 'image' && svgOf(x.b.src) != null));
     const system = `Du hilfst einer Lehrkraft, einen Lernpfad in PathFinder zu ändern. Du bekommst nur die betroffenen Bausteine, jeweils mit Kennung (B1, B2 …).
 
 ANTWORTE NUR MIT ÄNDERUNGEN, nichts Unverändertes wiederholen. Mögliche Anweisungen, jede auf einer eigenen Zeile:
@@ -1475,13 +1476,12 @@ REGELN
 - Bilder stehen als Verweise wie „anhang:bild1“: Verweise unverändert lassen.
 - Bausteine im PathFinder-Textformat beginnen mit ### (z. B. „### Quiz“) – außer normalem Text, Kästen [Merke] … und Bildern ![…](…).
 - Keine Erklärungen außerhalb von HINWEIS. Kein Codeblock um die ganze Antwort.
-
-${T2.formatHelp(env)}`;
+${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich ÄNDERE mit möglichst kurzen, eindeutigen Suchtexten. Niemals den ganzen Code wiederholen.' : '\n' + T2.formatHelp(env)}`;
     const prompt = `ÄNDERUNGSWUNSCH: ${wish}\n\n${ctx}`;
     aiDraft = wish; aiScopeV = scope; aiEl.dataset.busy = '1'; aiDraw();
     const box = $('#aiWait', aiEl), sink = document.createElement('textarea');
-    const ask = (p, title) => runDirect({ prompt: p, system, target: sink, box, maxTokens: big ? 24000 : 12000, what: 'die Änderung', title });
-    let usd = 0; const track = () => { const m = box.querySelector('.ki-done')?.textContent.match(/Kosten ca\. ([<\d,\s]+)\$/); if (m) usd += parseFloat(m[1].replace('<', '').replace(',', '.')) || 0; };
+    let usd = 0, tin = 0, tout = 0, calls = 0; const track = () => { };
+    const ask = (p, title) => runDirect({ prompt: p, system, target: sink, box, maxTokens: big ? 24000 : 12000, what: 'die Änderung', title, onDone: r => { calls++; usd += r.usd; const u = r.usage || {}; tin += (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0); tout += u.output_tokens || 0; } });
     let ans = await ask(prompt, 'Lernpfad wird umgebaut'); track();
     let res = ans != null ? aiPatch(ans, { byLabel, stLabel, att, T2, env }) : null;
     if (res && res.errors.length) {
@@ -1489,7 +1489,7 @@ ${T2.formatHelp(env)}`;
       res = ans != null ? aiPatch(ans, { byLabel, stLabel, att, T2, env }) : null;
     }
     delete aiEl.dataset.busy;
-    const cost = usd ? ` <span class="help">· ca. ${usd < 0.01 ? '< 0,01' : usd.toFixed(2).replace('.', ',')} $</span>` : '';
+    const cost = calls ? ` <span class="help">· ca. ${usd < 0.01 ? '< 0,01' : usd.toFixed(3).replace('.', ',')} $ · ${tin.toLocaleString('de-DE')} Token rein, ${tout.toLocaleString('de-DE')} raus${calls > 1 ? ` · ${calls} Aufrufe (mit Reparatur)` : ''}</span>` : '';
     if (!res) { aiLog.push({ c: 'bad', h: esc(box.textContent.trim() || 'Abgebrochen.') }); aiDraw(); return; }
     if (res.errors.length) { aiLog.push({ c: 'bad', h: `✗ Die Änderung ließ sich nicht übernehmen – nichts geändert.${cost}<br>${res.errors.slice(0, 3).map(esc).join('<br>')}` }); aiDraw(); return; }
     if (res.ops) { res.apply(); commit(); render(); drawPanel?.(); }
