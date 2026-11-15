@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-11b';
+const PF_BUILD = '2026-11-15a';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1259,6 +1259,71 @@ ${d.theme === 'grid' ? '' : `
     w.addEventListener('click', e => { if (e.target.closest('[data-ok]')) { w.remove(); document.getElementById('kiIn')?.focus(); } });
     document.body.appendChild(w); w.querySelector('[data-ok]').focus();
   }
+  /* ---------- KI direkt: eigener Claude-API-Key ---------- */
+  const loadApi = () => import(modUrl('pfapi.js'));
+  const loadLp = () => import(modUrl('pflehrplan.js'));
+  /** Statuszeile oben im KI-Dialog */
+  function apiBarHtml(A) {
+    const s = A.settings();
+    return s.key
+      ? `<span class="ki-api-on">⚡ Direkt mit Claude verbunden · ${esc(A.modelInfo(s.model).name)}</span><button class="lp-btn alt sm" data-api="set">⚙ API-Einstellungen</button>`
+      : `<span class="help">Mit einem eigenen Claude-API-Key erstellt PathFinder alles direkt – ohne Kopieren und Einfügen.</span><button class="lp-btn alt sm" data-api="set">⚡ API-Key hinterlegen</button>`;
+  }
+  /** Einstellungen für den API-Key (eigenes kleines Fenster) */
+  async function apiSettings(onDone) {
+    const A = await loadApi(), s = A.settings();
+    const w = document.createElement('div'); w.className = 'ki-pop-bd';
+    w.innerHTML = `<div class="ki-pop ki-api-pop ed-form" role="dialog" aria-modal="true">
+      <div class="ki-pop-ico">${KI_ICON}</div><b>Direkt mit Claude</b>
+      <p class="help">Du brauchst einen API-Key aus der <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">Claude Console</a> (eigenes Konto mit Guthaben, unabhängig vom Claude-Abo). Der Key wird nur an api.anthropic.com geschickt und nirgends sonst gespeichert als in diesem Browser.</p>
+      <label>API-Key<span class="ki-key"><input type="password" id="apKey" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" value="${esc(s.key)}"><button class="lp-btn alt sm" data-a="eye" title="Key zeigen">👁</button></span></label>
+      <label>Modell<select id="apModel">${A.MODELS.map(m => `<option value="${m.id}"${m.id === s.model ? ' selected' : ''}>${esc(m.name)} – ${m.note} (${String(m.in).replace('.', ',')} $ / ${String(m.out).replace('.', ',')} $ je Mio. Token)</option>`).join('')}</select></label>
+      <label class="chk"><input type="checkbox" id="apRem"${s.remember ? ' checked' : ''}>Key auf diesem Gerät merken (nicht auf geteilten Geräten)</label>
+      <div class="help">Ein Lernpfad kostet mit Sonnet grob 5–20 Cent, eine Prüfung ähnlich. Bisher über PathFinder ausgegeben: ca. ${A.usd(s.spent)}</div>
+      <div id="apMsg" class="ki-res"></div>
+      <div class="ki-btns" style="justify-content:center"><button class="lp-btn alt" data-a="test">Verbindung testen</button>${s.key ? '<button class="lp-btn alt" data-a="del">Key löschen</button>' : ''}<button class="lp-btn" data-a="ok">Speichern</button></div>
+    </div>`;
+    const val = () => ({ key: $('#apKey', w).value, model: $('#apModel', w).value, remember: $('#apRem', w).checked });
+    w.addEventListener('click', async e => {
+      if (e.target === w) { w.remove(); return; }
+      const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+      const msg = $('#apMsg', w);
+      if (a === 'eye') { const i = $('#apKey', w); i.type = i.type === 'password' ? 'text' : 'password'; }
+      if (a === 'test') {
+        const v = val(); if (!v.key.trim()) { msg.innerHTML = '<div class="bad">Bitte zuerst den Key eintragen.</div>'; return; }
+        msg.innerHTML = '<div class="help">Teste …</div>';
+        try { const r = await A.test(v.key.trim(), v.model); msg.innerHTML = `<div class="good">✓ Verbindung klappt (${esc(A.modelInfo(v.model).name)}).</div>`; } catch (er) { msg.innerHTML = `<div class="bad">✗ ${esc(er.message)}</div>`; }
+      }
+      if (a === 'del') { if (!confirm('API-Key aus diesem Browser löschen?')) return; A.forget(); w.remove(); toast('API-Key gelöscht'); onDone && onDone(); }
+      if (a === 'ok') { A.save(val()); w.remove(); toast(val().key.trim() ? '⚡ Claude ist eingerichtet' : 'Gespeichert'); onDone && onDone(); }
+    });
+    document.body.appendChild(w); $('#apKey', w).focus();
+  }
+  /**
+   * Anfrage an Claude mit Live-Anzeige: Text läuft in die Textbox target, Status in box.
+   * Ergebnis: Antworttext oder null (abgebrochen/Fehler)
+   */
+  let apiBusy = null;
+  async function runDirect({ prompt, target, box, maxTokens, onDone, what = 'den Lernpfad' }) {
+    const A = await loadApi();
+    if (!A.hasKey()) { apiSettings(); return null; }
+    if (apiBusy) { toast('Claude arbeitet noch …'); return null; }
+    const ac = new AbortController(); apiBusy = ac; const t0 = Date.now();
+    const s = A.settings();
+    box.innerHTML = `<div class="ki-live"><span class="ki-spin"></span><span id="liveTxt">Claude (${esc(A.modelInfo(s.model).name)}) schreibt ${what} …</span><button class="lp-btn alt sm" data-live="stop">Abbrechen</button></div>`;
+    box.querySelector('[data-live]').onclick = () => ac.abort();
+    const tick = n => { const l = box.querySelector('#liveTxt'); if (l) l.textContent = `Claude schreibt ${what} … ${n.toLocaleString('de-DE')} Zeichen · ${Math.round((Date.now() - t0) / 1000)} s`; };
+    try {
+      const r = await A.ask({ prompt, maxTokens, signal: ac.signal, onText: t => { target.value = t; tick(t.length); target.scrollTop = target.scrollHeight; } });
+      target.value = r.text;
+      box.innerHTML = `<div class="ki-done">✓ Fertig in ${Math.round((Date.now() - t0) / 1000)} s · Kosten ca. ${A.usd(r.usd)} (${(r.usage.input_tokens || 0).toLocaleString('de-DE')} Token rein, ${(r.usage.output_tokens || 0).toLocaleString('de-DE')} raus) · insgesamt bisher ca. ${A.usd(A.settings().spent)}</div>`
+        + (r.stop === 'max_tokens' ? '<div class="warn">Die Antwort wurde wegen ihrer Länge abgeschnitten – wähle einen kleineren Umfang oder lass sie korrigieren.</div>' : '');
+      onDone && onDone(r); return r.text;
+    } catch (e) {
+      box.innerHTML = e.name === 'AbortError' ? '<div class="warn">Abgebrochen.</div>' : `<div class="bad">✗ ${esc(e.message)}</div>`;
+      return null;
+    } finally { apiBusy = null; }
+  }
   /* ---------- Prüfung aus dem geladenen Lernpfad (Moodle-XML über eine fremde KI) ---------- */
   async function openExam() {
     const [T, X] = await Promise.all([loadText(), import(modUrl('pfexam.js'))]); const env = textEnv();
@@ -1268,10 +1333,12 @@ ${d.theme === 'grid' ? '' : `
     let ki = {}; try { ki = JSON.parse(LS.get(KI)) || {}; } catch (e) { }
     o = { count: 10, p1: 40, p2: 80, types: ['gapselect', 'ddwtos', 'multichoice', 'essay'], fach: ki.fach || '', klasse: ki.klasse || '', extra: '', ...o };
     const save = () => LS.set(KK, JSON.stringify(o));
-    let checked = null;
+    let checked = null, direct = false;
+    const A = await loadApi();
     const tasks = doc.stations.reduce((n, s) => n + s.blocks.filter(isCheck).length, 0);
     el.innerHTML = `<header><b>${KI_ICON} Prüfung aus Lernpfad</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
+        <div class="ki-api" id="kiApi"></div>
         <span class="help">Grundlage ist der geöffnete Lernpfad <b>„${esc(plain(doc.title) || 'ohne Titel')}“</b> (${doc.stations.length} Station${doc.stations.length === 1 ? '' : 'en'}, ${tasks} Aufgabe${tasks === 1 ? '' : 'n'}). Die KI erstellt daraus eine Fragensammlung für Moodle.</span>
         <div class="ki-step"><span class="n">1</span><b>Prüfung einstellen</b></div>
         <div class="row"><label>Fach<input type="text" data-o="fach" value="${esc(o.fach)}" placeholder="Informatik"></label><label>Zielgruppe<input type="text" data-o="klasse" value="${esc(o.klasse)}" placeholder="z. B. Gymnasium, 9. Klasse"></label><label>Anzahl Fragen<input type="number" data-o="count" min="1" max="60" value="${o.count}"></label></div>
@@ -1281,8 +1348,9 @@ ${d.theme === 'grid' ? '' : `
         <label>Aufgabenstile</label>
         <div class="ex-types">${X.TYPES.map(([k, n, h]) => `<label class="chk"><input type="checkbox" data-type="${k}"${o.types.includes(k) ? ' checked' : ''}>${n} <span class="help">– ${h}</span></label>`).join('')}</div>
         <label>Weitere Wünsche (optional)<textarea data-o="extra" rows="2" placeholder="z. B. Schwerpunkt auf Station 3, keine Fragen zur Geschichte">${esc(o.extra)}</textarea></label>
-        <div class="ki-btns"><button class="lp-btn" data-copy="exam">${KI_ICON} KI-Prompt generieren</button></div>
+        <div class="ki-btns"><button class="lp-btn" data-direct="exam" hidden>⚡ Direkt erstellen</button><button class="lp-btn" data-copy="exam">${KI_ICON} KI-Prompt generieren</button></div>
         <div class="ki-step"><span class="n">2</span><b>Antwort der KI hier einfügen</b></div>
+        <div id="kiLive" class="ki-res"></div>
         <textarea id="kiIn" rows="9" spellcheck="false" placeholder="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&lt;quiz&gt; …"></textarea>
         <div id="exRes" class="ki-res"></div>
         <div class="ki-btns"><button class="lp-btn alt" id="exPv" disabled>👁 Vorschau</button><button class="lp-btn" id="exDl" disabled>⇩ Moodle-XML herunterladen</button></div>
@@ -1295,11 +1363,17 @@ ${d.theme === 'grid' ? '' : `
       $('#exLv', el).innerHTML = `<span><i style="background:#8fd19e"></i>Basis ${o.p1} % · ${b} Frage${b === 1 ? '' : 'n'}</span><span><i style="background:#f6bf3a"></i>Mittel ${o.p2 - o.p1} % · ${m}</span><span><i style="background:#ef8a7a"></i>Anspruchsvoll ${100 - o.p2} % · ${a}</span>`;
     };
     lv();
+    const refreshApi = () => { direct = A.hasKey(); $('#kiApi', el).innerHTML = apiBarHtml(A); $$('[data-direct="exam"]', el).forEach(b => b.hidden = !direct); $('[data-copy="exam"]', el).classList.toggle('alt', direct); if (checked) check(); };
+    const direktXml = async (prompt, what) => {
+      const inp = $('#kiIn', el);
+      const t = await runDirect({ prompt, target: inp, box: $('#kiLive', el), maxTokens: 32000, what });
+      if (t != null) { inp.value = A.extractXml(t); check(); if (!checked?.errors.length) { const b = $('#exPrev', el); if (b.hidden) $('#exPv', el).click(); } }
+    };
     const check = () => {
       const r = X.checkXml($('#kiIn', el).value); checked = r; const out = $('#exRes', el);
       if (!r.xml) { out.innerHTML = ''; $('#exDl', el).disabled = true; $('#exPv', el).disabled = true; $('#exPrev', el).hidden = true; return; }
       const names = Object.fromEntries(X.TYPES), typ = Object.entries(r.byType).map(([k, n]) => `${n} × ${names[k] || k}`).join(', ');
-      out.innerHTML = (r.errors.length ? `<div class="bad">✗ ${r.errors.length} Problem${r.errors.length === 1 ? '' : 'e'} – bitte die KI um Korrektur bitten:</div><ul>${r.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : `<div class="good">✓ ${r.count} Fragen erkannt · Basis ${r.byLevel.B} · Mittel ${r.byLevel.M} · Anspruchsvoll ${r.byLevel.A}</div><div class="help">${esc(typ)}</div>`)
+      out.innerHTML = (r.errors.length ? `<div class="bad">✗ ${r.errors.length} Problem${r.errors.length === 1 ? '' : 'e'} – bitte die KI um Korrektur bitten:</div><ul>${r.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>${direct ? '<div class="ki-btns"><button class="lp-btn" data-direct="err">⚡ Von Claude beheben lassen</button></div>' : ''}` : `<div class="good">✓ ${r.count} Fragen erkannt · Basis ${r.byLevel.B} · Mittel ${r.byLevel.M} · Anspruchsvoll ${r.byLevel.A}</div><div class="help">${esc(typ)}</div>`)
         + (r.count && r.count !== o.count ? `<div class="warn">Bestellt waren ${o.count} Fragen, die KI hat ${r.count} geliefert.</div>` : '')
         + (r.warnings.length ? `<div class="warn">Hinweise:</div><ul>${r.warnings.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : '');
       $('#exDl', el).disabled = !!r.errors.length || !r.count; $('#exPv', el).disabled = !r.count;
@@ -1321,7 +1395,7 @@ ${d.theme === 'grid' ? '' : `
         return `${head}<div class="ex-q" data-qi="${q.i}"><div class="ex-qh"><b>${esc(q.name)}</b><span class="ex-tag">${esc(names[q.type] || q.type)}</span>${q.grade ? `<span class="ex-tag">${esc(q.grade)} P.</span>` : ''}<span class="sp"></span><button class="ex-del" data-del="${q.i}" title="Frage entfernen">🗑</button></div>
           <div class="ex-qt">${body}</div>${extra}${ans}${q.grader ? `<div class="ex-fb"><b>Erwartungshorizont:</b> ${clean(q.grader)}</div>` : ''}${q.feedback ? `<div class="ex-fb"><b>Rückmeldung:</b> ${clean(q.feedback)}</div>` : ''}
           <input type="text" class="ex-note" data-note="${esc(q.name)}" value="${esc(notes[q.name] || '')}" placeholder="Korrekturwunsch an die KI (optional)"></div>`;
-      }).join('') + `<div class="ki-btns"><button class="lp-btn" data-copy="fix">${KI_ICON} Korrektur-Prompt generieren</button><span class="help" style="align-self:center">für alle Fragen mit Korrekturwunsch – die Antwort der KI ersetzt oben die Datei</span></div>`;
+      }).join('') + `<div class="ki-btns">${direct ? '<button class="lp-btn" data-direct="fix">⚡ Korrekturen direkt umsetzen</button>' : ''}<button class="lp-btn${direct ? ' alt' : ''}" data-copy="fix">${KI_ICON} Korrektur-Prompt generieren</button><span class="help" style="align-self:center">für alle Fragen mit Korrekturwunsch – die Antwort der KI ersetzt oben die Datei</span></div>`;
     };
     el.addEventListener('input', e => {
       const t = e.target;
@@ -1338,6 +1412,18 @@ ${d.theme === 'grid' ? '' : `
     el.addEventListener('click', async e => {
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.x) { closeDlg(false); return; }
+      if (t.dataset.api) { apiSettings(refreshApi); return; }
+      if (t.dataset.direct === 'exam') {
+        if (!o.types.length) { toast('Bitte mindestens einen Aufgabenstil wählen'); return; }
+        direktXml(X.examPrompt({ ...o, title: plain(doc.title) || 'Lernpfad' }, T.docToText(doc, env)), 'die Fragen');
+      }
+      if (t.dataset.direct === 'err' && checked) direktXml(X.correctionPrompt(checked.xml, checked.errors.map(e => ['Problem', e])), 'die korrigierte Datei');
+      if (t.dataset.direct === 'fix' && checked) {
+        const list = Object.entries(notes).filter(([, v]) => v.trim());
+        if (!list.length) { toast('Trage zuerst bei mindestens einer Frage einen Korrekturwunsch ein'); return; }
+        for (const k in notes) delete notes[k];
+        direktXml(X.correctionPrompt(checked.xml, list), 'die überarbeiteten Fragen');
+      }
       if (t.id === 'exPv') { const b = $('#exPrev', el); b.hidden = !b.hidden; t.textContent = b.hidden ? '👁 Vorschau' : '👁 Vorschau schließen'; if (!b.hidden) { preview(); b.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }
       if (t.dataset.del != null) {
         const q = X.readQuestions(checked.xml).find(x => x.i === +t.dataset.del);
@@ -1357,23 +1443,57 @@ ${d.theme === 'grid' ? '' : `
       }
       if (t.id === 'exDl' && checked && !checked.errors.length) { download(new Blob([checked.xml], { type: 'application/xml' }), X.fileName(plain(doc.title))); toast('⇩ Moodle-XML gespeichert'); }
     });
+    refreshApi();
+  }
+
+  /** Angaben aus dem KI-Dialog → Beschreibung für den Prompt */
+  function kiPromptInfo(info, L) {
+    const fach = info.fsel === '*' ? (info.ffrei || '').trim() : (info.fsel || '');
+    const jg = info.jg ? +info.jg : 0;
+    const lb = L.lernbereiche(info.fsel, jg).find(x => x.id === info.lb);
+    const min = +info.min || 45;
+    const ST = { 5: 'eine kurze Station', 10: '1–2 kurze Stationen', 20: '2 Stationen', 30: '3 Stationen', 45: 'etwa 4 Stationen', 60: 'etwa 5 Stationen', 90: '6–7 Stationen' };
+    return {
+      thema: (info.thema || '').trim() || (lb ? lb.t : ''),
+      fach, klasse: jg ? `Gymnasium in Bayern, Jahrgangsstufe ${jg}` : '',
+      kopf: [fach, jg ? jg + '. Klasse' : ''].filter(Boolean).join(' · '),
+      umfang: `ca. ${min} Minuten Bearbeitungszeit für Schüler – ${ST[min] || 'passend viele Stationen'}`,
+      lehrplan: lb ? `${L.SOURCE}, ${fach} Jahrgangsstufe ${jg}, Lernbereich ${lb.nr !== '–' ? lb.nr + ' ' : ''}„${lb.t}“${lb.g ? ` (${lb.g})` : ''}` : '',
+      inhalte: lb ? (info.inh || []).filter(k => lb.k.includes(k)) : [],
+      alleInhalte: lb ? lb.k : [],
+      extra: info.extra || ''
+    };
   }
 
   async function openKI() {
-    const T = await loadText(); const env = textEnv();
+    const [T, L, A] = await Promise.all([loadText(), loadLp(), loadApi()]); const env = textEnv();
     const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
     const KK = (opts.storage || 'pathfinder') + '.ki';
     let info = {}; try { info = JSON.parse(LS.get(KK)) || {}; } catch (e) { }
+    // ältere Angaben (freie Felder) übernehmen
+    if (info.fsel == null && info.fach) { info.fsel = L.FAECHER.includes(info.fach.trim()) ? info.fach.trim() : '*'; info.ffrei = info.fach; }
+    if (info.jg == null && info.klasse) { const m = String(info.klasse).match(/\b(5|6|7|8|9|1[0-3])\b/); if (m) info.jg = m[1]; }
+    if (info.min == null) { const m = String(info.umfang || '').match(/(\d+)\s*min/i); info.min = m && L.UMFANG.includes(+m[1]) ? +m[1] : 45; }
+    if (!Array.isArray(info.inh)) info.inh = [];
+    const save = () => { const p = kiPromptInfo(info, L); info.fach = p.fach; info.klasse = info.jg ? info.jg + '. Klasse' : ''; LS.set(KK, JSON.stringify(info)); };
     let parsed = null, lastAtt = {}, fileAtt = {}, tok = 0;
-    el.innerHTML = `<header><b>${KI_ICON} Vorlage für KI</b><button class="ok" data-x="1">Schließen</button></header>
+    const opt = (v, t, sel) => `<option value="${esc(v)}"${String(sel) === String(v) ? ' selected' : ''}>${esc(t)}</option>`;
+    el.innerHTML = `<header><b>${KI_ICON} KI-Lernpfad</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
-        <div class="ki-step"><span class="n">1</span><b>Prompt für die KI</b></div>
-        <span class="help">Fülle die Felder aus und tippe auf „KI-Prompt generieren“. Den Prompt fügst du in eine KI deiner Wahl ein (z. B. die, die deine Schule erlaubt). Er beschreibt das Textformat – die KI muss PathFinder nicht kennen. Die KI liefert alles (auch Grafiken) in <b>einem</b> Textblock: einmal „Kopieren“ in der KI, unten einfügen, fertig.</span>
-        <label>Thema<input type="text" data-k="thema" value="${esc(info.thema || '')}" placeholder="z. B. Relative Zellbezüge in der Tabellenkalkulation"></label>
-        <div class="row"><label>Fach<input type="text" data-k="fach" value="${esc(info.fach || '')}" placeholder="Informatik"></label><label>Zielgruppe<input type="text" data-k="klasse" value="${esc(info.klasse || '')}" placeholder="z. B. Gymnasium, 9. Klasse"></label><label>Umfang<input type="text" data-k="umfang" value="${esc(info.umfang || '')}" placeholder="z. B. 4 Stationen, 45 min"></label></div>
-        <label>Präzise Beschreibung der gewünschten Inhalte<textarea data-k="extra" rows="3" placeholder="z. B. mit Alltagsbeispiel Pausenverkauf, eine Station als Challenge. Füge zwischen den Stationen wenigstens eine sinnvolle Animation für die Erklärung eines Aspekts ein.">${esc(info.extra || '')}</textarea></label>
-        <div class="ki-btns"><button class="lp-btn" data-copy="prompt">${KI_ICON} KI-Prompt generieren</button><button class="lp-btn alt" data-copy="doc" title="Den geöffneten Lernpfad als Text – z. B. um ihn von der KI überarbeiten zu lassen">📋 Aktuellen Lernpfad als Text</button><button class="lp-btn alt" data-copy="show">Format ansehen</button></div>
+        <div class="ki-api" id="kiApi"></div>
+        <div class="ki-step"><span class="n">1</span><b>Lernpfad beschreiben</b></div>
+        <div class="row"><label>Jahrgangsstufe<select data-k="jg">${opt('', '– wählen –', info.jg || '')}${[5, 6, 7, 8, 9, 10, 11, 12, 13].map(j => opt(j, j + '. Jahrgangsstufe', info.jg)).join('')}</select></label>
+          <label>Fach<select data-k="fsel">${opt('', '– wählen –', info.fsel || '')}${L.FAECHER.map(f => opt(f, f, info.fsel)).join('')}${opt('*', 'anderes Fach …', info.fsel)}</select></label></div>
+        <label id="kiFrei" hidden>Fach<input type="text" data-k="ffrei" value="${esc(info.ffrei || '')}" placeholder="z. B. Chemie"></label>
+        <label>Lernbereich im LehrplanPLUS<select data-k="lb" id="kiLb"></select></label>
+        <div id="kiLpHint" class="help"></div>
+        <div id="kiInh" class="ki-inh"></div>
+        <label>Thema <span class="help">(optional – sonst der Lernbereich)</span><input type="text" data-k="thema" value="${esc(info.thema || '')}" placeholder="z. B. Relative Zellbezüge in der Tabellenkalkulation"></label>
+        <label>Weitere Bemerkungen für die KI<textarea data-k="extra" rows="3" placeholder="z. B. mit Alltagsbeispiel Pausenverkauf, eine Station als Challenge, zwischen den Stationen eine Animation, die einen Aspekt erklärt">${esc(info.extra || '')}</textarea></label>
+        <div class="row"><label>Umfang<select data-k="min">${L.UMFANG.map(m => opt(m, m + ' Minuten', info.min)).join('')}</select></label><span></span></div>
+        <div class="ki-btns"><button class="lp-btn" data-direct="ki" hidden>⚡ Direkt erstellen</button><button class="lp-btn" data-copy="prompt">${KI_ICON} KI-Prompt generieren</button><button class="lp-btn alt" data-copy="doc" title="Den geöffneten Lernpfad als Text – z. B. um ihn von der KI überarbeiten zu lassen">📋 Aktuellen Lernpfad als Text</button><button class="lp-btn alt" data-copy="show">Format ansehen</button></div>
         <div class="ki-step"><span class="n">2</span><b>Antwort der KI hier einfügen</b></div>
+        <div id="kiLive" class="ki-res"></div>
         <textarea id="kiIn" rows="10" spellcheck="false" placeholder="# Titel des Lernpfads&#10;&#10;## Station: …"></textarea>
         <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Datei der KI laden<input type="file" id="kiFiles" multiple accept=".txt,.md,.svg,.png,.gif,.jpg,.jpeg,.webp,.zip" hidden></label><span class="help" style="align-self:center">statt Einfügen: lernpfad.txt – auch zusätzliche Bilder (.svg, .png, .gif, ZIP)</span></div>
         <div id="kiFileList" class="ki-res"></div>
@@ -1381,6 +1501,33 @@ ${d.theme === 'grid' ? '' : `
         <div class="ki-btns"><button class="lp-btn" id="kiOpen" disabled>＋ Als neuen Lernpfad öffnen</button></div>
       </div>`;
     const res = $('#kiRes', el), openB = $('#kiOpen', el);
+    let direct = false;
+    const refreshApi = () => { direct = A.hasKey(); $('#kiApi', el).innerHTML = apiBarHtml(A); $$('[data-direct="ki"]', el).forEach(b => b.hidden = !direct); $('[data-copy="prompt"]', el).classList.toggle('alt', direct); if (parsed) check(); };
+    // Lernbereiche und Inhalte passend zu Jahrgangsstufe und Fach
+    const drawLb = () => {
+      $('#kiFrei', el).hidden = info.fsel !== '*';
+      const sel = $('#kiLb', el), list = L.lernbereiche(info.fsel, +info.jg || 0), hint = $('#kiLpHint', el);
+      if (!info.jg || !info.fsel) { sel.innerHTML = opt('', '– zuerst Jahrgangsstufe und Fach wählen –', ''); sel.disabled = true; hint.textContent = ''; }
+      else if (!list.length) { sel.innerHTML = opt('', '– eigenes Thema (kein Lehrplan hinterlegt) –', ''); sel.disabled = true; hint.textContent = info.fsel === '*' ? 'Für andere Fächer gibt es noch keine Lehrplan-Auswahl – beschreibe das Thema unten.' : `Für ${info.fsel} in Jahrgangsstufe ${info.jg} gibt es am Gymnasium keinen eigenen Fachlehrplan.`; }
+      else {
+        sel.disabled = false;
+        if (!list.some(x => x.id === info.lb)) info.lb = '';
+        const groups = [...new Set(list.map(x => x.g))];
+        const o = x => opt(x.id, `${x.nr !== '–' ? 'LB ' + x.nr + ': ' : ''}${x.t}`, info.lb);
+        sel.innerHTML = opt('', '– Lernbereich wählen (oder eigenes Thema) –', info.lb)
+          + groups.map(g => g ? `<optgroup label="${esc(g)}">${list.filter(x => x.g === g).map(o).join('')}</optgroup>` : list.filter(x => !x.g).map(o).join('')).join('');
+        hint.innerHTML = `${esc(L.HINWEIS[info.fsel + '|' + info.jg] || '')} <a href="${esc(L.URL(info.fsel, info.jg))}" target="_blank" rel="noopener">Fachlehrplan öffnen ↗</a>`;
+      }
+      drawInh();
+    };
+    const drawInh = () => {
+      const box = $('#kiInh', el), lb = L.lernbereiche(info.fsel, +info.jg || 0).find(x => x.id === info.lb);
+      if (!lb) { box.innerHTML = ''; return; }
+      info.inh = info.inh.filter(k => lb.k.includes(k));
+      box.innerHTML = `<div class="ki-inh-h"><b>Inhalte für den Lernpfad</b><span class="help">nichts angekreuzt = ganzer Lernbereich</span><button class="lp-btn alt sm" data-inh="all">${info.inh.length === lb.k.length ? 'keine' : 'alle'}</button></div>`
+        + lb.k.map(k => `<label class="chk"><input type="checkbox" data-kw="${esc(k)}"${info.inh.includes(k) ? ' checked' : ''}>${esc(k)}</label>`).join('');
+    };
+    drawLb();
     const check = () => {
       const src = $('#kiIn', el).value;
       if (!src.trim()) { res.innerHTML = ''; openB.disabled = true; parsed = null; return; }
@@ -1390,7 +1537,7 @@ ${d.theme === 'grid' ? '' : `
       }
       parsed = T.parseText(src, { ...env, attachments: lastAtt, files: fileAtt });
       const { errors, warnings, stats } = parsed;
-      res.innerHTML = (errors.length ? `<div class="bad">✗ ${errors.length} Fehler – bitte korrigieren (oder die KI bitten, es zu korrigieren):</div><ul>${errors.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>` : `<div class="good">✓ Erkannt: „${esc(parsed.doc.title)}“ · ${stats.stations} Station${stats.stations === 1 ? '' : 'en'} · ${stats.blocks} Bausteine · ${stats.tasks} Aufgabe${stats.tasks === 1 ? '' : 'n'}${stats.images ? ` · ${stats.images} Bild${stats.images === 1 ? '' : 'er'}` : ''}</div>`)
+      res.innerHTML = (errors.length ? `<div class="bad">✗ ${errors.length} Fehler – bitte korrigieren (oder die KI bitten, es zu korrigieren):</div><ul>${errors.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>${direct ? '<div class="ki-btns"><button class="lp-btn" data-direct="fix">⚡ Von Claude beheben lassen</button></div>' : ''}` : `<div class="good">✓ Erkannt: „${esc(parsed.doc.title)}“ · ${stats.stations} Station${stats.stations === 1 ? '' : 'en'} · ${stats.blocks} Bausteine · ${stats.tasks} Aufgabe${stats.tasks === 1 ? '' : 'n'}${stats.images ? ` · ${stats.images} Bild${stats.images === 1 ? '' : 'er'}` : ''}</div>`)
         + (warnings.length ? `<div class="warn">Hinweise:</div><ul>${warnings.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>` : '');
       openB.disabled = !!errors.length;
       // Bilder wirklich laden – erfundenes Base64 fällt erst hier auf
@@ -1403,6 +1550,11 @@ ${d.theme === 'grid' ? '' : `
         res.insertAdjacentHTML('beforeend', `<div class="warn">${bad.length} Bild${bad.length === 1 ? ' lässt' : 'er lassen'} sich nicht anzeigen und ${bad.length === 1 ? 'wird' : 'werden'} weggelassen:</div><ul>${bad.map(x => `<li>Zeile ${x.n}</li>`).join('')}</ul>`);
       });
     };
+    const ready = () => {
+      const p = kiPromptInfo(info, L);
+      if (!p.thema && !p.extra.trim()) { toast('Bitte einen Lernbereich wählen oder ein Thema eintragen'); return null; }
+      return p;
+    };
     el.addEventListener('change', async e => {
       if (e.target.id !== 'kiFiles' || !e.target.files.length) return;
       const { att, notes, text } = await T.readFiles([...e.target.files]); Object.assign(fileAtt, att); e.target.value = '';
@@ -1410,21 +1562,48 @@ ${d.theme === 'grid' ? '' : `
       $('#kiFileList', el).innerHTML = `${Object.keys(fileAtt).length ? `<div class="good">${Object.keys(fileAtt).length} Bild${Object.keys(fileAtt).length === 1 ? '' : 'er'} aus Dateien</div>` : ''}<ul>${notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>`;
       check();
     });
-    el.addEventListener('input', e => {
-      const k = e.target.dataset.k; if (k) { info[k] = e.target.value; LS.set(KK, JSON.stringify(info)); }
-      if (e.target.id === 'kiIn') check();
-    });
+    const onInput = e => {
+      const t = e.target, k = t.dataset.k;
+      if (k) {
+        info[k] = t.value;
+        if (k === 'jg' || k === 'fsel') { info.lb = ''; info.inh = []; drawLb(); }
+        if (k === 'lb') { info.inh = []; drawInh(); }
+        save();
+      }
+      if (t.dataset.kw != null) { info.inh = $$('[data-kw]', el).filter(x => x.checked).map(x => x.dataset.kw); const b = $('[data-inh]', el); const lb = L.lernbereiche(info.fsel, +info.jg || 0).find(x => x.id === info.lb); if (b && lb) b.textContent = info.inh.length === lb.k.length ? 'keine' : 'alle'; save(); }
+      if (t.id === 'kiIn') check();
+    };
+    el.addEventListener('input', onInput);
+    el.addEventListener('change', e => { if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox') onInput(e); });
     el.addEventListener('click', async e => {
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.x) { closeDlg(false); return; }
-      if (t.dataset.copy === 'prompt') { if (await copyText(T.promptFor(info, env))) kiCopiedPopup(); else toast('Kopieren ging nicht'); }
+      if (t.dataset.api) { apiSettings(refreshApi); return; }
+      if (t.dataset.inh) { const lb = L.lernbereiche(info.fsel, +info.jg || 0).find(x => x.id === info.lb); if (!lb) return; info.inh = info.inh.length === lb.k.length ? [] : [...lb.k]; drawInh(); save(); return; }
+      if (t.dataset.copy === 'prompt') { const p = ready(); if (!p) return; if (await copyText(T.promptFor(p, env))) kiCopiedPopup(); else toast('Kopieren ging nicht'); }
+      if (t.dataset.direct === 'ki') {
+        const p = ready(); if (!p) return;
+        const inp = $('#kiIn', el); inp.value = ''; check();
+        const r = await runDirect({ prompt: T.promptFor(p, env), target: inp, box: $('#kiLive', el), maxTokens: 48000 });
+        if (r != null) { check(); res.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      }
+      if (t.dataset.direct === 'fix' && parsed) {
+        const inp = $('#kiIn', el), src = inp.value;
+        const prompt = 'Hier ist ein Lernpfad im unten beschriebenen Textformat. Beim Einlesen gab es diese Fehler:\n'
+          + parsed.errors.map(x => `- Zeile ${x.n}: ${x.m}`).join('\n')
+          + '\n\nKorrigiere genau diese Stellen und lass alles andere unverändert. Antworte nur mit dem vollständigen Lernpfad in einem Codeblock (vier Backticks, „text“).\n\n'
+          + T.formatHelp(env) + '\nLERNPFAD:\n' + src;
+        const r = await runDirect({ prompt, target: inp, box: $('#kiLive', el), maxTokens: 48000, what: 'die Korrektur' });
+        if (r == null) inp.value = src; check();
+      }
       if (t.dataset.copy === 'doc') { const o = {}; const txt = T.docToText(doc, env, o); lastAtt = Object.fromEntries(Object.entries(o.attachments).map(([k, v]) => [k.toLowerCase(), v])); }
       if (t.dataset.copy === 'doc') toast(await copyText('Überarbeite diesen Lernpfad. Behalte das Format genau bei und antworte nur mit dem vollständigen Lernpfad in einem Codeblock. Verweise wie anhang:bild1 ohne Eintrag im Anhang einfach stehen lassen.\n\n' + T.formatHelp(env) + '\nLERNPFAD:\n' + T.docToText(doc, env)) ? '📋 Lernpfad als Text kopiert (mit Formatbeschreibung)' : 'Kopieren ging nicht');
       if (t.dataset.copy === 'show') { const pre = document.createElement('pre'); pre.className = 'ki-fmt'; pre.textContent = T.formatHelp(env); t.closest('.ki-btns').after(pre); t.remove(); }
       if (t.id === 'kiOpen' && parsed && !parsed.errors.length) {
-        const d = parsed.doc; if (!plain(d.kicker || '').trim()) d.kicker = esc([info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')); closeDlg(false); openDoc(d); toast(`„${esc(d.title)}“ angelegt – jetzt kannst du alles im Editor anpassen.`);
+        const d = parsed.doc; if (!plain(d.kicker || '').trim()) d.kicker = esc(kiPromptInfo(info, L).kopf); closeDlg(false); openDoc(d); toast(`„${esc(d.title)}“ angelegt – jetzt kannst du alles im Editor anpassen.`);
       }
     });
+    refreshApi();
   }
 
   /* ---------- Zertifikat: Daten, Vorschau, PDF ---------- */
