@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-15h';
+const PF_BUILD = '2026-11-15i';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -260,7 +260,7 @@ export function startPathFinder(opts = {}) {
     if (!doc) doc = migrate(sample());
   }
   let mode = PLAYER ? 'preview' : 'edit', selId = null, curSid = null, single = false, fz = 1;
-  let aiEl = null, aiLog = [], aiDraft = '', aiScopeV = null; // KI-Assistent (schwebendes Fenster)
+  let aiEl = null, aiLog = [], aiDraft = '', aiSt = '', aiBk = ''; // KI-Assistent (schwebendes Fenster): gewählte Station ('*' = alles) und Baustein ('*' = ganze Station)
   let hist = [JSON.stringify(doc)], fut = [], pending = null;
   const freshProg = () => ({ solved: {}, quiz: {}, tips: {}, sol: {}, visited: {}, tries: {}, start: Date.now(), active: 0 });
   let prog = freshProg();
@@ -1340,7 +1340,7 @@ ${d.theme === 'grid' ? '' : `
     if (!on) { aiEl?.remove(); aiEl = null; return; }
     if (!aiEl) {
       aiEl = document.createElement('div'); aiEl.className = 'ai-float'; document.body.appendChild(aiEl);
-      aiEl.addEventListener('click', aiClick);
+      aiEl.addEventListener('click', aiClick); aiEl.addEventListener('change', aiChange);
       aiDrag();
     }
     aiDraw();
@@ -1350,33 +1350,37 @@ ${d.theme === 'grid' ? '' : `
     aiEl.classList.toggle('docked', docked);
     if (docked) { aiEl.style.left = aiEl.style.top = ''; aiEl.innerHTML = `<button class="ai-tab" data-ai="undock" title="KI-Assistent öffnen">${KI_ICON}<span>KI</span></button>`; return; }
     if (st.x != null) { aiEl.style.left = Math.max(4, Math.min(innerWidth - 120, st.x)) + 'px'; aiEl.style.top = Math.max(4, Math.min(innerHeight - 80, st.y)) + 'px'; aiEl.style.right = aiEl.style.bottom = 'auto'; }
-    const busy = !!aiEl.dataset.busy, keep = $('#aiIn', aiEl)?.value ?? aiDraft, scope = $('#aiScope', aiEl)?.value ?? aiScopeV ?? (selId ? 'b:' + selId : curSid || doc.stations[0]?.id || '');
-    aiEl.innerHTML = `<div class="ai-head" data-drag="1">${KI_ICON}<b>KI-Assistent</b><button data-ai="dock" title="Links andocken (minimieren)">⇤</button></div>
+    const busy = !!aiEl.dataset.busy;
+    if (!busy && $('#aiIn', aiEl)) aiDraft = $('#aiIn', aiEl).value;
+    const ready = aiSt === '*' || (aiSt && aiBk);
+    aiEl.innerHTML = `<div class="ai-head" data-drag="1">${KI_ICON}<b>KI-Assistent</b><button data-ai="set" title="API-Einstellungen">⚙</button><button data-ai="dock" title="Links andocken (minimieren)">⇤</button></div>
       <div class="ai-body">
         ${busy ? `<div id="aiWait"></div>` : `
-        <label class="ai-l">Was soll ich ändern?<select id="aiScope">${aiOpts(scope)}</select></label>
-        <textarea id="aiIn" rows="3" placeholder="Tipp: Baustein im Lernpfad antippen – dann geht nur er an Claude. Z. B. „Die Kraftpfeile sollen im Gleichgewicht gleich lang sein.“">${esc(keep)}</textarea>
-        <div class="ai-btns"><button class="lp-btn sm" data-ai="go">⚡ Ändern</button>${hist.length > 1 ? '<button class="lp-btn alt sm" data-ai="undo" title="Letzte Änderung zurücknehmen">↶ Rückgängig</button>' : ''}<button class="lp-btn alt sm" data-ai="set" title="API-Einstellungen">⚙</button></div>`}
+        <label class="ai-l">Welche Station soll ich ändern?<select id="aiSt">${aiStOpts()}</select></label>
+        ${aiSt && aiSt !== '*' ? `<label class="ai-l">Welchen Baustein soll ich ändern?<select id="aiBk">${aiBkOpts()}</select></label>` : ''}
+        ${ready ? `<textarea id="aiIn" rows="3" placeholder="Was soll sich ändern? Z. B. „Die Kraftpfeile sollen im Gleichgewicht gleich lang sein.“">${esc(aiDraft)}</textarea>
+        <div class="ai-btns"><button class="lp-btn sm" data-ai="go">⚡ Ändern</button>${hist.length > 1 ? '<button class="lp-btn alt sm" data-ai="undo" title="Letzte Änderung zurücknehmen">↶ Rückgängig</button>' : ''}</div>` : `<div class="help">Tipp: Tippst du im Lernpfad einen Baustein an, wird er hier ausgewählt.</div>`}`}
         <div class="ai-log">${aiLog.slice(-4).map(x => `<div class="${x.c}">${x.h}</div>`).join('')}</div>
       </div>`;
   }
-  const aiOpts = scope => {
-    const r = selId ? findBlock(selId) : null;
-    if (scope?.startsWith('b:') && (!r || scope !== 'b:' + r.b.id)) scope = r ? 'b:' + r.b.id : '';
-    return (r ? `<option value="b:${r.b.id}"${scope === 'b:' + r.b.id ? ' selected' : ''}>nur im ausgewählten Baustein: ${esc(blkName(r.b))}</option>` : '')
-      + doc.stations.map((s, i) => `<option value="${s.id}"${s.id === scope ? ' selected' : ''}>nur in Station ${i + 1}: ${esc(plain(s.title).slice(0, 40))}</option>`).join('')
-      + `<option value=""${scope === '' ? ' selected' : ''}>im ganzen Lernpfad</option>`;
-  };
-  /** Stationsliste und Rückgängig-Knopf im Fenster aktuell halten (nach Änderungen am Lernpfad) */
+  const opt2 = (v, t, cur) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${t}</option>`;
+  const aiStOpts = () => opt2('', '–', aiSt) + opt2('*', 'Ganzer Lernpfad (teuer!)', aiSt)
+    + doc.stations.map((st, i) => opt2(st.id, `Station ${i + 1}: ${esc(plain(st.title).slice(0, 40))}`, aiSt)).join('');
+  const blkLabel = b => { const t = plain(b.type === 'quiz' ? b.qs?.[0]?.q || '' : b.type === 'match' || b.type === 'task' || b.type === 'gap' && b.title ? b.title || '' : b.html || b.caption || b.summary || '').replace(/\s+/g, ' ').trim(); return blkName(b) + (t && !blkName(b).includes(t.slice(0, 10)) ? ': ' + t.slice(0, 34) + (t.length > 34 ? '…' : '') : ''); };
+  const aiBkOpts = () => { const st = doc.stations.find(x => x.id === aiSt); return opt2('', '–', aiBk) + opt2('*', 'Ganze Station', aiBk) + (st ? st.blocks.filter(b => b.type !== 'lock').map((b, i) => opt2(b.id, `${i + 1}. ${esc(blkLabel(b))}`, aiBk)).join('') : ''); };
+  /** Auswahl prüfen und Fenster auffrischen (nach Änderungen am Lernpfad) */
   function aiSync() {
     if (!aiEl || aiEl.dataset.busy) return;
-    const sel = $('#aiScope', aiEl); if (sel && document.activeElement !== sel) { const v = sel.value; sel.innerHTML = aiOpts(v.startsWith('b:') || doc.stations.some(s => s.id === v) ? v : (curSid || '')); }
-    const u = $('[data-ai="undo"]', aiEl); if (!u && hist.length > 1 && $('.ai-btns', aiEl)) aiDraw();
+    if (aiSt && aiSt !== '*' && !doc.stations.some(x => x.id === aiSt)) { aiSt = ''; aiBk = ''; }
+    if (aiBk && aiBk !== '*' && !findBlock(aiBk)) aiBk = '';
+    if (aiEl.contains(document.activeElement) && document.activeElement.tagName !== 'BUTTON') return;
+    aiDraw();
   }
-  /** Wird im Lernpfad ein Baustein gewählt, bezieht sich das Fenster darauf */
+  /** Wird im Lernpfad ein Baustein angetippt, wählt das Fenster Station und Baustein dazu aus */
   function aiPick() {
-    if (!aiEl || aiEl.dataset.busy) return; const sel = $('#aiScope', aiEl); if (!sel) return;
-    sel.innerHTML = aiOpts(selId ? 'b:' + selId : (sel.value.startsWith('b:') ? (curSid || '') : sel.value));
+    if (!aiEl || aiEl.dataset.busy || !selId) return; const r = findBlock(selId); if (!r || r.b.type === 'lock') return;
+    if (aiSt === r.st.id && aiBk === r.b.id) return;
+    aiSt = r.st.id; aiBk = r.b.id; aiDraw();
   }
   function aiDrag() {
     let sx, sy, ox, oy, moving = false;
@@ -1390,6 +1394,10 @@ ${d.theme === 'grid' ? '' : `
     });
     const end = () => { if (!moving) return; moving = false; const r = aiEl.getBoundingClientRect(); if (r.left < 30) { aiSave({ docked: true }); aiDraw(); } else aiSave({ x: r.left, y: r.top }); };
     aiEl.addEventListener('pointerup', end); aiEl.addEventListener('pointercancel', end);
+  }
+  function aiChange(e) {
+    if (e.target.id === 'aiSt') { aiSt = e.target.value; aiBk = ''; aiDraw(); }
+    if (e.target.id === 'aiBk') { aiBk = e.target.value; aiDraw(); $('#aiIn', aiEl)?.focus(); }
   }
   function aiClick(e) {
     const a = e.target.closest('[data-ai]')?.dataset.ai; if (!a) return;
@@ -1417,7 +1425,8 @@ ${d.theme === 'grid' ? '' : `
     const wish = $('#aiIn', aiEl).value.trim(); if (!wish) { toast('Schreib zuerst, was geändert werden soll'); return; }
     if (doc.skin) { toast('Lernpfade im Originaldesign kann der KI-Assistent nicht ändern'); return; }
     if (pending) commit();
-    const scope = $('#aiScope', aiEl).value;
+    if (!(aiSt === '*' || (aiSt && aiBk))) return;
+    const scope = aiSt === '*' ? '' : aiBk === '*' ? aiSt : 'b:' + aiBk;
     const [T2, A] = await Promise.all([loadText(), loadApi()]); const env = textEnv();
     // Bereich bestimmen: ein Baustein (b:ID), eine Station (ID) oder alles ('')
     let items = []; // { label, st, b }
@@ -1478,7 +1487,7 @@ REGELN
 - Keine Erklärungen außerhalb von HINWEIS. Kein Codeblock um die ganze Antwort.
 ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich ÄNDERE mit möglichst kurzen, eindeutigen Suchtexten. Niemals den ganzen Code wiederholen.' : '\n' + T2.formatHelp(env)}`;
     const prompt = `ÄNDERUNGSWUNSCH: ${wish}\n\n${ctx}`;
-    aiDraft = wish; aiScopeV = scope; aiEl.dataset.busy = '1'; aiDraw();
+    aiDraft = wish; aiEl.dataset.busy = '1'; aiDraw();
     const box = $('#aiWait', aiEl), sink = document.createElement('textarea');
     let usd = 0, tin = 0, tout = 0, calls = 0; const track = () => { };
     const ask = (p, title) => runDirect({ prompt: p, system, target: sink, box, maxTokens: big ? 24000 : 12000, what: 'die Änderung', title, onDone: r => { calls++; usd += r.usd; const u = r.usage || {}; tin += (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0); tout += u.output_tokens || 0; } });
@@ -1494,7 +1503,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     if (res.errors.length) { aiLog.push({ c: 'bad', h: `✗ Die Änderung ließ sich nicht übernehmen – nichts geändert.${cost}<br>${res.errors.slice(0, 3).map(esc).join('<br>')}` }); aiDraw(); return; }
     if (res.ops) { res.apply(); commit(); render(); drawPanel?.(); }
     aiLog.push({ c: res.ops ? 'good' : 'help', h: `${res.ops ? '✓' : 'ℹ'} ${esc(wish.length > 60 ? wish.slice(0, 57) + '…' : wish)}${cost}${res.notes.length ? '<br>' + res.notes.map(esc).join('<br>') : ''}` });
-    aiDraft = res.ops ? '' : wish; aiDraw(); if (res.ops) { $('#aiIn', aiEl).value = ''; toast('✨ Änderung übernommen – „Rückgängig“ nimmt sie zurück'); }
+    aiDraft = res.ops ? '' : wish; aiDraw(); if (res.ops) { toast('✨ Änderung übernommen – „Rückgängig“ nimmt sie zurück'); }
   }
   /** Antwort mit Änderungsanweisungen prüfen; liefert { errors, notes, ops, apply } */
   function aiPatch(ans, { byLabel, stLabel, att, T2, env }) {
