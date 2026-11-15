@@ -233,7 +233,15 @@ export function parseText(src, env) {
   const uid = env.uid;
   const station = (n) => { if (!st) { H.warn(n, 'Inhalt vor der ersten Station – eine Station „Start“ wurde angelegt.'); st = { id: uid(), title: 'Start', sub: '', check: false, blocks: [] }; doc.stations.push(st); } return st; };
   const push = (b, n) => { b.id = b.id || uid(); if (pendAnim && (b.type === 'text' || b.type === 'info')) b.anim = pendAnim; pendAnim = ''; station(n).blocks.push(b); };
-  const flushPara = () => { if (!para.length) return; const n = para[0][1]; const L = para.map(x => x[0]); para = []; if (L.join('').trim()) push({ type: 'text', html: mdToHtml(L) }, n); };
+  const flushPara = () => {
+    if (!para.length) return; const n = para[0][1]; const L = para.map(x => x[0]); para = [];
+    if (!L.join('').trim()) return;
+    // Lücken oder Abschnitts-Angaben im normalen Text: Der Abschnitt wurde vorzeitig beendet (z. B. durch ein Bild)
+    if (/\[\[[^\]]+\]\]/.test(L.join('\n'))) H.err(n, 'Lücken [[…]] stehen im normalen Text statt in einem Lückentext. Vermutlich hat ein Bild oder Infokasten den Abschnitt „### Lückentext“ vorzeitig beendet – Bilder gehören vor oder hinter den Abschnitt.');
+    else { const k = para0Key(L); if (k) H.err(n, `„${k}:“ steht im normalen Text statt in einem Abschnitt. Vermutlich hat ein Bild oder Infokasten den Abschnitt davor vorzeitig beendet.`); }
+    push({ type: 'text', html: mdToHtml(L) }, n);
+  };
+  const para0Key = L => { for (const l of L) { const m = l.trim().match(/^(Wortbank|Extra|Antwort|Tipp|Lösung|Loesung|XP)\s*(\((?:verborgen|versteckt)\))?:/i); if (m) return m[1]; } return ''; };
   const closeSec = () => {
     if (!sec) return; const S = sec; sec = null;
     const def = SECS[S.kind]; const keys = new Set(def.keys || []);
@@ -508,6 +516,8 @@ ${(info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boole
 - Bilder und Animationen: Zeichne passende Abbildungen selbst als SVG – im Abschnitt ## Anhang am Ende als „name: <svg …> … </svg>“, oben mit anhang:name einbinden. SVG darf animiert sein (<animate>, <animateTransform>, <animateMotion> oder CSS-@keyframes in <style> innerhalb des SVG). Immer viewBox angeben, gut lesbare Schrift (font-family="sans-serif"), keine Skripte, keine externen Links, Schriften oder Bilder. Lieber wenige, aussagekräftige Grafiken (z. B. Schaubild, Ablauf, Beispiel-Tabelle) als Deko.
 - Rasterbilder (PNG, GIF, JPG) nur als data:image/…;base64,…, und nur wenn du die Datei wirklich erzeugt hast (z. B. mit einem Code-Werkzeug) – niemals Base64 ausdenken. Sonst ein Bild-Platzhalter: ![Beschreibung]()
 - Keine Bilder aus dem Internet.
+- Innerhalb eines ###-Abschnitts (Aufgabe, Quiz, Lückentext, Zuordnen …) keine Bild-Zeilen und keine Infokästen: Sie beenden den Abschnitt. Bilder und Kästen gehören davor oder dahinter (bei Aufgaben stattdessen „Bild: anhang:name“).
+- Im Lückentext ist JEDE [[Lücke]] eine Antwort, die Schüler einsetzen müssen – Arbeitsanweisungen ohne Lücken als normalen Text vor den Abschnitt schreiben.
 
 ${formatHelp(env)}`;
 }
