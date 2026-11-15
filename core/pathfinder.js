@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-15k';
+const PF_BUILD = '2026-11-15l';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -50,6 +50,15 @@ export const PALETTES = [
   { n: 'Aquarell', fx: 'aquarell', l: { bg: '#fbfaf7', surface: '#fff', 'surface-2': '#f1f4f6', ink: '#2b2e3a', 'ink-2': '#6b6f7e', line: '#e3e6ea', a1: '#2f6f96', a1s: '#cfe3f0', a2: '#c23f51', a2s: '#f6d0d5', a3: '#edae49', a3d: '#c88a1f', a3s: '#fbebcc', a3ink: '#2e2000', g1: '#e3eef5', g2: '#f8e3e6', g3: '#fbf0dc', heroink: '#2b2e3a' }, d: { bg: '#1a1c22', surface: '#23262e', 'surface-2': '#2b2f38', ink: '#eef0f4', 'ink-2': '#b0b5c2', line: '#363a45', a1: '#7fb8dc', a1s: '#1f3a4d', a2: '#ee8a98', a2s: '#4a2229', a3: '#f2c069', a3d: '#e0a43c', a3s: '#3d3018', a3ink: '#2e2000', g1: '#203445', g2: '#40262e', g3: '#3f3420', heroink: '#f4f5f8' } },
   { n: 'Weihnachten', fx: 'winter', l: { bg: '#fbf8f3', surface: '#fff', 'surface-2': '#f5eee6', ink: '#2b1d1d', 'ink-2': '#6e5a55', line: '#ecdcd2', a1: '#b3202f', a1s: '#f6c9cd', a2: '#1f6b45', a2s: '#c4e6d2', a3: '#e2b54a', a3d: '#b8891c', a3s: '#f8edcf', a3ink: '#2b1f00', g1: '#173f2f', g2: '#22604a', g3: '#a61d2c', heroink: '#ffffff' }, d: { bg: '#10161a', surface: '#18212a', 'surface-2': '#1f2a35', ink: '#f1f5f8', 'ink-2': '#a9b6c2', line: '#2b3846', a1: '#ff7a85', a1s: '#4a1b20', a2: '#6fd39c', a2s: '#173a2a', a3: '#f2cd6b', a3d: '#e3b341', a3s: '#3b3218', a3ink: '#2b1f00', g1: '#0b2433', g2: '#103a4d', g3: '#5a1520', heroink: '#ffffff' } },
 ];
+/* Symbole für die Paletten mit eigenem Kopf-Effekt und für „Hack“ (statt der drei Farbstreifen) */
+const PAL_ICONS = {
+  comic: '<svg viewBox="0 0 32 32"><path d="M16 1l3 7 7-4-2 8 8 2-7 4 4 7-8-2-2 8-4-7-5 5v-8l-8-1 6-5-5-6 8 1z" fill="#ffd400" stroke="#111" stroke-width="1.6" stroke-linejoin="round"/><text x="16" y="19.5" font-family="Arial Black,Impact,sans-serif" font-size="8.5" font-weight="900" text-anchor="middle" fill="#e4002b">POW</text></svg>',
+  bauplan: '<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="4" fill="#1f5fae"/><path d="M0 8h32M0 16h32M0 24h32M8 0v32M16 0v32M24 0v32" stroke="#fff" stroke-opacity=".25"/><circle cx="16" cy="17" r="9" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M16 3v6M16 3l-4 22M16 3l4 22" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><circle cx="16" cy="4" r="1.8" fill="#ffd166"/></svg>',
+  synth: '<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="4" fill="#2a0f4f"/><defs><linearGradient id="pfsun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe259"/><stop offset="1" stop-color="#ff4f9a"/></linearGradient></defs><path d="M7 17a9 9 0 0 1 18 0z" fill="url(#pfsun)"/><path d="M7.4 13.6h17.2M7.1 15.4h17.8" stroke="#2a0f4f" stroke-width="1"/><path d="M0 19h32M0 22h32M0 26h32M16 19v13M11 19l-6 13M21 19l6 13M6 19 -4 32M26 19l10 13" stroke="#ff5adc" stroke-width="1"/></svg>',
+  aquarell: '<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="4" fill="#fbfaf7"/><circle cx="10" cy="11" r="7" fill="#2f6f96" opacity=".45"/><circle cx="20" cy="9" r="6" fill="#c23f51" opacity=".4"/><circle cx="15" cy="20" r="7" fill="#edae49" opacity=".5"/><path d="M27 4 17 22" stroke="#7a5230" stroke-width="2.4" stroke-linecap="round"/><path d="M17 22c-2 1-3 4-5 5 3 0 6-1 7-3z" fill="#2b2e3a"/></svg>',
+  winter: '<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="4" fill="#e9f3fb"/><path d="M6 15c3-9 14-12 21-7l-3 3c-4-2-8-2-11 1z" fill="#c8102e"/><circle cx="26" cy="9" r="2.6" fill="#fff" stroke="#ccc" stroke-width=".6"/><rect x="5" y="14" width="22" height="4" rx="2" fill="#fff" stroke="#ddd" stroke-width=".6"/><circle cx="16" cy="21" r="6" fill="#f6c8a8"/><path d="M8 21c0 7 4 10 8 10s8-3 8-10c-2 2-4 3-8 3s-6-1-8-3z" fill="#fff" stroke="#ddd" stroke-width=".6"/><circle cx="13.5" cy="20" r="1" fill="#333"/><circle cx="18.5" cy="20" r="1" fill="#333"/><circle cx="16" cy="22.6" r="1.4" fill="#e8737a"/></svg>',
+  hack: '<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="4" fill="#050b06"/><g font-family="monospace" font-size="6" font-weight="700" fill="#5fe08a"><text x="3" y="7">1</text><text x="3" y="14" opacity=".7">0</text><text x="3" y="21" opacity=".4">ア</text><text x="11" y="11" opacity=".5">ﾊ</text><text x="11" y="18">1</text><text x="11" y="25" opacity=".7">0</text><text x="19" y="6" opacity=".4">0</text><text x="19" y="13" opacity=".8">ｼ</text><text x="19" y="20">1</text><text x="19" y="27" opacity=".5">1</text><text x="26" y="9">0</text><text x="26" y="16" opacity=".6">1</text><text x="26" y="30" opacity=".9">ﾂ</text></g></svg>'
+};
 /* Stil „Hack“ (intern 'grid'; wie die FlowPad-Challenges des Informatik-9-Kurses): immer dunkel, Raster-Kopf mit grün
    leuchtendem Pixel-Totenkopf (Standard-Kopfbild), Aufgabenkarten mit farbiger Kante und Pixel-Schild „#1 · FORMEL“.
    Ersetzt Farbpalette und Hell/Dunkel. */
@@ -1159,11 +1168,9 @@ export function startPathFinder(opts = {}) {
         <label class="chk"><input type="checkbox" id="ptsIn"${doc.pointsOn ? ' checked' : ''}>Punkte für Aufgaben vergeben</label><span class="help">Die Punkte stehen links neben jeder Aufgabe, lassen sich dort anpassen und zählen im SCORM-Lernpaket.</span>
         </fieldset>
         <fieldset><legend>Aussehen</legend>
-        <label>Stil</label>${seg('theme', [['standard', 'Standard'], ['grid', '▦ Hack']], d.theme === 'grid' ? 'grid' : 'standard')}
-        <span class="help">${d.theme === 'grid' ? '„Hack“: immer dunkel, Raster-Kopf mit grünem Pixel-Totenkopf (eigenes Bild unter Kopf möglich), Aufgaben mit farbiger Kante und Schild (#1 · FORMEL). Farbpalette und Hell/Dunkel entfallen.' : 'Standard: Farben aus der Farbpalette, hell oder dunkel.'}</span>
-${d.theme === 'grid' ? '' : `
+        <label>Farbpalette <span class="help">${d.theme === 'grid' ? 'Hack · immer dunkel' : esc(PALETTES[d.pal].n) + ' · ' + (scheme() === 'dunkel' ? 'dunkler' : 'heller') + ' Modus'}</span></label><div class="ed-sw">${PALETTES.map((p, i) => { const c = scheme() === 'dunkel' ? p.d || p.l : p.l, on = d.theme !== 'grid' && i === d.pal; return PAL_ICONS[p.fx] ? `<button class="ic" data-pal="${i}" title="${esc(p.n)}" aria-pressed="${on}">${PAL_ICONS[p.fx]}</button>` : `<button data-pal="${i}" title="${esc(p.n)}" aria-pressed="${on}" style="background:${c.bg}"><span style="background:${c.a1}"></span><span style="background:${c.a2}"></span><span style="background:${c.a3}"></span></button>`; }).join('')}<button class="ic" data-hack="1" title="Hack (immer dunkel)" aria-pressed="${d.theme === 'grid'}">${PAL_ICONS.hack}</button></div>
+${d.theme === 'grid' ? `<span class="help">„Hack“: immer dunkel, Raster-Kopf mit grünem Pixel-Totenkopf (eigenes Bild unter Kopf möglich), Aufgaben mit farbiger Kante und Schild (#1 · FORMEL).</span>` : `
         <label>Vorschau</label>${seg('preview', [['hell', '☀ Hell'], ['dunkel', '☾ Dunkel']], scheme())}
-        <label>Farbpalette <span class="help">${esc(PALETTES[d.pal].n)} · ${scheme() === 'dunkel' ? 'dunkler' : 'heller'} Modus</span></label><div class="ed-sw">${PALETTES.map((p, i) => { const c = scheme() === 'dunkel' ? p.d || p.l : p.l; return `<button data-pal="${i}" title="${esc(p.n)}" aria-pressed="${i === d.pal}" style="background:${c.bg}"><span style="background:${c.a1}"></span><span style="background:${c.a2}"></span><span style="background:${c.a3}"></span></button>`; }).join('')}</div>
         <label>Für Schüler</label>${seg('scheme', [['auto', 'wie das Gerät'], ['hell', 'immer hell'], ['dunkel', 'immer dunkel']], d.scheme || 'auto')}
         <span class="help">„wie das Gerät“: Der Lernpfad erscheint hell oder dunkel, je nachdem, wie das iPad eingestellt ist. Prüfe mit der Vorschau beide Modi – vor allem Bilder und Grafiken.</span>`}
         <label>Schrift</label>${seg('font', Object.entries(FONTS).map(([k, f]) => [k, f.n]), d.font)}
@@ -1186,7 +1193,8 @@ ${d.theme === 'grid' ? '' : `
     el.addEventListener('click', e => {
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.x) { closeDlg(true); return; }
-      if (t.dataset.pal) doc.design.pal = +t.dataset.pal;
+      if (t.dataset.pal) { doc.design.pal = +t.dataset.pal; doc.design.theme = 'standard'; }
+      if (t.dataset.hack) doc.design.theme = 'grid';
       if (t.dataset.pat) doc.design.pattern = t.dataset.pat;
       if (t.dataset.divpal) delete doc.design.divColor;
       if (t.dataset.gadd) doc.goals.push('');
