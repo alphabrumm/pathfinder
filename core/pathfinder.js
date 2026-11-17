@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-15l';
+const PF_BUILD = '2026-11-17a';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -95,9 +95,10 @@ const CORE = {
   quiz: { n: 'Quiz', ic: '?', g: 'Aufgaben', h: 'eine oder mehrere Fragen mit Rückmeldung', make: () => ({ qs: [{ q: '', opts: [{ t: '', ok: true, fb: '' }, { t: '', ok: false, fb: '' }, { t: '', ok: false, fb: '' }] }], xp: 10 }) },
   gap: { n: 'Lückentext', ic: '▭', g: 'Aufgaben', h: 'Lücken als [[Antwort]], auch mit Begriffen zum Ziehen', make: () => ({ html: 'Das Wort in der Lücke ist [[richtig]].', bank: false, extra: [], heft: false, title: '', sub: '', xp: 10 }) },
   match: { n: 'Zuordnen', ic: '⇄', g: 'Aufgaben', h: 'Paare per Drag & Drop', make: () => ({ title: 'Ordne zu', pairs: [{ a: '', b: '' }, { a: '', b: '' }], xp: 10 }) },
+  essay: { n: 'Freitext', ic: '✍', g: 'Aufgaben', h: 'offene Antwort mit Erwartungshorizont – nur in Prüfungen', exam: true, make: () => ({ title: '', html: '', img: '', lines: 6, rubric: [], pts: 4 }) },
   lock: { n: 'Sperre', ic: '🔒', g: 'Ablauf', h: 'Ab hier erst frei, wenn … gelöst', make: () => ({ after: '' }) },
 };
-const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match']);
+const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match', 'essay']);
 
 
 
@@ -146,7 +147,12 @@ function textW(t, size, bold) { const c = measureCtx(); c.font = `${bold ? 'bold
 function fitText(t, size, bold, w) { t = String(t); if (textW(t, size, bold) <= w) return t; while (t.length > 1 && textW(t + '…', size, bold) > w) t = t.slice(0, -1); return t.trim() + '…'; }
 function wrapText(t, size, bold, w) { const out = []; let line = ''; for (const word of String(t).split(/\s+/)) { const tr = line ? line + ' ' + word : word; if (textW(tr, size, bold) > w && line) { out.push(line); line = word; } else line = tr; } if (line) out.push(line); return out; }
 class Pdf {
-  constructor() { this.ops = []; this.img = null; }
+  constructor() { this.pages = [[]]; this.cur = 0; this.img = null; }
+  get ops() { return this.pages[this.cur]; }
+  /** neue Seite anfangen (alle folgenden Zeichenbefehle landen dort) */
+  addPage() { this.pages.push([]); this.cur = this.pages.length - 1; return this; }
+  /** auf eine vorhandene Seite zurückspringen, z. B. für Fußzeilen „Seite 1 von 3“ */
+  page(i) { this.cur = i; return this; }
   color(hex, stroke) { this.ops.push(`${rgb(hex)} ${stroke ? 'RG' : 'rg'}`); return this; }
   rect(x, y, w, h, fill, stroke, lw = 1) { if (fill) this.color(fill); if (stroke) { this.color(stroke, true); this.ops.push(`${lw} w`); } this.ops.push(`${x} ${842 - y - h} ${w} ${h} re ${fill && stroke ? 'B' : fill ? 'f' : 'S'}`); return this; }
   line(x1, y1, x2, y2, col, lw = 1) { this.color(col, true); this.ops.push(`${lw} w ${x1} ${842 - y1} m ${x2} ${842 - y2} l S`); return this; }
@@ -157,14 +163,17 @@ class Pdf {
   }
   image(jpeg, x, y, w, h) { this.img = jpeg; this.ops.push(`q ${w} 0 0 ${h} ${x} ${842 - y - h} cm /Im1 Do Q`); return this; }
   bytes() {
-    const objs = [];
+    // 1 Katalog, 2 Seitenbaum, 3/4 Schriften, 5 Bild (falls vorhanden), danach je Seite: Seite + Inhalt
+    const base = this.img ? 6 : 5, N = this.pages.length, objs = [];
     objs.push('<< /Type /Catalog /Pages 2 0 R >>');
-    objs.push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
-    objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >>${this.img ? ' /XObject << /Im1 7 0 R >>' : ''} >> /Contents 6 0 R >>`);
+    objs.push(`<< /Type /Pages /Kids [${this.pages.map((_, i) => `${base + 2 * i} 0 R`).join(' ')}] /Count ${N} >>`);
     objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
     objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
-    const cs = this.ops.join('\n'); objs.push(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`);
     if (this.img) objs.push(`<< /Type /XObject /Subtype /Image /Width ${this.img.w} /Height ${this.img.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${this.img.data.length} >>\nstream\n${this.img.data}\nendstream`);
+    this.pages.forEach((ops, i) => {
+      objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>${this.img ? ' /XObject << /Im1 5 0 R >>' : ''} >> /Contents ${base + 2 * i + 1} 0 R >>`);
+      const cs = ops.join('\n'); objs.push(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`);
+    });
     let out = '%PDF-1.4\n%\xe2\xe3\xcf\xd3\n'; const off = [];
     objs.forEach((o, i) => { off.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
     const xref = out.length;
@@ -237,15 +246,26 @@ export function startPathFinder(opts = {}) {
   const isCheck = b => CORE_CHECK.has(b.type) || !!def(b)?.check?.(b);
 
   /* ---------- Beispiel und Umwandlung ---------- */
-  const emptyDoc = (form = 'lernpfad') => ({
-    v: 2, id: uid(), form, design: { pal: 0, font: 'pixel', shape: 'eckig', hero: 'logo', heroImg: '' },
-    kicker: '', title: '', subtitle: '', goals: [], rank: '', anim: {}, typeLines: [],
-    stations: [{ id: uid(), title: '', sub: '', check: false, blocks: [{ id: uid(), type: 'text', html: '' }] }],
-    cert: { on: true, need: 'immer', pct: 80, text: 'hat den Lernpfad mit folgendem Ergebnis bearbeitet:', show: { zeit: true, tipps: true, quiz: true, xp: true } },
-  });
+  const emptyDoc = (form = 'lernpfad') => {
+    const d = {
+      v: 2, id: uid(), form, design: { pal: 0, font: 'pixel', shape: 'eckig', hero: 'logo', heroImg: '' },
+      kicker: '', title: '', subtitle: '', goals: [], rank: '', anim: {}, typeLines: [],
+      stations: [{ id: uid(), title: '', sub: '', check: false, blocks: [{ id: uid(), type: 'text', html: '' }] }],
+      cert: { on: true, need: 'immer', pct: 80, text: 'hat den Lernpfad mit folgendem Ergebnis bearbeitet:', show: { zeit: true, tipps: true, quiz: true, xp: true } },
+    };
+    if (form === 'pruefung') { d.pointsOn = true; d.cert.on = false; d.design.font = 'schlicht'; d.design.shape = 'rund'; }
+    return d;
+  };
+  /* Digitale Prüfung: Punkte immer an, keine Rückmeldung für Schüler; EXAM() = Schüler beantworten gerade eine Prüfung */
+  const EXAMF = () => doc?.form === 'pruefung';
+  const EXAM = () => EXAMF() && !E();
+  const EXAM_DONE = () => EXAMF() && !!doc.exam?.submitted; // nach der Abgabe: Antworten nur noch ansehen
+  // stabile Schlüssel für Antwortoptionen und Zuordnungskarten: Antworten bleiben gültig, auch wenn gemischt wird
+  const keyOf = () => uid() + uid().slice(0, 3);
   function migrate(d) {
     d.goals = d.goals || []; d.rank = d.rank || ''; d.id = d.id || uid(); d.anim = d.anim || {}; d.typeLines = d.typeLines || [];
     d.cert = d.cert || emptyDoc().cert;
+    if (d.form === 'pruefung') d.pointsOn = true;
     if (d.design) delete d.design.bgColor; // eigene Hintergrundfarbe gibt es nicht mehr – jede Palette hat einen hellen und einen dunklen Modus
     // frühere Standard-Kopfzeile („PathFinder · Lernpfad“, „JPad · Challenge“ …) ist Werbung – weg damit
     if (/^\s*(PathFinder|JPad|\w+Pad)\s*·\s*(Lernpfad|Challenge)\s*$/i.test(d.kicker || '')) d.kicker = '';
@@ -255,6 +275,9 @@ export function startPathFinder(opts = {}) {
         for (const p of plugins) p.migrate?.(b);
         if (b.type === 'quiz' && !b.qs) { b.qs = [{ q: b.q || '', opts: (b.opts || []).map(o => ({ fb: '', ...o })) }]; delete b.q; delete b.opts; delete b.multi; }
         if (b.type === 'gap') b.extra = b.extra || [];
+        if (b.type === 'quiz') for (const q of b.qs || []) for (const o of q.opts || []) o.k = o.k || keyOf();
+        if (b.type === 'match') for (const p of b.pairs || []) { p.ka = p.ka || keyOf(); p.kb = p.kb || keyOf(); }
+        if (b.type === 'essay') { b.rubric = b.rubric || []; b.lines = b.lines || 6; }
       }
     }
     return d;
@@ -276,7 +299,7 @@ export function startPathFinder(opts = {}) {
   let mode = PLAYER ? 'preview' : 'edit', selId = null, curSid = null, single = false, fz = 1;
   let aiEl = null, aiLog = [], aiDraft = '', aiSt = '', aiBk = ''; // KI-Assistent (schwebendes Fenster): gewählte Station ('*' = alles) und Baustein ('*' = ganze Station)
   let hist = [JSON.stringify(doc)], fut = [], pending = null;
-  const freshProg = () => ({ solved: {}, quiz: {}, tips: {}, sol: {}, visited: {}, tries: {}, start: Date.now(), active: 0 });
+  const freshProg = () => ({ solved: {}, quiz: {}, tips: {}, sol: {}, visited: {}, tries: {}, ans: {}, start: Date.now(), active: 0 });
   let prog = freshProg();
   /* Aktive Bearbeitungszeit: zählt nur, solange die Seite sichtbar ist und in den letzten 2 Minuten benutzt wurde */
   let lastUse = Date.now();
@@ -289,10 +312,11 @@ export function startPathFinder(opts = {}) {
     let saved = null;
     try { saved = JSON.parse((scorm && scorm.get('cmi.suspend_data')) || LS.get(PROGKEY) || 'null'); } catch (e) { }
     if (saved) prog = { ...freshProg(), ...saved };
+    if (opts.answers) prog.ans = clone(opts.answers); // Prüfung: Antworten kommen von der Plattform (z. B. nach dem Neuladen)
   }
   function progSave() {
     if (!PLAYER) return;
-    const keep = { solved: prog.solved, tips: prog.tips, sol: prog.sol, visited: prog.visited, start: prog.start, active: prog.active, sent: prog.sent, quiz: prog.quiz };
+    const keep = { solved: prog.solved, tips: prog.tips, sol: prog.sol, visited: prog.visited, start: prog.start, active: prog.active, sent: prog.sent, quiz: prog.quiz, ...(EXAMF() ? { ans: prog.ans } : {}) };
     let txt = JSON.stringify(keep);
     if (txt.length > 4000) { delete keep.quiz; txt = JSON.stringify(keep); } // SCORM 1.2 erlaubt höchstens 4096 Zeichen
     LS.set(PROGKEY, txt);
@@ -418,6 +442,7 @@ export function startPathFinder(opts = {}) {
     if (lp.classList.contains('pf-skin')) { lp.classList.remove('pf-skin'); $('#pf-skin-css')?.remove(); }
     applyDesign();
     lp.classList.toggle('editing', E());
+    lp.classList.toggle('exam-done', EXAM_DONE() && !E());
     lp.classList.toggle('single-station', single);
     if (!curSid || !doc.stations.some(s => s.id === curSid)) curSid = doc.stations[0]?.id;
     const d = doc.design, lines = doc.typeLines || [];
@@ -428,12 +453,12 @@ export function startPathFinder(opts = {}) {
     const goals = doc.goals || [];
     h += `<header class="lp-hero${d.hero === 'hintergrund' && d.heroImg ? ' has-bg' : ''}${d.hero === 'gross' && d.heroImg ? ' big' : ''}"${d.hero === 'hintergrund' && d.heroImg ? ` style="background-image:url(${d.heroImg})"` : ''}>`
       + (d.hero !== 'hintergrund' ? `<div class="lp-logo${d.hero === 'logo' && opts.logo && !hackImg ? ' applogo' : ''}${(d.hero !== 'logo' && d.heroImg) || hackImg ? ' own' : ''}"${E() ? ' title="Antippen: eigenes Bild oder GIF setzen"' : ''}>${logo}</div>` : '')
-      + `<div class="lp-herotxt" style="min-width:0">${ce('$kicker', doc.kicker, 'Kopfzeile, z. B. Fach · Jahrgangsstufe', { tag: 'small' })}${ce('$title', doc.title, 'Titel des Lernpfads', { tag: 'h1', anim: doc.anim?.title })}${ce('$subtitle', doc.subtitle, 'Untertitel', { tag: 'p', rich: true, anim: doc.anim?.subtitle })}`
+      + `<div class="lp-herotxt" style="min-width:0">${ce('$kicker', doc.kicker, 'Kopfzeile, z. B. Fach · Jahrgangsstufe', { tag: 'small' })}${ce('$title', doc.title, EXAMF() ? 'Titel der Prüfung' : 'Titel des Lernpfads', { tag: 'h1', anim: doc.anim?.title })}${ce('$subtitle', doc.subtitle, 'Untertitel', { tag: 'p', rich: true, anim: doc.anim?.subtitle })}`
       + (goals.length ? `<ul class="lp-goals">${goals.map((g, i) => ce('$goals.' + i, g, 'Lernziel', { tag: 'li', rich: true })).join('')}</ul>` : '')
       + (doc.rank ? `<div class="lp-rank">${ce('$rank', doc.rank, 'Rang', { tag: 'span', rich: true })}</div>` : '')
       + (E() && (!goals.length || !doc.rank) ? `<div class="ed-hint" style="display:inline-block">Lernziele und Rang: ⚙ Einstellungen → Kopf</div>` : '')
       + `</div></header><div class="lp-divider" aria-hidden="true"></div>`;
-    h += `<nav class="lp-trail"><div class="lp-trail-in"><div class="lp-stops" id="stops">${doc.stations.map((s, i) => `<a data-sid="${s.id}" class="${stationDone(s) ? 'done' : ''}${s.id === curSid ? ' cur' : ''}" title="${esc(s.title)}">${stationDone(s) ? '✓' : esc(s.nr || i + 1)}</a>`).join('')}${doc.cert.on ? '<a data-sid="cert" title="Abschluss">🏁</a>' : ''}</div><span class="lp-count">${doc.stations.filter(stationDone).length} / ${doc.stations.length}</span></div></nav>`;
+    h += `<nav class="lp-trail"><div class="lp-trail-in"><div class="lp-stops" id="stops">${doc.stations.map((s, i) => `<a data-sid="${s.id}" class="${stationDone(s) ? 'done' : ''}${s.id === curSid ? ' cur' : ''}" title="${esc(s.title)}">${stationDone(s) ? '✓' : esc(s.nr || i + 1)}</a>`).join('')}${doc.cert.on || EXAMF() ? `<a data-sid="cert" title="${EXAMF() ? 'Abgabe' : 'Abschluss'}">🏁</a>` : ''}</div><span class="lp-count">${doc.stations.filter(stationDone).length} / ${doc.stations.length}</span></div></nav>`;
     gridNo = null; if (d.theme === 'grid') { gridNo = new Map(); let n = 0; for (const st of doc.stations) for (const b of st.blocks) if (isCheck(b)) gridNo.set(b.id, ++n); }
     h += `<main class="lp-main">`;
     if (doc.form === 'challenge') { const x = xpNow(), mx = xpMax() || 1; h += `<div class="lp-hud"><span>⚡ ${x} XP</span><span class="bar"><i style="width:${Math.round(100 * x / mx)}%"></i></span><span>von ${mx}</span></div>`; }
@@ -444,6 +469,7 @@ export function startPathFinder(opts = {}) {
       let open = false;
       s.blocks.forEach((b, i) => {
         if (E()) h += plus(s.id, i);
+        if (b.type === 'lock' && EXAMF()) { if (E()) h += blockHtml(b); return; } // Sperren gibt es in Prüfungen nicht
         if (b.type === 'lock' && !E()) {
           if (open) h += '</div></div>';
           const ref = findBlock(b.after), isLocked = !!ref && isCheck(ref.b) && !prog.solved[b.after];
@@ -454,12 +480,13 @@ export function startPathFinder(opts = {}) {
       });
       if (open) h += '</div></div>';
       if (E()) h += plus(s.id, s.blocks.length);
-      if (s.check) { const ok = !!prog.solved['st:' + s.id]; h += `<label class="lp-done${ok ? ' ok' : ''}"><input type="checkbox" data-sdone="${s.id}"${ok ? ' checked' : ''}${E() ? ' disabled' : ''}> Station erledigt</label>`; }
+      if (s.check && !EXAMF()) { const ok = !!prog.solved['st:' + s.id]; h += `<label class="lp-done${ok ? ' ok' : ''}"><input type="checkbox" data-sdone="${s.id}"${ok ? ' checked' : ''}${E() ? ' disabled' : ''}> Station erledigt</label>`; }
       h += `</section>`;
     });
     if (E()) h += `<button class="ed-add-station" data-act="addStation">＋ Neue Station</button>`;
-    if (doc.cert.on || E()) h += certHtml();
-    h += `</main><footer class="lp-foot">${doc.form === 'challenge' ? 'Challenge' : 'Lernpfad'} · läuft komplett im Browser${scorm?.ok ? ' · Fortschritt wird in der Lernplattform gespeichert' : ''}</footer>`;
+    if (EXAMF()) h += examFootHtml();
+    else if (doc.cert.on || E()) h += certHtml();
+    h += `</main><footer class="lp-foot">${doc.form === 'challenge' ? 'Challenge' : EXAMF() ? 'Digitale Prüfung' : 'Lernpfad'} · läuft komplett im Browser${scorm?.ok ? ' · Fortschritt wird in der Lernplattform gespeichert' : ''}</footer>`;
     lp.innerHTML = h;
     runAnims();
     if (PLAYER) progSave();
@@ -565,7 +592,7 @@ export function startPathFinder(opts = {}) {
   function gridTag(b) {
     let t = def(b)?.tag?.(b) || null;
     if (b.tag) t = { ...(t || {}), l: b.tag, k: GRID_KINDS[String(b.tag).toLowerCase()] || t?.k || 'quiz', ...(b.where ? { where: b.where } : {}) };
-    if (!t) t = b.type === 'quiz' ? { k: 'quiz', l: 'Quiz' } : b.type === 'gap' ? { k: 'fill', l: 'Lückentext' } : b.type === 'match' ? { k: 'quiz', l: 'Zuordnen' } : { k: 'quiz', l: 'Aufgabe' };
+    if (!t) t = b.type === 'quiz' ? { k: 'quiz', l: 'Quiz' } : b.type === 'gap' ? { k: 'fill', l: 'Lückentext' } : b.type === 'match' ? { k: 'quiz', l: 'Zuordnen' } : b.type === 'essay' ? { k: 'lesen', l: 'Freitext' } : { k: 'quiz', l: 'Aufgabe' };
     return t;
   }
   const wrap = (b, inner, cls = '') => {
@@ -594,6 +621,10 @@ export function startPathFinder(opts = {}) {
   }
 
   function blockHtml(b) {
+    if (EXAM() && CORE_CHECK.has(b.type)) return examBlockHtml(b);
+    if (b.type === 'essay') return wrap(b, essayEdit(b));
+    if (b.type === 'task' && EXAMF() && E() && !b.answer) return wrap(b, taskCard(b, { hint: 'In der Prüfung: <b>freie Antwort</b>, die du bewertest. Für automatische Bewertung ⚙ → Ergebnis eintragen.' }));
+    if (b.type === 'task' && EXAMF() && E()) return wrap(b, taskCard(b, { buttons: `<span class="lp-answer"><input disabled placeholder="${esc(b.answerPh || 'Ergebnis')}"></span>`, hint: `Wird automatisch bewertet. Richtig ist: <b>${esc(b.answer.split('|').join(' oder '))}</b>` }));
     const ok = !!prog.solved[b.id], t = def(b);
     switch (b.type) {
       case 'text': return wrap(b, ce('html', b.html, 'Text schreiben … ( / für Bausteine)', { rich: true, cls: 'lp-text', anim: b.anim, key: b.id }));
@@ -669,6 +700,89 @@ export function startPathFinder(opts = {}) {
     const app = b.app || (b.type.startsWith('fp') || ['sheet', 'action', 'legend'].includes(b.type) ? 'FlowPad' : 'eine App');
     return wrap(b, `<div class="lp-missing"><span class="app">braucht ${esc(typeof app === 'string' ? app : 'eine App')}</span>${b.title ? `<div><b>${esc(plain(b.title))}</b></div>` : ''}${b.html ? `<div>${b.html}</div>` : ''}${b.label ? `<div>${esc(b.label)}</div>` : ''}</div>`);
   }
+  /* ---------- Digitale Prüfung: Antworten erfassen, ohne zu prüfen ---------- */
+  function essayEdit(b) {
+    const R = b.rubric || [];
+    return `<div class="lp-card lp-task lp-essay"><div class="hd">${ce('title', b.title, 'Freitext', { tag: 'b', cls: 'lp-ctitle' })}</div>${imgHtml(b.img, '', 'klein')}${ce('html', b.html, 'Aufgabenstellung …', { rich: true })}`
+      + `<textarea class="lp-essay-in" rows="${Math.max(2, +b.lines || 6)}" disabled placeholder="Hier schreiben die Schüler ihre Antwort."></textarea>`
+      + (E() ? `<div class="ed-hint">${R.length ? `Erwartungshorizont (nur für dich): ${R.map(r => `${esc(r.t || '…')} (${+r.p || 0} P.)`).join(' · ')}` : 'Erwartungshorizont mit Teilpunkten über ⚙'}</div>` : '') + '</div>';
+  }
+  const ansOf = id => { const a = prog.ans || (prog.ans = {}); return a[id] && typeof a[id] === 'object' ? a[id] : (a[id] = {}); };
+  const gapCount = b => (String(b.html || '').match(/\[\[(.+?)\]\]/g) || []).length;
+  /** Begriffe der Wortbank: in der Schülerfassung vorgegeben, sonst aus den Lücken und Ablenkern */
+  const bankWords = b => b.words || shuffled([...String(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].map(m => m[1].split('|')[0]).concat(b.extra || []), b.id);
+  /** Zuordnen: linke Karten (gemischt) und rechte Felder; in der Schülerfassung schon vorgegeben */
+  function matchSides(b) {
+    if (b.left && b.right) return { L: b.left, R: b.right };
+    for (const p of b.pairs || []) { p.ka = p.ka || keyOf(); p.kb = p.kb || keyOf(); }
+    return { L: shuffled((b.pairs || []).map(p => ({ k: p.ka, t: p.a })), b.id), R: (b.pairs || []).map(p => ({ k: p.kb, t: p.b })) };
+  }
+  /** Ist die Aufgabe vollständig beantwortet? (nur für die Anzeige „beantwortet“) */
+  function answered(b) {
+    const a = prog.ans?.[b.id];
+    if (b.type === 'quiz') return !!a && (b.qs || []).every((q, qi) => a[qi] != null);
+    if (b.type === 'gap') { const n = gapCount(b); return !!a && n > 0 && Array.from({ length: n }, (_, i) => String(a[i] ?? '').trim()).every(Boolean); }
+    if (b.type === 'match') return !!a && matchSides(b).R.every(r => a[r.k] != null);
+    return typeof a === 'string' && a.trim() !== '';
+  }
+  const examState = b => `<span class="lp-state" data-xstate>${answered(b) ? '✓ beantwortet' : ''}</span>`;
+  function examBlockHtml(b) {
+    const NOCORR = 'autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"' + (EXAM_DONE() ? ' disabled' : '');
+    const A = prog.ans || (prog.ans = {}), a = A[b.id];
+    if (b.type === 'quiz') {
+      let h = `<div class="lp-card lp-quiz lp-exam"><div class="hd"><b class="lp-ctitle">${b.qs.length > 1 ? `Quiz · ${b.qs.length} Fragen` : 'Quiz'}</b>${examState(b)}</div>`;
+      b.qs.forEach((q, qi) => {
+        for (const o of q.opts) o.k = o.k || keyOf();
+        h += `<div class="qq">${b.qs.length > 1 ? `<span class="qn">${qi + 1}</span>` : ''}<div class="qt">${q.q}</div>`;
+        // Schülerfassung ist schon gemischt; im Editor (Vorschau) wie im Lernpfad mischen
+        const order = doc.exam?.student ? q.opts.map((_, i) => i) : shuffled(q.opts.map((_, i) => i), b.id + '.' + qi + QUIZ_SALT);
+        order.forEach(i => { const o = q.opts[i], on = a?.[qi] === o.k; h += `<button class="opt${on ? ' sel' : ''}" data-opt="${qi}.${i}" aria-pressed="${on}">${o.t}</button>`; });
+        h += '</div>';
+      });
+      return wrap(b, h + '</div>');
+    }
+    if (b.type === 'gap') {
+      const head = b.heft ? `<div class="heft-title">${esc(b.title)}</div><div class="heft-sub">${esc(b.sub)}</div>` : `<b class="lp-ctitle">Lückentext</b>`;
+      let n = 0;
+      if (b.bank) {
+        const words = bankWords(b), used = Object.values(a || {}), seen = {};
+        const html = String(b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const i = n++, v = a?.[i]; return `<span class="gapslot${v != null ? ' filled' : ''}" data-gslot="${i}" role="button" tabindex="0">${v != null ? esc(v) : ''}</span>`; });
+        return wrap(b, `<div class="lp-card lp-gap lp-exam${b.heft ? ' heft' : ''}">${head}<div>${html}</div><div class="bank"><span class="bl">Begriffe · ziehen oder erst Begriff, dann Lücke antippen · Lücke antippen zum Leeren</span>${words.map(w => { const k = seen[w] = (seen[w] || 0) + 1; return `<span class="gchip${used.filter(x => x === w).length >= k ? ' used' : ''}" data-gchip="${esc(w)}">${esc(w)}</span>`; }).join('')}</div>${examState(b)}</div>`);
+      }
+      const html = String(b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const i = n++; return `<input data-xgap="${i}" value="${esc(a?.[i] ?? '')}" ${NOCORR} aria-label="Lücke ${i + 1}">`; });
+      return wrap(b, `<div class="lp-card lp-gap lp-exam${b.heft ? ' heft' : ''}">${head}<div>${html}</div>${examState(b)}</div>`);
+    }
+    if (b.type === 'match') {
+      const { L, R } = matchSides(b), placed = new Set(Object.values(a || {}));
+      return wrap(b, `<div class="lp-card lp-match lp-exam"><b class="lp-ctitle">${esc(b.title)}</b><div class="grid">`
+        + R.map((r, i) => { const l = L[i], got = L.find(x => x.k === a?.[r.k]); return `<div class="chip${l && placed.has(l.k) ? ' used' : ''}" data-chip="${i}">${esc(l?.t ?? '')}</div><div class="slot${got ? ' filled' : ''}" data-slot="${i}"><span>${esc(r.t)}</span>${got ? `<span class="got">${esc(got.t)}</span>` : ''}</div>`; }).join('')
+        + `</div><div class="lp-state" style="margin-top:6px" data-xstate>${answered(b) ? '✓ beantwortet' : 'Karte antippen, dann das Passende – oder ziehen. Feld antippen zum Leeren.'}</div></div>`);
+    }
+    // Aufgabe mit Ergebnis: kurze Antwort; ohne Ergebnis und Freitext: freie Antwort
+    const short = b.type === 'task' && (b.answer || b.short), v = typeof a === 'string' ? a : '';
+    const field = short ? `<span class="lp-answer"><input data-xans value="${esc(v)}" placeholder="${esc(b.answerPh || 'Ergebnis')}" ${NOCORR}></span>`
+      : `<textarea class="lp-essay-in" data-xans rows="${Math.max(2, +b.lines || 6)}" placeholder="Deine Antwort …" ${NOCORR}>${esc(v)}</textarea>`;
+    return wrap(b, `<div class="lp-card lp-task lp-exam"><div class="hd"><b class="lp-ctitle">${esc(plain(b.title)) || (b.type === 'essay' ? 'Freitext' : 'Aufgabe')}</b>${examState(b)}</div>${imgHtml(b.img, '', 'klein')}<div>${b.html || ''}</div>${field}</div>`);
+  }
+  /** nach jeder Antwort: speichern, der Plattform melden, Anzeige „beantwortet“ und Stationsleiste nachführen (ohne neu zu zeichnen) */
+  function examChanged(id) {
+    progSave();
+    host.onAnswer?.(id, prog.ans[id], prog.ans);
+    const r = findBlock(id), el = $(`.blk[data-id="${id}"] [data-xstate]`, lp);
+    if (r && el) el.textContent = answered(r.b) ? '✓ beantwortet' : '';
+    $$('#stops a[data-sid]', lp).forEach((a, i) => { const s = doc.stations.find(x => x.id === a.dataset.sid); if (!s) return; const d = stationDone(s); a.classList.toggle('done', d); a.textContent = d ? '✓' : (s.nr || i + 1); });
+    const c = $('.lp-count', lp); if (c) c.textContent = `${doc.stations.filter(stationDone).length} / ${doc.stations.length}`;
+    const f = $('#examFootCount', lp); if (f) f.textContent = examCount();
+  }
+  const examTasks = () => doc.stations.flatMap(s => s.blocks.filter(isCheck));
+  const examCount = () => { const t = examTasks(); return `${t.filter(answered).length} von ${t.length} Aufgaben beantwortet`; };
+  function examFootHtml() {
+    const max = examTasks().reduce((s, b) => s + ptsOf(b), 0);
+    if (E()) return `<div class="lp-cert lp-examfoot" id="st-cert"><div class="seal">✓</div><div><b>Abgabe</b><br>Schüler sehen keine Rückmeldung. Sie können jederzeit ein Protokoll ihrer Antworten als PDF erstellen und geben am Ende ab. Insgesamt <b>${max} Punkte</b>.<br><button class="lp-btn alt" data-act="examprot">📄 Protokoll – Muster</button></div></div>`;
+    const done = !!doc.exam?.submitted;
+    return `<div class="lp-cert lp-examfoot" id="st-cert"><div class="seal">${done ? '✓' : '🏁'}</div><div><b>${done ? 'Abgegeben' : 'Abgabe'}</b><br><span id="examFootCount">${examCount()}</span> · ${max} Punkte insgesamt<br>`
+      + (done ? '' : `<button class="lp-btn" data-act="examsubmit">Abgeben</button>`) + `<button class="lp-btn alt" data-act="examprot">📄 Protokoll (PDF)</button></div></div>`;
+  }
   function certHtml() {
     const c = doc.cert, can = certReady();
     if (!c.on) return `<div class="lp-cert" style="opacity:.5"><div class="seal">★</div><div><b>Zertifikat ist aus</b><br><button class="lp-btn alt" data-act="certcfg">⚙ Zertifikat einstellen</button></div></div>`;
@@ -677,7 +791,7 @@ export function startPathFinder(opts = {}) {
   }
   function shuffled(arr, seed) { let h = 0; for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0; const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { h = (h * 1103515245 + 12345) >>> 0; const j = h % (i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
   const checksOf = s => { const c = s.blocks.filter(isCheck).map(b => b.id); if (s.check) c.push('st:' + s.id); return c; };
-  const stationDone = s => { const c = checksOf(s); return c.length ? c.every(id => prog.solved[id]) : !!prog.visited[s.id] && mode === 'preview'; };
+  const stationDone = s => { if (EXAM()) { const c = s.blocks.filter(isCheck); return c.length ? c.every(answered) : !!prog.visited[s.id]; } const c = checksOf(s); return c.length ? c.every(id => prog.solved[id]) : !!prog.visited[s.id] && mode === 'preview'; };
   const allChecks = () => doc.stations.flatMap(checksOf);
   function certReady() { const all = allChecks(), n = all.filter(id => prog.solved[id]).length; if (doc.cert.need === 'immer') return true; if (doc.cert.need === 'pct') return n >= Math.ceil(all.length * doc.cert.pct / 100); return n === all.length; }
   const xpBlocks = () => doc.stations.flatMap(s => s.blocks.filter(isCheck));
@@ -729,6 +843,8 @@ export function startPathFinder(opts = {}) {
       if (a === 'addStation') { const s = { id: uid(), title: '', sub: '', check: !!doc.skin, blocks: [{ id: uid(), type: 'text', html: '' }] }; doc.stations.push(s); curSid = s.id; commit(); render(); goStation(s.id, true); setTimeout(() => $(`#st-${s.id} h2[data-f]`)?.focus(), 350); return; }
       if (a === 'certcfg') { openForm('cert'); return; }
       if (a === 'certprev') { certPreview(); return; }
+      if (a === 'examprot') { examProtocol(); return; }
+      if (a === 'examsubmit') { examSubmit(); return; }
     }
     const sact = t.closest('[data-sact]');
     if (sact) {
@@ -747,10 +863,13 @@ export function startPathFinder(opts = {}) {
     if (run) { runAction(run.closest('.blk').dataset.id, run.dataset.run); return; }
     if (E()) { const blk = t.closest('.blk'); selId = blk ? blk.dataset.id : null; markSel(); if (blk) curSid = blk.closest('.lp-station')?.dataset.sid || curSid; if (panelOpen && blk && panelWhat !== selId) { panelWhat = selId; drawPanel(); } return; }
     const opt = t.closest('[data-opt]');
+    if (EXAM_DONE() && t.closest('.lp-exam')) return;
+    if (opt && EXAM()) { const id = opt.closest('.blk').dataset.id, r = findBlock(id), [qi, i] = opt.dataset.opt.split('.').map(Number), k = r.b.qs[qi].opts[i].k, a = ansOf(id); if (a[qi] === k) delete a[qi]; else a[qi] = k; render(); examChanged(id); return; }
     if (opt) { const id = opt.closest('.blk').dataset.id, r = findBlock(id), [qi, i] = opt.dataset.opt.split('.').map(Number); const st = prog.quiz[id] || (prog.quiz[id] = {}); st[qi] = i; if (r.b.qs.every((q, k) => q.opts[st[k]]?.ok)) solve(id); else render(); return; }
     const chip = t.closest('[data-chip], [data-gchip]');
     if (chip && !chip.classList.contains('used')) { $$('.picked', lp).forEach(c => c !== chip && c.classList.remove('picked')); chip.classList.toggle('picked'); return; }
     const slot = t.closest('[data-slot]');
+    if (slot && EXAM() && !$('.chip.picked', slot.closest('.blk'))) { const id = slot.closest('.blk').dataset.id, r = findBlock(id), k = matchSides(r.b).R[+slot.dataset.slot]?.k, a = ansOf(id); if (k && a[k] != null) { delete a[k]; render(); examChanged(id); } return; }
     if (slot) { const pick = $('.chip.picked', slot.closest('.blk')); if (pick) placeChip(slot.closest('.blk').dataset.id, +pick.dataset.chip, +slot.dataset.slot); return; }
     const gs = t.closest('[data-gslot]');
     if (gs) { const id = gs.closest('.blk').dataset.id, pick = $('.gchip.picked', gs.closest('.blk')); placeGap(id, +gs.dataset.gslot, pick ? pick.dataset.gchip : null); }
@@ -764,6 +883,7 @@ export function startPathFinder(opts = {}) {
   }, true);
   lp.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.matches?.('[data-ans]')) { ev.preventDefault(); runAction(ev.target.closest('.blk').dataset.id, 'answer'); } });
   lp.addEventListener('input', ev => {
+    if (EXAM()) { const x = ev.target.closest('[data-xgap], [data-xans]'); if (!x || EXAM_DONE()) return; const id = x.closest('.blk').dataset.id; if (x.dataset.xgap != null) ansOf(id)[x.dataset.xgap] = x.value; else prog.ans[id] = x.value; examChanged(id); return; }
     if (E()) return; const inp = ev.target.closest('[data-gap]'); if (!inp) return;
     const id = inp.closest('.blk').dataset.id, r = findBlock(id); (prog.quiz[id] || (prog.quiz[id] = {}))[inp.dataset.n] = inp.value;
     let all = true;
@@ -771,12 +891,19 @@ export function startPathFinder(opts = {}) {
     if (all && !prog.solved[id]) solve(id, true);
   });
   function placeChip(id, chip, slot) {
+    if (EXAM()) { const r = findBlock(id), { L, R } = matchSides(r.b), a = ansOf(id), k = L[chip]?.k; if (!k || !R[slot]) return; for (const x in a) if (a[x] === k) delete a[x]; a[R[slot].k] = k; render(); examChanged(id); return; }
     const r = findBlock(id), got = prog.quiz[id] || (prog.quiz[id] = {});
     for (const k in got) if (got[k] === chip) delete got[k];
     got[slot] = chip;
     if (r.b.pairs.every((_, i) => got[i] === i)) solve(id); else render();
   }
   function placeGap(id, slot, word) {
+    if (EXAM()) {
+      const a = ansOf(id);
+      if (word == null) delete a[slot];
+      else if (a[slot] !== word) { const copies = bankWords(findBlock(id).b).filter(w => w === word).length, placed = Object.keys(a).filter(k => a[k] === word); if (placed.length >= copies) delete a[placed[0]]; a[slot] = word; }
+      render(); examChanged(id); return;
+    }
     const got = prog.quiz[id] || (prog.quiz[id] = {});
     delete prog.quiz[id + ':chk'];
     if (word == null) delete got[slot];
@@ -831,7 +958,7 @@ export function startPathFinder(opts = {}) {
     pop = document.createElement('div'); pop.className = 'ed-pop';
     let filter = '', hi = 0;
     const draw = () => {
-      const items = Object.entries(T).filter(([k, t]) => (doc.skin ? SKIN_TYPES.has(k) : !t.skinOnly)).filter(([k, t]) => !filter ||(t.n + ' ' + t.h + ' ' + k).toLowerCase().includes(filter));
+      const items = Object.entries(T).filter(([k, t]) => (doc.skin ? SKIN_TYPES.has(k) : !t.skinOnly)).filter(([k, t]) => EXAMF() ? !!CORE[k] && k !== 'lock' : !t.exam).filter(([k, t]) => !filter ||(t.n + ' ' + t.h + ' ' + k).toLowerCase().includes(filter));
       let g = '', h = `<h3>${c.slash ? `Baustein: „/${esc(filter)}“` : 'Baustein einfügen'}</h3><div class="ed-pal">`;
       items.forEach(([k, t], i) => { if (t.g !== g) { g = t.g; h += `<div class="grp">${g}</div>`; } h += `<button data-type="${k}" class="${i === hi ? 'hi' : ''}"><b>${t.ic} ${esc(t.n)}</b><span>${esc(t.h)}</span></button>`; });
       if (!items.length) h += '<div class="grp">nichts gefunden</div>';
@@ -988,10 +1115,11 @@ export function startPathFinder(opts = {}) {
     reveal: [{ k: 'summary', l: 'Überschrift der Klappbox', t: 'text' }],
     file: [{ k: 'data', l: 'Datei', t: 'file' }, { k: 'name', l: 'Dateiname', t: 'text' }],
     html: [{ k: 'html', l: 'HTML', t: 'code', help: 'Wird für Schüler so angezeigt. Skripte laufen erst im exportierten Lernpfad.' }],
-    task: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'answer', l: 'Ergebnis zur Selbstkontrolle (optional)', t: 'text', help: 'Leer = Schüler hakt „Erledigt“ ab. Sonst tippen sie das Ergebnis ein; mehrere richtige mit | trennen. Zahlen werden mit Komma oder Punkt erkannt.', show: () => !doc.skin }, { k: 'tips', l: 'Tipps (werden nacheinander aufgedeckt)', t: 'list', ph: 'Tipp', vis: 'tipsHide' }, { k: 'solution', l: 'Lösung zum Aufdecken (leer = keine)', t: 'text' }, { k: 'solHide', l: 'Lösung für Schüler sichtbar', t: 'shown', show: b => !!b.solution }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }, XP],
+    task: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'answer', l: 'Ergebnis zur Selbstkontrolle (optional)', t: 'text', help: 'Leer = Schüler hakt „Erledigt“ ab. Sonst tippen sie das Ergebnis ein; mehrere richtige mit | trennen. Zahlen werden mit Komma oder Punkt erkannt.', show: () => !doc.skin && !EXAMF() }, { k: 'answer', l: 'Ergebnis (wird automatisch bewertet)', t: 'text', help: 'Leer = Schüler schreiben eine freie Antwort, die du bewertest. Mehrere richtige mit | trennen; Zahlen werden mit Komma oder Punkt erkannt.', show: () => EXAMF() }, { k: 'tips', l: 'Tipps (werden nacheinander aufgedeckt)', t: 'list', ph: 'Tipp', vis: 'tipsHide', show: () => !EXAMF() }, { k: 'solution', l: 'Lösung zum Aufdecken (leer = keine)', t: 'text', show: () => !EXAMF() }, { k: 'solution', l: 'Musterlösung (nur für dich bei der Korrektur)', t: 'text', show: () => EXAMF() }, { k: 'solHide', l: 'Lösung für Schüler sichtbar', t: 'shown', show: b => !!b.solution && !EXAMF() }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }, XP],
     quiz: [{ k: 'qs', l: 'Fragen', t: 'qs' }, XP],
     gap: [{ k: 'bank', l: 'Begriffe zum Ziehen anbieten (statt Tippen)', t: 'check' }, { k: 'extra', l: 'Zusätzliche falsche Begriffe (Ablenker)', t: 'list', ph: 'Begriff', show: b => b.bank }, { k: 'heft', l: 'Als Hefteintrag gestalten (mit Titel)', t: 'check' }, XP],
     match: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'pairs', l: 'Paare', t: 'pairs' }, XP],
+    essay: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'lines', l: 'Höhe des Antwortfelds in Zeilen', t: 'number' }, { k: 'rubric', l: 'Erwartungshorizont', t: 'rubric' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }],
     lock: [{ k: 'after', l: 'Frei, sobald gelöst ist:', t: 'target' }],
     code: [{ k: 'lang', l: 'Sprache', t: 'select', o: [['java', 'Java'], ['python', 'Python'], ['sql', 'SQL'], ['text', 'Text']] }, { k: 'file', l: 'Dateiname über dem Code (optional)', t: 'text' }, { k: 'mark', l: 'Zeilen hervorheben (z. B. 3-5)', t: 'text', show: () => !!doc.skin }, { k: 'nocopy', l: 'ohne Knopf (nur zum Anschauen, z. B. wenn der Code schon im Projekt steht oder eine Aufgabe verraten würde)', t: 'check' }],
     uml: [{ k: 'name', l: 'Klassenname', t: 'text' }, { k: 'attrs', l: 'Attribute', t: 'list', ph: 'Attribut' }, { k: 'methods', l: 'Methoden', t: 'list', ph: 'Methode' }],
@@ -1052,6 +1180,7 @@ export function startPathFinder(opts = {}) {
         else if (f.t === 'formula') h += `<div class="row"><label>${esc(f.l)}<input type="text" class="mono" data-k="${f.k}" value="${esc(v)}" placeholder="=B2*C2" autocapitalize="off" autocorrect="off" spellcheck="false">${help}</label>${takeBtn('formula', f.k)}</div>`;
         else if (f.t === 'list') h += `<label>${esc(f.l)}</label>${f.vis ? '<span class="help">👁 = für Schüler sichtbar · antippen zum Verbergen</span>' : ''}<div class="list">${(v || []).map((t, i) => `<div class="it">${f.vis ? (hid => `<button class="pf-eye${hid ? ' off' : ''}" data-lvis="${f.vis}" data-i="${i}" aria-pressed="${!hid}" title="${hid ? 'verborgen – antippen zum Zeigen' : 'sichtbar – antippen zum Verbergen'}">${hid ? '🙈' : '👁'}</button>`)(!!(b[f.vis] || [])[i]) : ''}<input type="text" data-li="${f.k}" data-i="${i}" value="${esc(plain(t))}" placeholder="${esc(f.ph)} ${i + 1}"><button data-ldel="${f.k}" data-i="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-ladd="${f.k}">＋ ${esc(f.ph)}</button></div>`;
         else if (f.t === 'qs') h += `<label>${esc(f.l)}</label>${v.map((q, qi) => `<fieldset><legend>Frage ${qi + 1}</legend><input type="text" data-qq="${qi}" value="${esc(plain(q.q))}" placeholder="Frage"><div class="list">${q.opts.map((o, i) => `<div class="it"><input type="radio" name="ok${qi}" data-qok2="${qi}.${i}"${o.ok ? ' checked' : ''} title="richtig" style="width:24px;height:24px"><input type="text" data-qt="${qi}.${i}" value="${esc(plain(o.t))}" placeholder="Antwort ${i + 1}"><button data-qodel="${qi}.${i}" aria-label="entfernen">✕</button></div><div class="it" style="padding-left:30px"><input type="text" data-qfb="${qi}.${i}" value="${esc(plain(o.fb))}" placeholder="Rückmeldung zu dieser Antwort (optional)" style="font-size:13px"></div>`).join('')}<div class="row" style="align-items:center"><button class="add" data-qoadd="${qi}">＋ Antwort</button>${v.length > 1 ? `<button class="add" data-qdel="${qi}">Frage entfernen</button>` : ''}</div></div></fieldset>`).join('')}<button class="add" data-qadd="1">＋ Frage</button>`;
+        else if (f.t === 'rubric') h += `<label>${esc(f.l)}</label><span class="help">Teilaspekte mit Punkten – nur für dich bei der Korrektur, Schüler sehen sie nicht. Die Summe sind die Punkte der Aufgabe.</span><div class="list">${(v || []).map((r, i) => `<div class="it"><input type="text" data-rt="${i}" value="${esc(r.t)}" placeholder="Teilaspekt, z. B. nennt das Trägheitsprinzip"><input type="number" min="0" step="0.5" inputmode="decimal" data-rp="${i}" value="${esc(r.p)}" style="width:4.5em;flex:none" aria-label="Punkte"><button data-rdel="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-radd="1">＋ Teilaspekt</button></div>`;
         else if (f.t === 'pairs') h += `<label>${esc(f.l)}</label><div class="list">${v.map((p, i) => `<div class="it"><input type="text" data-pa="${i}" value="${esc(p.a)}" placeholder="Karte"><span>→</span><input type="text" data-pb="${i}" value="${esc(p.b)}" placeholder="passt zu"><button data-pdel="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-padd="1">＋ Paar</button></div>`;
         else if (f.t === 'image') h += `<label>${esc(f.l)}</label><div class="imgprev">${v ? `<img src="${v}" alt="">` : ''}<label class="take" style="display:inline-flex;align-items:center;cursor:pointer">🖼 ${v ? 'Anderes Bild' : 'Bild/GIF wählen'}<input type="file" accept="image/*" data-img="${f.k}" hidden></label>${v ? `<button class="add" data-imgdel="${f.k}">entfernen</button>` : ''}</div><span class="help">Große Fotos werden verkleinert, GIFs bleiben animiert.</span>`;
         else if (f.t === 'file') h += `<label>${esc(f.l)}</label><div class="imgprev"><span class="help">${v ? `${esc(b.name)} · ${Math.round(v.length * .75 / 1024)} KB` : 'noch keine Datei'}</span><label class="take" style="display:inline-flex;align-items:center;cursor:pointer">📎 Datei wählen<input type="file" data-file="${f.k}" hidden></label></div>`;
@@ -1071,6 +1200,8 @@ export function startPathFinder(opts = {}) {
       if (d.qt) { const [qi, i] = d.qt.split('.').map(Number); b.qs[qi].opts[i].t = esc(t.value); }
       if (d.qfb) { const [qi, i] = d.qfb.split('.').map(Number); b.qs[qi].opts[i].fb = esc(t.value); }
       if (d.qok2) { const [qi, i] = d.qok2.split('.').map(Number); b.qs[qi].opts.forEach((o, k) => o.ok = k === i); }
+      if (d.rt != null) b.rubric[+d.rt].t = t.value;
+      if (d.rp != null) { b.rubric[+d.rp].p = Math.max(0, +t.value || 0); const s = b.rubric.reduce((a, r) => a + (+r.p || 0), 0); if (s > 0) b.pts = s; }
       if (d.pa != null) b.pairs[+d.pa].a = t.value;
       if (d.pb != null) b.pairs[+d.pb].b = t.value;
       changed();
@@ -1099,6 +1230,8 @@ export function startPathFinder(opts = {}) {
       if (d.qdel) { b.qs.splice(+d.qdel, 1); draw(); }
       if (d.qoadd) { b.qs[+d.qoadd].opts.push({ t: '', ok: false, fb: '' }); draw(); }
       if (d.qodel) { const [qi, i] = d.qodel.split('.').map(Number); b.qs[qi].opts.splice(i, 1); draw(); }
+      if (d.radd) { b.rubric = b.rubric || []; b.rubric.push({ t: '', p: 1 }); b.pts = b.rubric.reduce((a, r) => a + (+r.p || 0), 0); draw(); $$('[data-rt]', el).pop()?.focus(); }
+      if (d.rdel) { b.rubric.splice(+d.rdel, 1); const s = b.rubric.reduce((a, r) => a + (+r.p || 0), 0); if (s > 0) b.pts = s; draw(); }
       if (d.padd) { b.pairs.push({ a: '', b: '' }); draw(); }
       if (d.pdel) { b.pairs.splice(+d.pdel, 1); draw(); }
       if (d.imgdel) { setPath(b, d.imgdel, ''); draw(); }
@@ -1163,9 +1296,9 @@ export function startPathFinder(opts = {}) {
       const pat = d.pattern || 'punkte', custom = !PATTERNS.some(x => x[0] === pat);
       el.innerHTML = `${live ? '<div class="pf-ptitle">Allgemein</div>' : '<header><b>Allgemein</b><button class="ok" data-x="ok">Fertig</button></header>'}<div class="ed-form">
         <fieldset><legend>Art</legend>
-        ${seg('form', [['lernpfad', 'Lernpfad'], ['challenge', 'Challenge']], doc.form)}
-        <span class="help">${doc.form === 'challenge' ? 'Challenge: mit XP-Leiste und Rang – spielerisch.' : 'Lernpfad: Stationen der Reihe nach, ruhig und übersichtlich.'}</span>
-        <label class="chk"><input type="checkbox" id="ptsIn"${doc.pointsOn ? ' checked' : ''}>Punkte für Aufgaben vergeben</label><span class="help">Die Punkte stehen links neben jeder Aufgabe, lassen sich dort anpassen und zählen im SCORM-Lernpaket.</span>
+        ${seg('form', [['lernpfad', 'Lernpfad'], ['challenge', 'Challenge'], ['pruefung', 'Digitale Prüfung']], doc.form)}
+        <span class="help">${doc.form === 'challenge' ? 'Challenge: mit XP-Leiste und Rang – spielerisch.' : EXAMF() ? 'Digitale Prüfung: Punkte für jede Aufgabe, keine Tipps, Lösungen oder Sperren. Schüler sehen keine Rückmeldung; bewertet wird nach der Abgabe. Aufgaben ohne Ergebnis und Freitexte bewertest du selbst.' : 'Lernpfad: Stationen der Reihe nach, ruhig und übersichtlich.'}</span>
+        ${EXAMF() ? '' : `<label class="chk"><input type="checkbox" id="ptsIn"${doc.pointsOn ? ' checked' : ''}>Punkte für Aufgaben vergeben</label><span class="help">Die Punkte stehen links neben jeder Aufgabe, lassen sich dort anpassen und zählen im SCORM-Lernpaket.</span>`}
         </fieldset>
         <fieldset><legend>Aussehen</legend>
         <label>Farbpalette <span class="help">${d.theme === 'grid' ? 'Hack · immer dunkel' : esc(PALETTES[d.pal].n) + ' · ' + (scheme() === 'dunkel' ? 'dunkler' : 'heller') + ' Modus'}</span></label><div class="ed-sw">${PALETTES.map((p, i) => { const c = scheme() === 'dunkel' ? p.d || p.l : p.l, on = d.theme !== 'grid' && i === d.pal; return PAL_ICONS[p.fx] ? `<button class="ic" data-pal="${i}" title="${esc(p.n)}" aria-pressed="${on}">${PAL_ICONS[p.fx]}</button>` : `<button data-pal="${i}" title="${esc(p.n)}" aria-pressed="${on}" style="background:${c.bg}"><span style="background:${c.a1}"></span><span style="background:${c.a2}"></span><span style="background:${c.a3}"></span></button>`; }).join('')}<button class="ic" data-hack="1" title="Hack (immer dunkel)" aria-pressed="${d.theme === 'grid'}">${PAL_ICONS.hack}</button></div>
@@ -1199,7 +1332,7 @@ ${d.theme === 'grid' ? `<span class="help">„Hack“: immer dunkel, Raster-Kopf
       if (t.dataset.divpal) delete doc.design.divColor;
       if (t.dataset.gadd) doc.goals.push('');
       if (t.dataset.gdel) doc.goals.splice(+t.dataset.gdel, 1);
-      const sg = t.closest('[data-seg]'); if (sg) { const k = sg.dataset.seg; if (k === 'form') doc.form = t.dataset.v; else if (k === 'preview') schemePrev = t.dataset.v; else if (k === 'scheme') { doc.design.scheme = t.dataset.v; schemePrev = null; } else doc.design[k] = t.dataset.v; }
+      const sg = t.closest('[data-seg]'); if (sg) { const k = sg.dataset.seg; if (k === 'form') { doc.form = t.dataset.v; if (EXAMF()) doc.pointsOn = true; } else if (k === 'preview') schemePrev = t.dataset.v; else if (k === 'scheme') { doc.design.scheme = t.dataset.v; schemePrev = null; } else doc.design[k] = t.dataset.v; }
       draw(); render(); if (live) softCommit(); if (t.dataset.gadd) $$('[data-goal]', el).pop()?.focus();
     });
     el.addEventListener('input', e => {
@@ -1709,7 +1842,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const ST = { 5: 'eine kurze Station', 10: '1–2 kurze Stationen', 20: '2 Stationen', 30: '3 Stationen', 45: 'etwa 4 Stationen', 60: 'etwa 5 Stationen', 90: '6–7 Stationen' };
     const p1 = info.p1 ?? 40, p2 = info.p2 ?? 80;
     return {
-      art: info.art === 'challenge' ? 'challenge' : 'lernpfad',
+      art: info.art === 'challenge' || info.art === 'pruefung' ? info.art : 'lernpfad',
       mix: [p1, p2 - p1, 100 - p2],
       thema: (info.thema || '').trim() || (lb ? lb.t : ''),
       fach, klasse: jg ? `Gymnasium in Bayern, Jahrgangsstufe ${jg}` : '',
@@ -1739,7 +1872,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       <div class="ed-form">
         <div class="ki-api" id="kiApi"></div>
         <div class="ki-step"><span class="n">1</span><b>Lernpfad beschreiben</b></div>
-        <label>Art des Lernpfades<select data-k="art">${opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad')}${opt('challenge', 'Challenge – Übungsaufgaben', info.art)}</select></label>
+        <label>Art des Lernpfades<select data-k="art">${opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad')}${opt('challenge', 'Challenge – Übungsaufgaben', info.art)}${opt('pruefung', 'Digitale Prüfung – mit Punkten, ohne Rückmeldung', info.art)}</select></label>
         <div id="kiMix" hidden>
           <label>Anteil der Aufgaben</label>
           <div class="ex-tri"><div class="ex-bar" id="kiBar"></div><input type="range" id="kiP1" min="0" max="100" step="5" value="${info.p1 ?? 40}" aria-label="Grenze Grundlagen / Fortgeschritten"><input type="range" id="kiP2" min="0" max="100" step="5" value="${info.p2 ?? 80}" aria-label="Grenze Fortgeschritten / Experte"></div>
@@ -1802,10 +1935,10 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     };
     drawLb();
     const drawMix = () => {
-      const ch = info.art === 'challenge'; $('#kiMix', el).hidden = !ch; if (!ch) return;
-      const p1 = info.p1 ?? 40, p2 = info.p2 ?? 80;
+      const ch = info.art === 'challenge' || info.art === 'pruefung'; $('#kiMix', el).hidden = !ch; if (!ch) return;
+      const p1 = info.p1 ?? 40, p2 = info.p2 ?? 80, N = info.art === 'pruefung' ? ['AFB I – Reproduktion', 'AFB II – Transfer', 'AFB III – Problemlösen'] : ['Grundlagen', 'Fortgeschritten', 'Experte'];
       $('#kiBar', el).style.background = `linear-gradient(90deg, #8fd19e 0 ${p1}%, #f6bf3a ${p1}% ${p2}%, #ef8a7a ${p2}% 100%)`;
-      $('#kiLv', el).innerHTML = `<span><i style="background:#8fd19e"></i>Grundlagen ${p1} %</span><span><i style="background:#f6bf3a"></i>Fortgeschritten ${p2 - p1} %</span><span><i style="background:#ef8a7a"></i>Experte ${100 - p2} %</span>`;
+      $('#kiLv', el).innerHTML = `<span><i style="background:#8fd19e"></i>${N[0]} ${p1} %</span><span><i style="background:#f6bf3a"></i>${N[1]} ${p2 - p1} %</span><span><i style="background:#ef8a7a"></i>${N[2]} ${100 - p2} %</span>`;
     };
     drawMix();
     const check = () => {
@@ -1870,7 +2003,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (t.dataset.direct === 'ki') {
         const p = ready(); if (!p) return;
         const inp = $('#kiIn', el); inp.value = ''; check();
-        const r = await runDirect({ prompt: T.promptFor(p, env), target: inp, box: $('#kiLive', el), maxTokens: 48000, what: p.art === 'challenge' ? 'die Challenge' : 'den Lernpfad', title: p.art === 'challenge' ? 'Challenge wird gebaut' : 'Lernpfad wird gebaut' });
+        const r = await runDirect({ prompt: T.promptFor(p, env), target: inp, box: $('#kiLive', el), maxTokens: 48000, what: p.art === 'challenge' ? 'die Challenge' : p.art === 'pruefung' ? 'die Prüfung' : 'den Lernpfad', title: p.art === 'challenge' ? 'Challenge wird gebaut' : p.art === 'pruefung' ? 'Prüfung wird gebaut' : 'Lernpfad wird gebaut' });
         if (r != null) {
           check(); await imgCheck;
           if (parsed && !parsed.errors.length) { openB.click(); return; }
@@ -2000,6 +2133,102 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     });
   }
 
+  /* ---------- Digitale Prüfung: Protokoll (PDF), Abgabe, Probe-Auswertung ---------- */
+  const fmtPts = x => String(Math.round(x * 100) / 100).replace('.', ',');
+  function examTitle(b) {
+    const t = plain(b.title || '').trim(); if (t) return t;
+    return { quiz: 'Quiz', gap: 'Lückentext', match: 'Zuordnen', essay: 'Freitext' }[b.type] || 'Aufgabe';
+  }
+  /** Antworten einer Aufgabe als Textzeilen – für Protokoll und Vorschau */
+  function answerLines(b) {
+    const a = prog.ans?.[b.id], none = '– keine Antwort –';
+    if (b.type === 'quiz') return b.qs.flatMap((q, qi) => { const o = q.opts.find(x => x.k != null && x.k === a?.[qi]); return [`${b.qs.length > 1 ? qi + 1 + '. ' : ''}${plain(q.q)}`, `Antwort: ${o ? plain(o.t) : none}`]; });
+    if (b.type === 'gap') { let i = 0; const t = plain(String(b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const v = a?.[i++]; return ` [${v != null && String(v).trim() ? esc(v) : '___'}] `; })).replace(/\s+/g, ' ').replace(/\s+([.,;:!?])/g, '$1').trim(); return [t, ...(gapCount(b) && !answered(b) ? ['(nicht alle Lücken ausgefüllt)'] : [])]; }
+    if (b.type === 'match') { const { L, R } = matchSides(b); return R.map(r => { const g = L.find(x => x.k === a?.[r.k]); return `${plain(r.t)}: ${g ? plain(g.t) : none}`; }); }
+    return typeof a === 'string' && a.trim() ? a.split(/\n/) : [none];
+  }
+  /** Prüfcode über Name und Antworten: zeigt, ob ein Protokoll nachträglich verändert wurde */
+  async function examCode(name) {
+    const txt = JSON.stringify([doc.id, (name || '').trim().toLowerCase(), host.examToken?.() || '', prog.ans || {}]);
+    try {
+      const h = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt)));
+      const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = ''; for (let i = 0; i < 9; i++) c += A[h[i] % 32];
+      return c.slice(0, 3) + '-' + c.slice(3, 6) + '-' + c.slice(6);
+    } catch (e) { return certCode([txt]); } // ohne sichere Verbindung (z. B. Datei) gibt es kein crypto.subtle
+  }
+  async function examPdf(name, code) {
+    const pdf = new Pdf(), W = 595, M = 50, BOT = 842 - 64, P = (PALETTES[doc.design.pal] || PALETTES[0]).l;
+    let y = 64;
+    const need = h => { if (y + h > BOT) { pdf.addPage(); y = 64; } };
+    pdf.text((plain(doc.kicker) || 'Digitale Prüfung').toUpperCase(), M, y, 9, { col: '#888888', spacing: 1.2 }); y += 26;
+    for (const l of wrapText(plain(doc.title) || 'Prüfung', 20, true, W - 2 * M)) { pdf.text(l, M, y, 20, { bold: true, col: P.a1 }); y += 24; }
+    pdf.text('Prüfungsprotokoll', M, y + 4, 13, { bold: true }); y += 28;
+    const now = new Date();
+    [['Name', name], ['Erstellt', `${now.toLocaleDateString('de-DE')}, ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} Uhr`], ['Stand', examCount()], ['Prüfcode', code]]
+      .forEach(([k, v]) => { pdf.text(k, M, y, 10, { col: '#666666' }); pdf.text(fitText(v, 10, true, W - 2 * M - 80), M + 80, y, 10, { bold: true }); y += 15; });
+    y += 4; pdf.line(M, y, W - M, y, '#cccccc', 1); y += 24;
+    let n = 0;
+    for (const s of doc.stations) {
+      const tasks = s.blocks.filter(isCheck); if (!tasks.length) continue;
+      if (plain(s.title).trim()) { need(48); pdf.text(fitText(plain(s.title), 13, true, W - 2 * M), M, y, 13, { bold: true, col: P.a1 }); y += 20; }
+      for (const b of tasks) {
+        n++; need(34);
+        pdf.text(fitText(`Aufgabe ${n}: ${examTitle(b)}`, 11, true, W - 2 * M - 60), M, y, 11, { bold: true });
+        pdf.text(`${fmtPts(ptsOf(b))} P.`, W - M, y, 10, { col: '#666666', align: 'right' }); y += 16;
+        for (const para of answerLines(b)) for (const l of wrapText(para || ' ', 10, false, W - 2 * M - 14)) { need(14); pdf.text(l, M + 14, y, 10, { col: /^– keine Antwort –$|^\(nicht alle/.test(l) ? '#999999' : '#222222' }); y += 14; }
+        y += 10;
+      }
+    }
+    const N = pdf.pages.length;
+    for (let i = 0; i < N; i++) { pdf.page(i); pdf.text(fitText(`${plain(doc.title)} · ${name} · Prüfcode ${code}`, 8, false, W - 2 * M - 80), M, 842 - 36, 8, { col: '#999999' }); pdf.text(`Seite ${i + 1} von ${N}`, W - M, 842 - 36, 8, { col: '#999999', align: 'right' }); }
+    return new Blob([pdf.bytes()], { type: 'application/pdf' });
+  }
+  function examProtocol() {
+    const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
+    const NK = `${opts.storage || 'pathfinder'}.examname`, fixed = host.studentName?.() || '';
+    let name = fixed || (PLAYER ? (LS.get(NK) || '') : 'Max Muster');
+    el.classList.add('cert-dlg');
+    const draw = () => { $('#exProt', el).innerHTML = doc.stations.map(s => { const t = s.blocks.filter(isCheck); return t.length ? `<h4>${esc(plain(s.title))}</h4>` + t.map(b => `<div class="ex-a"><b>${esc(examTitle(b))}</b> <span class="help">${fmtPts(ptsOf(b))} P.</span>${answerLines(b).map(l => `<div>${esc(l)}</div>`).join('')}</div>`).join('') : ''; }).join(''); };
+    el.innerHTML = `<header><b>📄 ${PLAYER ? 'Protokoll deiner Antworten' : 'Protokoll – Muster'}</b><button data-pdf="1">⬇︎ PDF speichern</button><button class="ok" data-x="1">Schließen</button></header>
+      <div class="ed-form">${fixed ? `<div>Name: <b>${esc(fixed)}</b></div>` : `<label>Vor- und Nachname<input type="text" id="exName" value="${esc(name)}" placeholder="Vor- und Nachname" autocomplete="name"></label>`}
+      <span class="help">Das Protokoll enthält alle ${PLAYER ? 'deine' : ''} Antworten mit Datum, Uhrzeit und Prüfcode. Es entsteht direkt hier auf dem Gerät – auch ohne Internet. ${PLAYER ? 'Speichere es, wenn deine Lehrkraft dich darum bittet, z. B. wenn das Internet ausfällt.' : 'Hier mit deinen Antworten aus der Vorschau.'} Es enthält keine Punkte und keine Lösungen.</span>
+      <div class="ex-prot" id="exProt"></div></div>`;
+    draw();
+    el.addEventListener('input', e => { if (e.target.id === 'exName') { name = e.target.value; if (PLAYER) LS.set(NK, name); } });
+    el.addEventListener('click', async e => {
+      if (e.target.closest('[data-x]')) closeDlg(false);
+      if (e.target.closest('[data-pdf]')) {
+        if (!name.trim()) { toast('Bitte zuerst deinen Namen eintragen.'); $('#exName', el)?.focus(); return; }
+        const code = await examCode(name), blob = await examPdf(name.trim(), code);
+        download(blob, `Pruefungsprotokoll_${name.trim().replace(/[^\wäöüÄÖÜß-]+/g, '_')}.pdf`);
+      }
+    });
+  }
+  async function examSubmit() {
+    if (host.submit) {
+      const open = examTasks().filter(b => !answered(b)).length;
+      if (!confirm(open ? `${open} Aufgabe${open > 1 ? 'n sind' : ' ist'} noch nicht vollständig beantwortet. Trotzdem abgeben?` : 'Prüfung jetzt abgeben? Danach kannst du nichts mehr ändern.')) return;
+      await host.submit({ answers: clone(prog.ans || {}) });
+      return;
+    }
+    if (!PLAYER) { examTrial(); return; }
+    toast('Abgeben geht nur über die Prüfungsplattform. Erstelle stattdessen das Protokoll (PDF).', 4000);
+  }
+  /** Im Editor: so würde die Plattform die Antworten aus der Vorschau bewerten */
+  async function examTrial() {
+    let S; try { S = await import(modUrl('pfsplit.js')); } catch (e) { toast('Die Auswertung konnte nicht geladen werden.'); return; }
+    const { key, warnings } = S.splitExam(doc), R = S.gradeExam(key, prog.ans || {});
+    const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
+    el.classList.add('cert-dlg');
+    const row = it => `<tr><td><b>${esc(it.title)}</b>${it.parts.map(p => `<div class="ex-part ${p.ok ? 'ok' : 'no'}">${p.ok ? '✓' : '✗'} ${esc(p.label)} → ${esc(p.given || '–')}${p.ok ? '' : ` <span class="help">richtig: ${esc(p.expected)}</span>`}</div>`).join('')}${it.auto ? '' : `<div class="help">Freitext – bewertest du nach der Abgabe${it.text ? `: „${esc(it.text.slice(0, 120))}${it.text.length > 120 ? '…' : ''}“` : ' (keine Antwort)'}</div>`}</td><td style="text-align:right;white-space:nowrap">${it.pts == null ? '?' : fmtPts(it.pts)} / ${fmtPts(it.max)}</td></tr>`;
+    el.innerHTML = `<header><b>Probe-Auswertung</b><button class="ok" data-x="1">Schließen</button></header><div class="ed-form">
+      <span class="help">So bewertet die Prüfungsplattform deine Antworten aus der Vorschau. Teilpunkte werden auf halbe Punkte abgerundet. ${R.pending ? 'Freitext zählt hier noch mit 0 Punkten.' : ''}</span>
+      <div style="font-weight:700;font-size:18px">${fmtPts(R.total)} von ${fmtPts(R.max)} Punkten (${Math.round(R.pct)} %) · Note ${S.gradeFor(R.pct)}</div><span class="help">Note nach Standard-Notenschlüssel (wie im Abitur: ab 20 % Note 5, ab 40 % Note 4, ab 55 % Note 3, ab 70 % Note 2, ab 85 % Note 1)</span>
+      ${warnings.length ? `<div class="ed-hint">${warnings.map(esc).join('<br>')}</div>` : ''}
+      <table class="ex-trial">${R.items.map(row).join('')}</table></div>`;
+    el.addEventListener('click', e => { if (e.target.closest('[data-x]')) closeDlg(false); });
+  }
+
   /* ---------- Knöpfe in Lernpfaden ---------- */
   function runAction(id, a) {
     const r = findBlock(id); if (!r) return;
@@ -2027,8 +2256,8 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const base = opts.examples ? opts.examples.replace(/[^/]*$/, '') : '';
     const mine = docList();
     let h = '<div class="grp">Meine Lernpfade (in diesem Browser)</div>';
-    h += mine.map(d => `<button data-open="${esc(d.id)}" class="${d.id === doc.id ? 'hi' : ''}"><b>${d.form === 'challenge' ? '⚡' : '📘'} ${esc(d.title)}</b><span>zuletzt ${new Date(d.t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</span></button>`).join('') || '<div class="grp" style="text-transform:none;letter-spacing:0">noch keine</div>';
-    h += '<button data-new="lernpfad"><b>＋ Neuer Lernpfad</b><span>leer beginnen</span></button><button data-new="challenge"><b>＋ Neue Challenge</b><span>leer beginnen</span></button><button data-imp="1"><b>⤒ Lernpfad-Datei öffnen</b><span>HTML-Lernpfad oder SCORM-Paket (.zip) aus PathFinder · fremde Lernpfad-Seiten behalten ihr Design</span></button>';
+    h += mine.map(d => `<button data-open="${esc(d.id)}" class="${d.id === doc.id ? 'hi' : ''}"><b>${d.form === 'challenge' ? '⚡' : d.form === 'pruefung' ? '📝' : '📘'} ${esc(d.title)}</b><span>zuletzt ${new Date(d.t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</span></button>`).join('') || '<div class="grp" style="text-transform:none;letter-spacing:0">noch keine</div>';
+    h += '<button data-new="lernpfad"><b>＋ Neuer Lernpfad</b><span>leer beginnen</span></button><button data-new="challenge"><b>＋ Neue Challenge</b><span>leer beginnen</span></button><button data-new="pruefung"><b>＋ Neue digitale Prüfung</b><span>Punkte je Aufgabe, ohne Rückmeldung – für die Prüfungsplattform</span></button><button data-imp="1"><b>⤒ Lernpfad-Datei öffnen</b><span>HTML-Lernpfad oder SCORM-Paket (.zip) aus PathFinder · fremde Lernpfad-Seiten behalten ihr Design</span></button>';
     if (ex.length) h += `<div class="grp">${esc(opts.examplesTitle || 'Beispiele')}</div>` + ex.map(e => `<button data-ex="${esc(e.file)}"><b>${esc(e.title)}</b><span>${esc(e.note || '')}</span></button>`).join('');
     $('#openList', pop).innerHTML = h; placePop(anchor);
     pop.onclick = async ev => {
@@ -2093,7 +2322,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     if (m === 'preview') { prog.visited[curSid] = 1; animDone.clear(); panelBack = panelOpen; hidePanel(); }
     else if (panelBack && panelFits()) showPanel();
     render();
-    toast(m === 'preview' ? '▶ Vorschau – so sehen es die Schüler. Fortschritt wird hier nur probeweise gezählt.' : '✎ Bearbeiten');
+    toast(m === 'preview' ? (EXAMF() ? '▶ Vorschau – so sehen es die Schüler, ohne Rückmeldung. „Abgeben“ zeigt eine Probe-Auswertung.' : '▶ Vorschau – so sehen es die Schüler. Fortschritt wird hier nur probeweise gezählt.') : '✎ Bearbeiten');
   }
   if (!PLAYER) {
   $('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
@@ -2106,7 +2335,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   if ($('#bKI')) $('#bKI').onclick = e => { // nur in der eigenständigen WebApp: Auswahl der KI-Prompts
     closePop(); pop = document.createElement('div'); pop.className = 'ed-pop ki-menu';
     pop.innerHTML = `<h3>KI-Tools</h3><div class="ed-pal ed-pal1">
-      <button data-k="ki"><b>${KI_ICON} KI-Lernpfad oder -Challenge</b><span>einen neuen Lernpfad oder eine Challenge von einer KI schreiben lassen</span></button>
+      <button data-k="ki"><b>${KI_ICON} KI-Lernpfad oder -Challenge</b><span>einen neuen Lernpfad, eine Challenge oder eine digitale Prüfung von einer KI schreiben lassen</span></button>
       <button data-k="exam"><b>${KI_ICON} Prüfung aus offenem Lernpfad generieren</b><span>Fragensammlung für Moodle (Moodle-XML)</span></button></div>`;
     document.body.appendChild(pop); placePop(e.currentTarget);
     pop.onclick = ev => { const k = ev.target.closest('[data-k]')?.dataset.k; if (!k) return; closePop(); if (k === 'ki') openKI(); else openExam(); };
@@ -2247,6 +2476,11 @@ ${SC}
   function openExport() {
     if (pending) commit();
     const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
+    if (EXAMF()) { // eine exportierte Datei enthielte die Lösungen
+      el.innerHTML = `<header><b>⇩ Export</b><button class="ok" data-x="1">Schließen</button></header><div class="ed-form"><span class="help"><b>Digitale Prüfungen</b> werden nicht als HTML-Datei oder Lernpaket exportiert: Die Datei enthielte die Lösungen. Sie laufen über die Prüfungsplattform, die den Schülern nur eine Fassung ohne Lösungen schickt.</span><span class="help">Für Moodle: ⋯ → „Prüfung aus Lernpfad“ erstellt eine Fragensammlung (Moodle-XML).</span></div>`;
+      el.onclick = e => { if (e.target.closest('[data-x]')) closeDlg(false); };
+      return;
+    }
     const appBlocks = doc.stations.flatMap(s => s.blocks.filter(b => def(b)?.exportAs));
     const bundled = plugins.find(p => p.bundle);
     const st = { fmt: bundled && host.adopt ? 'app' : 'html', pass: doc.pass || 80, cert: doc.cert.on };
@@ -2341,6 +2575,11 @@ ${SC}
     /** Lernpfad als Datei für die App (Erweiterung eingebaut) – für „Fertig“ im Editor der App */
     buildForApp: (o = {}) => { if (pending) commit(); return appHtml({ pass: doc.pass || 80, cert: doc.cert?.on !== false, scorm: !!o.scorm }); }, // scorm: Lernpfad meldet an ein SCORM-API (z. B. die App als Lernpaket in Moodle)
     get dirty() { return hist.length > 1; },
+    /** Digitale Prüfung: aktuelle Antworten, Protokoll-Dialog, „abgegeben“ anzeigen */
+    get answers() { return prog.ans; },
+    examProtocol: () => examProtocol(),
+    examPdf: async name => examPdf(name, await examCode(name)),
+    setSubmitted: (v = true) => { doc.exam = { ...(doc.exam || {}), submitted: !!v }; render(); },
     /** vorhandene HTML-Lernpfad-Seite öffnen (Originaldesign); liefert das Dokument oder null */
     importHtml: html => importPage(html), openFile: f => openFile(f),
   };

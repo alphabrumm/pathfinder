@@ -187,6 +187,13 @@ const CORE_SECTIONS = {
     if (pairs.length < 2) H.err(S.line, 'Zuordnen braucht mindestens zwei Paare „links -> rechts“.');
     return { type: 'match', title: S.title || 'Ordne zu', pairs, xp: S.num('xp', 10) };
   } },
+  freitext: { n: 'Freitext', keys: ['erwartung', 'zeilen', 'punkte', 'bild'], make(S, H) {
+    // Erwartung: Teilaspekt (2)  → Teilaspekt mit 2 Punkten; ohne Zahl 1 Punkt
+    const rubric = S.all('erwartung').map(x => { const m = x.match(/^(.*?)\s*\((\d+(?:[.,]\d+)?)\s*(?:P\.?|Punkte?)?\)\s*$/i); return m ? { t: m[1].trim(), p: parseFloat(m[2].replace(',', '.')) } : { t: x.trim(), p: 1 }; }).filter(r => r.t);
+    const b = { type: 'essay', title: S.title, html: H.md(S.body), img: S.one('bild') ? H.img(S.one('bild'), S.line) : '', lines: Math.max(2, Math.min(30, parseInt(S.one('zeilen')) || 6)), rubric };
+    if (rubric.length) b.pts = rubric.reduce((a, r) => a + r.p, 0); else H.warn(S.line, `Freitext „${S.title || ''}“ ohne Erwartungshorizont – schreibe Zeilen „Erwartung: Teilaspekt (Punkte)“.`);
+    return b;
+  } },
   aufdecken: { n: 'Aufdecken', make: (S, H) => ({ type: 'reveal', summary: S.title || 'Mehr erfahren', html: H.md(S.body) }) },
   uml: { n: 'UML', make(S) {
     const L = S.body.map(l => l.replace(/^\s*[-+#~•]\s*/, '').trim()).filter(Boolean);
@@ -194,7 +201,7 @@ const CORE_SECTIONS = {
   } },
   html: { n: 'HTML', make: S => ({ type: 'html', html: S.raw.join('\n') }) },
 };
-const SEC_ALIAS = { aufgabe: 'aufgabe', auftrag: 'aufgabe', quiz: 'quiz', test: 'quiz', lueckentext: 'lueckentext', luecken: 'lueckentext', zuordnen: 'zuordnen', zuordnung: 'zuordnen', aufdecken: 'aufdecken', aufklappen: 'aufdecken', 'mehr erfahren': 'aufdecken', uml: 'uml', 'uml-klasse': 'uml', klasse: 'uml', html: 'html' };
+const SEC_ALIAS = { aufgabe: 'aufgabe', auftrag: 'aufgabe', quiz: 'quiz', test: 'quiz', lueckentext: 'lueckentext', luecken: 'lueckentext', zuordnen: 'zuordnen', zuordnung: 'zuordnen', aufdecken: 'aufdecken', aufklappen: 'aufdecken', 'mehr erfahren': 'aufdecken', uml: 'uml', 'uml-klasse': 'uml', klasse: 'uml', html: 'html', freitext: 'freitext', 'offene aufgabe': 'freitext', essay: 'freitext' };
 
 export function parseText(src, env) {
   const errors = [], warnings = [];
@@ -249,9 +256,9 @@ export function parseText(src, env) {
     for (const [l, n] of S.lines) { const m = l.match(/^\s*([A-Za-zÄÖÜäöüß -]{2,24}?)\s*(\((?:verborgen|versteckt)\))?:\s*(.*)$/i); const k = m && norm(m[1]); if (m && keys.has(k)) { (kv[k] = kv[k] || []).push(m[3].trim()); (kh[k] = kh[k] || []).push(!!m[2]); } else { body.push(l); bodyN.push([l, n]); } }
     while (body.length && !body[body.length - 1].trim()) { body.pop(); bodyN.pop(); }
     const Sx = { title: S.title, line: S.line, body, bodyN, raw: S.lines.map(x => x[0]), table: S.table, code: S.code || [], kv, one: k => (kv[k] || [])[0], all: k => kv[k] || [], hid: k => kh[k] || [], num: (k, d) => { const v = (kv[k] || kv.punkte || [])[0]; return v != null && !isNaN(parseInt(v)) ? parseInt(v) : d; } };
-    try { const b = def.make(Sx, H, env); if (b) { if (kv.punkte) b.pts = parseInt(kv.punkte[0]) || undefined; push(b, S.line); } } catch (e) { H.err(S.line, `Abschnitt „${S.head}“: ${e.message}`); }
+    try { const b = def.make(Sx, H, env); if (b) { if (kv.punkte) b.pts = parseFloat(String(kv.punkte[0]).replace(',', '.')) || undefined; push(b, S.line); } } catch (e) { H.err(S.line, `Abschnitt „${S.head}“: ${e.message}`); }
   };
-  const lastCheckable = () => { const bl = st ? st.blocks : []; for (let k = bl.length - 1; k >= 0; k--) if (['task', 'quiz', 'gap', 'match'].includes(bl[k].type) || (env.isCheck && env.isCheck(bl[k]))) return bl[k]; return null; };
+  const lastCheckable = () => { const bl = st ? st.blocks : []; for (let k = bl.length - 1; k >= 0; k--) if (['task', 'quiz', 'gap', 'match', 'essay'].includes(bl[k].type) || (env.isCheck && env.isCheck(bl[k]))) return bl[k]; return null; };
 
   for (; i < lines.length; i++) {
     const raw = lines[i], n = i + 1, l = raw.trim();
@@ -279,16 +286,16 @@ export function parseText(src, env) {
     if (inHead && (m = l.match(/^([A-Za-zÄÖÜäöüß -]{3,24}):\s*(.*)$/))) {
       const k = norm(m[1]), v = m[2].trim();
       if (k === 'untertitel') { doc.subtitle = v; continue; }
-      if (k === 'art') { doc.form = /challenge/i.test(v) ? 'challenge' : 'lernpfad'; doc.kicker = doc.kicker.replace(/Lernpfad|Challenge/, doc.form === 'challenge' ? 'Challenge' : 'Lernpfad'); continue; }
+      if (k === 'art') { doc.form = /challenge/i.test(v) ? 'challenge' : /pr(ü|ue|u)fung|klausur|schulaufgabe|test/i.test(v) ? 'pruefung' : 'lernpfad'; if (doc.form === 'pruefung') { doc.pointsOn = true; doc.cert.on = false; } else doc.kicker = doc.kicker.replace(/Lernpfad|Challenge/, doc.form === 'challenge' ? 'Challenge' : 'Lernpfad'); continue; }
       if (k === 'kopfzeile') { doc.kicker = v; continue; }
       if (k === 'farbe' || k === 'farben') { const p = env.palettes.findIndex(x => norm(x.n) === norm(v)); if (p >= 0) doc.design.pal = p; else H.warn(n, `Farbe „${v}“ gibt es nicht. Möglich: ${env.palettes.map(x => x.n).join(', ')}.`); continue; }
       if (k === 'schrift') { const f = FONTS[norm(v)]; if (f) doc.design.font = f; else H.warn(n, 'Schrift: Pixel, schlicht, elegant oder Handwriting.'); continue; }
       if (k === 'kopfbild') { const src = H.img(v, n); if (src) { doc.design.heroImg = src; doc.design.hero = doc.design.hero === 'logo' ? 'bild' : doc.design.hero; } continue; }
       if (k === 'kopfbild-art' || k === 'kopfbild art') { const a = { klein: 'bild', gross: 'gross', 'groß': 'gross', hintergrund: 'hintergrund' }[norm(v)] || { gross: 'gross' }[norm(v)]; if (a) doc.design.hero = a; else H.warn(n, 'Kopfbild-Art: klein, groß oder Hintergrund.'); continue; }
       if (k === 'titel-animation' || k === 'untertitel-animation') { const a = ANIM[norm(v)]; if (a) doc.anim[k.startsWith('titel') ? 'title' : 'subtitle'] = a; else H.warn(n, 'Animation: tippen, einblenden, glitch oder leuchten.'); continue; }
-      if (k === 'zertifikat') { doc.cert.on = !/^(nein|aus|no|false)$/i.test(v); continue; }
+      if (k === 'zertifikat') { doc.cert.on = doc.form !== 'pruefung' && !/^(nein|aus|no|false)$/i.test(v); continue; }
       if (k === 'rang') { doc.rank = inline(v); continue; }
-      if (k === 'punkte') { doc.pointsOn = /^(ja|an|yes|true)$/i.test(v); continue; }
+      if (k === 'punkte') { doc.pointsOn = doc.form === 'pruefung' || /^(ja|an|yes|true)$/i.test(v); continue; }
       if (k === 'ziele' || k === 'lernziele') { goalsMode = true; if (v) doc.goals.push(inline(v)); continue; }
     }
     if (inHead && goalsMode && (m = l.match(/^[-•*]\s+(.+)$/))) { doc.goals.push(inline(m[1])); continue; }
@@ -339,7 +346,7 @@ export function parseText(src, env) {
   if (!doc.stations.length) H.err(1, 'Keine Station gefunden – Stationen beginnen mit „## Station: Titel“.');
   doc.stations.forEach(s => { if (!s.blocks.length) s.blocks.push({ id: uid(), type: 'text', html: '' }); });
   const all = doc.stations.flatMap(s => s.blocks);
-  const stats = { stations: doc.stations.length, blocks: all.length, tasks: all.filter(b => ['task', 'quiz', 'gap', 'match'].includes(b.type) || (env.isCheck && env.isCheck(b))).length };
+  const stats = { stations: doc.stations.length, blocks: all.length, tasks: all.filter(b => ['task', 'quiz', 'gap', 'match', 'essay'].includes(b.type) || (env.isCheck && env.isCheck(b))).length };
   stats.images = images.length;
   return { doc, errors, warnings, stats, images };
 }
@@ -360,7 +367,7 @@ export function docToText(doc, env, out = {}) {
   const plug = {}; for (const p of env.plugins || []) for (const [k, t] of Object.entries(p.text || {})) if (t.type) plug[t.type] = { ...t, key: k };
   L.push(`# ${md(doc.title)}`);
   if (doc.subtitle) L.push(`Untertitel: ${md(doc.subtitle)}`);
-  L.push(`Art: ${doc.form === 'challenge' ? 'Challenge' : 'Lernpfad'}`);
+  L.push(`Art: ${doc.form === 'challenge' ? 'Challenge' : doc.form === 'pruefung' ? 'Prüfung' : 'Lernpfad'}`);
   if (doc.kicker) L.push(`Kopfzeile: ${md(doc.kicker)}`);
   L.push(`Farbe: ${env.palettes[doc.design.pal]?.n || 'Pastell'}`, `Schrift: ${doc.design.font}`);
   if (doc.goals?.length) { L.push('Ziele:'); doc.goals.forEach(g => L.push('- ' + md(g))); }
@@ -368,8 +375,8 @@ export function docToText(doc, env, out = {}) {
   if (doc.design.heroImg && doc.design.hero !== 'logo') { L.push(`Kopfbild: ${ref(doc.design.heroImg, 'kopf')}`); L.push(`Kopfbild-Art: ${{ bild: 'klein', gross: 'groß', hintergrund: 'Hintergrund' }[doc.design.hero] || 'klein'}`); }
   if (doc.anim?.title) L.push(`Titel-Animation: ${doc.anim.title}`);
   if (doc.anim?.subtitle) L.push(`Untertitel-Animation: ${doc.anim.subtitle}`);
-  if (doc.pointsOn) L.push('Punkte: ja');
-  L.push(`Zertifikat: ${doc.cert?.on ? 'ja' : 'nein'}`);
+  if (doc.pointsOn && doc.form !== 'pruefung') L.push('Punkte: ja');
+  if (doc.form !== 'pruefung') L.push(`Zertifikat: ${doc.cert?.on ? 'ja' : 'nein'}`);
   for (const s of doc.stations) {
     L.push('', `## Station: ${md(s.title)}${s.sub ? ' | ' + md(s.sub) : ''}`);
     if (s.anim) L.push(`Animation: ${s.anim}`);
@@ -387,7 +394,8 @@ export function docToText(doc, env, out = {}) {
         case 'code': L.push('```' + (b.lang || '') + (b.nocopy ? ' ohne-knopf' : ''), b.code, '```'); break;
         case 'uml': L.push(`### UML: ${b.name}`, ...b.attrs.map(a => '- ' + a), ...b.methods.map(a => '+ ' + a)); break;
         case 'html': L.push('### HTML', '```html', b.html, '```'); break;
-        case 'task': L.push(`### Aufgabe: ${md(b.title)}`, md(b.html)); if (b.answer) L.push(`Antwort: ${b.answer}`); if (b.img) L.push(`Bild: ${ref(b.img, 'bild')}`); (b.tips || []).forEach((t, i) => L.push(`Tipp${b.tipsHide?.[i] ? ' (verborgen)' : ''}: ${md(t)}`)); if (b.solution) L.push(`Lösung${b.solHide ? ' (verborgen)' : ''}: ${md(b.solution).replace(/\n+/g, ' ')}`); L.push(`XP: ${b.xp}`); break;
+        case 'task': L.push(`### Aufgabe: ${md(b.title)}`, md(b.html)); if (b.answer) L.push(`Antwort: ${b.answer}`); if (b.img) L.push(`Bild: ${ref(b.img, 'bild')}`); (b.tips || []).forEach((t, i) => L.push(`Tipp${b.tipsHide?.[i] ? ' (verborgen)' : ''}: ${md(t)}`)); if (b.solution) L.push(`Lösung${b.solHide ? ' (verborgen)' : ''}: ${md(b.solution).replace(/\n+/g, ' ')}`); if (doc.form !== 'pruefung') L.push(`XP: ${b.xp}`); break;
+        case 'essay': L.push(`### Freitext: ${md(b.title)}`, md(b.html)); if (b.img) L.push(`Bild: ${ref(b.img, 'bild')}`); (b.rubric || []).forEach(r => L.push(`Erwartung: ${r.t} (${String(r.p).replace('.', ',')})`)); if ((b.lines || 6) !== 6) L.push(`Zeilen: ${b.lines}`); break;
         case 'quiz': L.push('### Quiz'); b.qs.forEach(q => { L.push(`? ${md(q.q)}`); q.opts.forEach(o => L.push(`[${o.ok ? 'x' : ' '}] ${md(o.t)}${o.fb ? ' // ' + md(o.fb) : ''}`)); }); break;
         case 'gap': L.push(`### Lückentext${b.title ? ': ' + md(b.title) : ''}`, md(b.html)); if (b.bank) L.push('Wortbank: ja'); if (b.extra?.length) L.push(`Extra: ${b.extra.join(', ')}`); break;
         case 'match': L.push(`### Zuordnen: ${md(b.title)}`, ...b.pairs.map(p => `${p.a} -> ${p.b}`)); break;
@@ -395,6 +403,8 @@ export function docToText(doc, env, out = {}) {
         case 'file': L.push(`%% Datei „${b.name}“ (nur im Editor)`); break;
         default: { const t = plug[b.type]; L.push(t?.toText ? t.toText(b, { md }) : `%% Baustein „${b.type}“ – im Textformat nicht darstellbar`); }
       }
+      // Punkte je Aufgabe (bei Freitext mit Erwartungshorizont ergeben sie sich aus den Teilpunkten)
+      if (doc.pointsOn && b.pts != null && ['task', 'quiz', 'gap', 'match', 'essay'].includes(b.type) && !(b.type === 'essay' && (b.rubric || []).length)) L.push(`Punkte: ${b.pts}`);
     }
   }
   if (att.length) {
@@ -410,7 +420,7 @@ export function formatHelp(env) {
   return `FORMAT (PathFinder-Text):
 # Titel des Lernpfads
 Untertitel: kurze Unterzeile
-Art: Lernpfad            (oder: Challenge)
+Art: Lernpfad            (oder: Challenge, Prüfung)
 Farbe: ${env.palettes.map(p => p.n).join(' | ')}
 Schrift: Pixel | schlicht | elegant | Handwriting
 Ziele:
@@ -455,6 +465,14 @@ Extra: Ablenker, Ablenker   (optional: falsche Begriffe in der Wortbank)
 Begriff -> Erklärung
 Begriff -> Erklärung
 
+### Freitext: Titel       (nur in Prüfungen: offene Antwort, die die Lehrkraft bewertet)
+Aufgabenstellung.
+Erwartung: erster Teilaspekt der erwarteten Antwort (2)   (Erwartungshorizont, Zahl in Klammern = Punkte)
+Erwartung: zweiter Teilaspekt (1)
+Zeilen: 6               (optional: Höhe des Antwortfelds)
+
+Punkte: 2               (in jeder Aufgabe, jedem Quiz, Lückentext oder Zuordnen: Punkte für diese Aufgabe)
+
 ### Aufdecken: Mehr erfahren
 Text, der erst nach Antippen erscheint.
 
@@ -482,12 +500,25 @@ ${extra.length ? '\nZUSÄTZLICH IN DIESER APP:\n' + extra.join('\n\n') + '\n' : 
 }
 export function promptFor(info, env) {
   const f = (k, d) => (info[k] || '').trim() || d;
-  const ch = info.art === 'challenge', mix = info.mix || [40, 40, 20];
+  const ch = info.art === 'challenge', ex = info.art === 'pruefung', mix = info.mix || [40, 40, 20];
   const app = env.appName && env.appName !== 'PathFinder' ? ` (App: ${env.appName})` : '';
-  const intro = ch
+  const intro = ex
+    ? `Du erstellst eine DIGITALE PRÜFUNG (Leistungsnachweis) für die Plattform PathFinder${app}. Die Schüler bearbeiten sie am iPad ohne Rückmeldung; bewertet wird erst nach der Abgabe – geschlossene Aufgaben automatisch, Freitexte von der Lehrkraft.`
+    : ch
     ? `Du erstellst eine CHALLENGE (Übungsaufgaben) für die Plattform PathFinder${app}. Eine Challenge bringt nichts Neues bei: Sie greift auf das Vorwissen der Schüler zurück und lässt sie es an abwechslungsreichen Aufgaben anwenden, üben und vertiefen.`
     : `Du erstellst einen interaktiven LERNPFAD FÜR NEUES WISSEN für die Plattform PathFinder${app}. Der Lernpfad führt die Schüler Schritt für Schritt an ein neues Thema heran und festigt das Gelernte direkt mit Quiz, Aufgaben, Lückentexten und Zuordnungen.`;
-  const artRules = ch
+  const artRules = ex
+    ? `- Schreibe im Kopf die Zeile „Art: Prüfung“.
+- KEINE Erklärungen, Merkkästen, Figuren, Tipps, Lösungen zum Aufdecken oder Sperren – nur kurze Arbeitsanweisungen, Material (Texte, Tabellen, Abbildungen) und Aufgaben.
+- Gliedere die Prüfung in Stationen als Teilaufgaben oder Themenblöcke (z. B. „## Station: Teil A | Grundwissen“).
+- Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Freitext) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken.
+- Rechenaufgaben mit eindeutigem Ergebnis als „### Aufgabe“ mit „Antwort:“ (Zahl, ohne Einheit, mehrere richtige mit | trennen) – sie werden automatisch bewertet. Schreibe die erwartete Einheit in den Auftrag.
+- Offene Aufgaben (erklären, begründen, beschreiben, beurteilen) als „### Freitext“ mit Erwartungshorizont: mehrere Zeilen „Erwartung: … (Punkte)“; die Summe ergibt die Punkte der Aufgabe.
+- Anforderungsbereiche: etwa ${mix[0]} % der Punkte Reproduktion (AFB I), ${mix[1]} % Anwendung und Transfer (AFB II), ${mix[2]} % Problemlösen und Beurteilen (AFB III); von leicht nach schwer.
+- Quizfragen mit genau einer richtigen Antwort und plausiblen falschen Antworten; Rückmeldungen nach // sind nicht nötig.
+- Lückentexte ohne Wortbank werden tolerant bewertet (Groß/Klein egal); mehrdeutige Lücken vermeiden oder alle richtigen Antworten mit | angeben.
+`
+    : ch
     ? `- Schreibe im Kopf die Zeile „Art: Challenge“ und „Punkte: ja“.
 - KEINE neuen Inhalte erklären. Höchstens ein kurzer [Merke]-Kasten pro Station zur Erinnerung an Bekanntes; der Schwerpunkt liegt ganz auf Aufgaben, Quiz, Lückentexten und Zuordnungen.
 - Schwierigkeitsmischung der Aufgaben: etwa ${mix[0]} % Grundlagen, ${mix[1]} % Fortgeschritten, ${mix[2]} % Experte. Ordne die Stationen von leicht nach schwer (z. B. „Station: Grundlagen“, „Station: Fortgeschritten“, „Station: Experte“; Stufen mit 0 % weglassen).
