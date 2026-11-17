@@ -532,10 +532,10 @@ export function promptFor(info, env) {
 `;
   return `${intro}
 
-THEMA: ${f('thema', '[bitte Thema eintragen]')}
+THEMA: ${f('thema', info.basisTitle ? `Inhalte des Lernpfads „${info.basisTitle}“` : '[bitte Thema eintragen]')}
 ${info.fach?.trim() ? 'FACH: ' + info.fach.trim() + '\n' : ''}ZIELGRUPPE: ${f('klasse', '[Jahrgangsstufe / Schulart]')}
 UMFANG: ${f('umfang', 'etwa 4 Stationen, ca. 45 Minuten')}
-${info.lehrplan ? 'LEHRPLANBEZUG: ' + info.lehrplan + '\n' : ''}${info.inhalte?.length ? 'ZU BEHANDELNDE LEHRPLANINHALTE: ' + info.inhalte.join('; ') + '\n' : info.lehrplan && info.alleInhalte?.length ? 'INHALTE DES LERNBEREICHS (sinnvoll auswählen, passend zum Umfang): ' + info.alleInhalte.join('; ') + '\n' : ''}${info.extra?.trim() ? 'WEITERE WÜNSCHE DER LEHRKRAFT (bitte genau umsetzen): ' + info.extra.trim() + '\n' : ''}
+${info.lehrplan ? 'LEHRPLANBEZUG: ' + info.lehrplan + '\n' : ''}${info.inhalte?.length ? 'ZU BEHANDELNDE LEHRPLANINHALTE: ' + info.inhalte.join('; ') + '\n' : info.lehrplan && info.alleInhalte?.length ? 'INHALTE DES LERNBEREICHS (sinnvoll auswählen, passend zum Umfang): ' + info.alleInhalte.join('; ') + '\n' : ''}${info.basis ? 'GRUNDLAGE – der Lernpfad, mit dem die Schüler gelernt haben. Prüfe genau diese Inhalte und Fachbegriffe, aber formuliere neue Aufgaben, statt die Übungen des Lernpfads zu kopieren:\n<<<\n' + info.basis.trim() + '\n>>>\n' : ''}${info.extra?.trim() ? 'WEITERE WÜNSCHE DER LEHRKRAFT (bitte genau umsetzen): ' + info.extra.trim() + '\n' : ''}
 REGELN
 - WICHTIG – alles in EINEN kopierbaren Textblock: Der komplette Lernpfad samt Anhang mit allen Grafiken steht in einem einzigen Codeblock, damit die Lehrkraft nur einmal kopieren und einfügen muss. Beginne den Block mit vier Backticks und „text“ (\`\`\`\`text) und beende ihn mit vier Backticks (\`\`\`\`), damit Code-Beispiele darin den Block nicht vorzeitig schließen. Kein Text davor oder danach, nichts auf mehrere Blöcke oder Nachrichten verteilen.
 - Halte dich exakt an das unten beschriebene PathFinder-Textformat, damit der Lernpfad ohne Nacharbeit eingelesen werden kann.

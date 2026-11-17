@@ -25,7 +25,7 @@
       <button class="ed-btn" id="bRedo" title="Wiederholen (⇧⌘Z)" aria-label="Wiederholen">↷</button>
       <span class="sp"></span>
       <span class="ed-saved" id="saved"></span>
-      <button class="ed-btn" id="bOpen" title="Lernpfad öffnen oder neu anlegen">📂<span class="t"> Öffnen</span></button>
+      <button class="ed-btn" id="bOpen" title="Dokumente: öffnen, neu anlegen, Datei laden">📂<span class="t"> Dokumente</span></button>
       <button class="ed-btn" id="bMore" title="Mehr">⋯</button>
     </div>
     <div class="lp-scroll" id="scroll"><div class="lp" id="lp"></div></div>
@@ -62,6 +62,8 @@ const sample = () => {
   };
 };
 
-startPathFinder({ appName: 'PathFinder', logo: 'icon.svg', storage: 'pathfinder', sample, examples: 'beispiele/index.json' });
+// ?nur=pruefung: nur digitale Prüfungen (so wie eingebettet in Probe) – zum Ausprobieren
+const nur = new URLSearchParams(location.search).get('nur');
+startPathFinder({ appName: 'PathFinder', logo: 'icon.svg', storage: 'pathfinder', sample, examples: 'beispiele/index.json', ...(nur ? { forms: nur.split(',') } : {}) });
 </script>
 </body></html>
