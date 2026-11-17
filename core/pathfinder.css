@@ -722,5 +722,6 @@ label.lp-btn { display: inline-flex; align-items: center; justify-content: cente
 /* Schreibgeschützt (opts.readOnly): keine Bearbeiten-Werkzeuge, keine Platzhalter */
 .pf-ro .editing .ed-plus, .pf-ro .editing .ed-tools, .pf-ro .editing .ed-station-tools, .pf-ro .editing .ed-add-station, .pf-ro .editing .ed-hint { display: none !important; }
 .pf-ro .editing [data-ph]:empty:not(td):not(th) { display: none; }
-.pf-ro .editing [contenteditable] { cursor: default; outline: none; }
+.pf-ro .editing [contenteditable], .pf-ro .editing [contenteditable]:hover, .pf-ro .editing [contenteditable]:focus { cursor: default; outline: none; box-shadow: none; background: none; }
+.pf-ro .editing [contenteditable]:empty::before { content: none; }
 .ed-ro { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 99px; background: var(--ed-mid); color: var(--ed-ink); font-size: 13px; font-weight: 600; white-space: nowrap; }

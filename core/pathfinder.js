@@ -2424,6 +2424,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const tag = document.createElement('span'); tag.className = 'ed-ro'; tag.textContent = '🔒 ' + (opts.readOnlyLabel || 'Nur ansehen');
     tag.title = opts.readOnlyTitle || 'Schreibgeschützt: Du kannst alles ansehen und in der Vorschau ausprobieren, aber nichts ändern.';
     const sp = $('.ed-bar .sp'); if (sp) sp.after(tag); else $('.ed-bar')?.appendChild(tag);
+    const eb = $('#modeSeg [data-mode="edit"]'); if (eb) { eb.textContent = EXAMF() ? '👁 Mit Lösungen' : '👁 Ansicht'; eb.title = 'Alles ansehen – bei Prüfungen mit Lösungen, Punkten und Erwartungen'; }
     const fix = () => { if (!E()) return; $$('[contenteditable="true"]', lp).forEach(x => x.setAttribute('contenteditable', 'false')); $$('input, select, textarea', lp).forEach(x => { x.disabled = true; }); };
     new MutationObserver(fix).observe(lp, { childList: true, subtree: true }); fix();
     const free = t => t.closest?.('[data-fz], #stops a, [data-skst], summary');
@@ -2441,7 +2442,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     if (m === 'preview') { prog.visited[curSid] = 1; animDone.clear(); panelBack = panelOpen; hidePanel(); }
     else if (panelBack && panelFits()) showPanel();
     render();
-    toast(m === 'preview' ? (EXAMF() ? '▶ Vorschau – so sehen es die Schüler, ohne Rückmeldung. „Abgeben“ zeigt eine Probe-Auswertung.' : '▶ Vorschau – so sehen es die Schüler. Fortschritt wird hier nur probeweise gezählt.') : '✎ Bearbeiten');
+    toast(m === 'preview' ? (EXAMF() ? '▶ Vorschau – so sehen es die Schüler, ohne Rückmeldung. „Abgeben“ zeigt eine Probe-Auswertung.' : '▶ Vorschau – so sehen es die Schüler. Fortschritt wird hier nur probeweise gezählt.') : RO ? (EXAMF() ? '👁 Mit Lösungen' : '👁 Ansicht') : '✎ Bearbeiten');
   }
   if (!PLAYER) {
   $('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
