@@ -13,8 +13,15 @@ die Seite später sehen. Gebaut für das iPad (mit oder ohne Tastatur).
 
 ## Digitale Prüfung
 
-Neben „Lernpfad“ und „Challenge“ gibt es das Format **Digitale Prüfung** (`doc.form = 'pruefung'`, 📂 → ＋ Neue digitale Prüfung
-oder ⚙ Einstellungen → Art). Es ist die Grundlage für die geplante Prüfungsplattform:
+Neben „Lernpfad“ und „Challenge“ gibt es das Format **Digitale Prüfung** (`doc.form = 'pruefung'`, 📂 Dokumente → ＋ Neue digitale Prüfung
+oder ⚙ Einstellungen → Art). Es ist die Grundlage für die Prüfungsplattform **Probe**:
+
+* Eine neue Prüfung beginnt mit der Wahl: **aus einem Lernpfad** (Aufgaben übernehmen oder von der KI neue Aufgaben zu seinem Inhalt
+  schreiben lassen), **mit KI** oder **leer**. Der Lernpfad selbst bleibt unverändert.
+* `index.html?nur=pruefung` zeigt PathFinder so, wie er in Probe eingebettet ist: nur Prüfungen, Lernpfade werden beim Öffnen zur Prüfung.
+* Eingebettet: `startPathFinder({ forms: ['pruefung'], doc, startDialog: true, lernpfadStorage: 'pathfinder', host: { saved(doc), done(doc), doneLabel } })`
+  – `saved` bekommt jede Änderung, der Knopf „✓ Fertig“ ruft `done` auf (vorher Prüfung auf fehlende Lösungen); „Dokumente“ ist dann ausgeblendet.
+* Ohne Probe: ⋯ → Export → „Prüfungsdatei für Probe (.json)“; die Datei lässt sich über 📂 Dokumente → Datei öffnen wieder laden.
 
 * Punkte für jede Aufgabe, keine Tipps, Lösungen, Sperren oder Zertifikat. Neuer Baustein **Freitext** mit Erwartungshorizont
   (Teilaspekte mit Punkten). Aufgaben mit Ergebnis werden automatisch bewertet, Aufgaben ohne Ergebnis und Freitexte von der Lehrkraft.

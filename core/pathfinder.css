@@ -700,3 +700,20 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .ex-trial .ex-part.ok { color: #2e8b57; }
 .ex-trial .ex-part.no { color: #c0392b; }
 .lp.exam-done .lp-exam .opt, .lp.exam-done .lp-exam .chip, .lp.exam-done .lp-exam .slot, .lp.exam-done .lp-exam .gchip, .lp.exam-done .lp-exam .gapslot { pointer-events: none; }
+/* Neue Prüfung: Startdialog */
+.ex-choices { display: grid; gap: 10px; margin-top: 6px; }
+.ex-choices > button { display: flex; gap: 14px; align-items: center; text-align: left; padding: 14px 16px; min-height: 72px; border-radius: 14px; border: 2px solid rgba(127, 127, 127, .25); background: rgba(127, 127, 127, .06); color: inherit; font: inherit; cursor: pointer; }
+.ex-choices > button:hover, .ex-choices > button:focus-visible { border-color: #5b6fc2; background: rgba(91, 111, 194, .08); }
+.ex-choices .ic { flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 24px; background: rgba(91, 111, 194, .12); }
+.ex-choices .ic .ki-ico { width: 26px; height: 26px; }
+.ex-choices .tx { display: flex; flex-direction: column; gap: 3px; }
+.ex-choices .tx b { font-size: 17px; }
+.ex-choices .tx span { font-size: 14px; opacity: .75; line-height: 1.35; }
+.ex-lplist { display: grid; gap: 6px; max-height: 50vh; overflow: auto; }
+.ex-lp { border: 2px solid rgba(127, 127, 127, .2); border-radius: 12px; padding: 4px; }
+.ex-lp.on { border-color: #5b6fc2; }
+.ex-lp > button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 8px 10px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ex-lp > button span { font-size: 13px; opacity: .65; }
+.ex-lpact { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 8px 4px; }
+.ex-lp > .help { display: block; padding: 0 10px 8px; }
+.ed-done { font-weight: 700; }

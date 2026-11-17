@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-17a';
+const PF_BUILD = '2026-11-17b';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -290,12 +290,18 @@ export function startPathFinder(opts = {}) {
   const loadDoc = id => { try { const d = JSON.parse(LS.get(DOCKEY(id))); return d ? migrate(d) : null; } catch (e) { return null; } };
   const PLAYER = !!opts.player; // exportierter Lernpfad: nur abspielen, kein Editor
   let doc = null;
+  // Erlaubte Formate (z. B. nur 'pruefung', wenn PathFinder in Probe eingebettet ist)
+  const FORMS_OK = Array.isArray(opts.forms) && opts.forms.length ? opts.forms : ['lernpfad', 'challenge', 'pruefung'];
+  const formOk = f => FORMS_OK.includes(f || 'lernpfad');
+  let startHere = false, convertNext = false; // convertNext: das nächste geöffnete Dokument wird zur Prüfung
   if (PLAYER) doc = migrate(opts.doc);
+  else if (opts.doc) doc = migrate(clone(opts.doc));
   else {
     const cur = LS.get(CUR); doc = cur && loadDoc(cur);
     if (!doc && opts.legacy) { const l = opts.legacy(); if (l) doc = migrate(l); }
     if (!doc) doc = migrate(sample());
   }
+  if (!PLAYER && !formOk(doc.form)) { startHere = true; doc = migrate(emptyDoc(FORMS_OK[0])); }
   let mode = PLAYER ? 'preview' : 'edit', selId = null, curSid = null, single = false, fz = 1;
   let aiEl = null, aiLog = [], aiDraft = '', aiSt = '', aiBk = ''; // KI-Assistent (schwebendes Fenster): gewählte Station ('*' = alles) und Baustein ('*' = ganze Station)
   let hist = [JSON.stringify(doc)], fut = [], pending = null;
@@ -328,6 +334,7 @@ export function startPathFinder(opts = {}) {
     if (PLAYER) return;
     const ok = LS.set(DOCKEY(doc.id), JSON.stringify(doc));
     LS.set(CUR, doc.id);
+    host.saved?.(clone(doc)); // eingebettet (Probe): Entwurf beim Server sichern
     const l = docList(), i = l.findIndex(x => x.id === doc.id), e = { id: doc.id, title: doc.title || 'ohne Titel', form: doc.form, t: Date.now() };
     if (i >= 0) l[i] = e; else l.unshift(e); saveDocList(l);
     $('#saved').textContent = ok ? '✓ gesichert' : '⚠ zu groß zum Sichern';
@@ -342,7 +349,7 @@ export function startPathFinder(opts = {}) {
   function undo() { if (pending) commit(); if (hist.length < 2) return; fut.push(hist.pop()); doc = JSON.parse(hist[hist.length - 1]); save(); render(); updUndo(); drawPanel?.(); aiSync(); }
   function redo() { if (!fut.length) return; const s = fut.pop(); hist.push(s); doc = JSON.parse(s); save(); render(); updUndo(); drawPanel?.(); }
   function updUndo() { if (!$('#bUndo')) return; $('#bUndo').disabled = hist.length < 2; $('#bRedo').disabled = !fut.length; }
-  function openDoc(d) { if (pending) commit(); if (panelOpen) { panelWhat = 'design'; hidePanel(); } doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); selId = null; curSid = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; drawPanel(); aiSync(); }
+  function openDoc(d) { if (!PLAYER && d.form !== 'pruefung' && (convertNext || (!formOk(d.form) && formOk('pruefung')))) { const r = toExam(d); d = r.d; setTimeout(() => toast(examTakenMsg(r), 5000), 60); } convertNext = false; if (pending) commit(); if (panelOpen) { panelWhat = 'design'; hidePanel(); } doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); selId = null; curSid = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; drawPanel(); aiSync(); }
 
   function findBlock(id) {
     for (const st of doc.stations) { const i = st.blocks.findIndex(b => b.id === id); if (i >= 0) return { st, i, b: st.blocks[i] }; }
@@ -1296,7 +1303,7 @@ export function startPathFinder(opts = {}) {
       const pat = d.pattern || 'punkte', custom = !PATTERNS.some(x => x[0] === pat);
       el.innerHTML = `${live ? '<div class="pf-ptitle">Allgemein</div>' : '<header><b>Allgemein</b><button class="ok" data-x="ok">Fertig</button></header>'}<div class="ed-form">
         <fieldset><legend>Art</legend>
-        ${seg('form', [['lernpfad', 'Lernpfad'], ['challenge', 'Challenge'], ['pruefung', 'Digitale Prüfung']], doc.form)}
+        ${seg('form', [['lernpfad', 'Lernpfad'], ['challenge', 'Challenge'], ['pruefung', 'Digitale Prüfung']].filter(([v]) => formOk(v)), doc.form)}
         <span class="help">${doc.form === 'challenge' ? 'Challenge: mit XP-Leiste und Rang – spielerisch.' : EXAMF() ? 'Digitale Prüfung: Punkte für jede Aufgabe, keine Tipps, Lösungen oder Sperren. Schüler sehen keine Rückmeldung; bewertet wird nach der Abgabe. Aufgaben ohne Ergebnis und Freitexte bewertest du selbst.' : 'Lernpfad: Stationen der Reihe nach, ruhig und übersichtlich.'}</span>
         ${EXAMF() ? '' : `<label class="chk"><input type="checkbox" id="ptsIn"${doc.pointsOn ? ' checked' : ''}>Punkte für Aufgaben vergeben</label><span class="help">Die Punkte stehen links neben jeder Aufgabe, lassen sich dort anpassen und zählen im SCORM-Lernpaket.</span>`}
         </fieldset>
@@ -1833,6 +1840,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     refreshApi();
   }
 
+  let kiBasis = null; const basisOf = () => kiBasis;
   /** Angaben aus dem KI-Dialog → Beschreibung für den Prompt */
   function kiPromptInfo(info, L) {
     const fach = info.fsel === '*' ? (info.ffrei || '').trim() : (info.fsel || '');
@@ -1851,15 +1859,19 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       lehrplan: lb ? `${L.SOURCE}, ${fach} Jahrgangsstufe ${jg}, Lernbereich ${lb.nr !== '–' ? lb.nr + ' ' : ''}„${lb.t}“${lb.g ? ` (${lb.g})` : ''}` : '',
       inhalte: lb ? (info.inh || []).filter(k => lb.k.includes(k)) : [],
       alleInhalte: lb ? lb.k : [],
-      extra: info.extra || ''
+      extra: info.extra || '',
+      ...(basisOf() ? { basis: basisOf().text, basisTitle: basisOf().title } : {})
     };
   }
 
-  async function openKI() {
+  async function openKI(preset = {}) {
     const [T, L, A] = await Promise.all([loadText(), loadLp(), loadApi()]); const env = textEnv();
     const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
     const KK = (opts.storage || 'pathfinder') + '.ki';
     let info = {}; try { info = JSON.parse(LS.get(KK)) || {}; } catch (e) { }
+    if (preset.art) info.art = preset.art;
+    if (!formOk(info.art || 'lernpfad')) info.art = FORMS_OK[0];
+    kiBasis = preset.basis || null; // Lernpfad als Grundlage für eine Prüfung (nicht gespeichert)
     // ältere Angaben (freie Felder) übernehmen
     if (info.fsel == null && info.fach) { info.fsel = L.FAECHER.includes(info.fach.trim()) ? info.fach.trim() : '*'; info.ffrei = info.fach; }
     if (info.jg == null && info.klasse) { const m = String(info.klasse).match(/\b(5|6|7|8|9|1[0-3])\b/); if (m) info.jg = m[1]; }
@@ -1872,7 +1884,8 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       <div class="ed-form">
         <div class="ki-api" id="kiApi"></div>
         <div class="ki-step"><span class="n">1</span><b>Lernpfad beschreiben</b></div>
-        <label>Art des Lernpfades<select data-k="art">${opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad')}${opt('challenge', 'Challenge – Übungsaufgaben', info.art)}${opt('pruefung', 'Digitale Prüfung – mit Punkten, ohne Rückmeldung', info.art)}</select></label>
+        <label>Art des Lernpfades<select data-k="art">${formOk('lernpfad') ? opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad') : ''}${formOk('challenge') ? opt('challenge', 'Challenge – Übungsaufgaben', info.art) : ''}${formOk('pruefung') ? opt('pruefung', 'Digitale Prüfung – mit Punkten, ohne Rückmeldung', info.art) : ''}</select></label>
+        <div id="kiBasis"></div>
         <div id="kiMix" hidden>
           <label>Anteil der Aufgaben</label>
           <div class="ex-tri"><div class="ex-bar" id="kiBar"></div><input type="range" id="kiP1" min="0" max="100" step="5" value="${info.p1 ?? 40}" aria-label="Grenze Grundlagen / Fortgeschritten"><input type="range" id="kiP2" min="0" max="100" step="5" value="${info.p2 ?? 80}" aria-label="Grenze Fortgeschritten / Experte"></div>
@@ -1934,6 +1947,8 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         + lb.k.map(k => `<label class="chk"><input type="checkbox" data-kw="${esc(k)}"${info.inh.includes(k) ? ' checked' : ''}>${esc(k)}</label>`).join('');
     };
     drawLb();
+    const drawBasis = () => { $('#kiBasis', el).innerHTML = kiBasis ? `<div class="ed-hint">📘 Grundlage: Lernpfad „${esc(kiBasis.title)}“ – die KI schreibt neue Prüfungsaufgaben zu genau diesen Inhalten. <button class="lp-btn alt" data-nobasis="1">✕ ohne Grundlage</button></div>` : ''; };
+    drawBasis();
     const drawMix = () => {
       const ch = info.art === 'challenge' || info.art === 'pruefung'; $('#kiMix', el).hidden = !ch; if (!ch) return;
       const p1 = info.p1 ?? 40, p2 = info.p2 ?? 80, N = info.art === 'pruefung' ? ['AFB I – Reproduktion', 'AFB II – Transfer', 'AFB III – Problemlösen'] : ['Grundlagen', 'Fortgeschritten', 'Experte'];
@@ -1965,7 +1980,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     };
     const ready = () => {
       const p = kiPromptInfo(info, L);
-      if (!p.thema && !p.extra.trim()) { toast('Bitte einen Lernbereich wählen oder ein Thema eintragen'); return null; }
+      if (!p.thema && !p.extra.trim() && !p.basis) { toast('Bitte einen Lernbereich wählen oder ein Thema eintragen'); return null; }
       return p;
     };
     el.addEventListener('change', async e => {
@@ -1998,6 +2013,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.x) { closeDlg(false); return; }
       if (t.dataset.api) { apiSettings(refreshApi); return; }
+      if (t.dataset.nobasis) { kiBasis = null; drawBasis(); return; }
       if (t.dataset.inh) { const lb = L.lernbereiche(info.fsel, +info.jg || 0).find(x => x.id === info.lb); if (!lb) return; info.inh = info.inh.length === lb.k.length ? [] : [...lb.k]; drawInh(); save(); return; }
       if (t.dataset.copy === 'prompt') { const p = ready(); if (!p) return; if (await copyText(T.promptFor(p, env))) kiCopiedPopup(); else toast('Kopieren ging nicht'); }
       if (t.dataset.direct === 'ki') {
@@ -2229,6 +2245,64 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     el.addEventListener('click', e => { if (e.target.closest('[data-x]')) closeDlg(false); });
   }
 
+  /* ---------- Digitale Prüfung: aus einem Lernpfad, Startdialog ---------- */
+  /** Lernpfad oder Challenge → Prüfung (Kopie): Aufgaben mit Punkten, ohne Tipps, Sperren, Zertifikat und App-Bausteine */
+  function toExam(src) {
+    const d = migrate(clone(src)), from = plain(d.title || '').trim();
+    d.id = uid(); d.form = 'pruefung'; d.pointsOn = true; d.cert = { ...d.cert, on: false }; d.goals = []; d.rank = ''; d.typeLines = []; delete d.skin; delete d.pass;
+    d.title = from ? `Prüfung: ${from}` : '';
+    let tasks = 0, removed = 0;
+    for (const s of d.stations) {
+      s.check = false; delete s.skin;
+      s.blocks = s.blocks.filter(b => { if (b.type === 'lock') return false; if (!CORE[b.type]) { removed++; return false; } return true; });
+      for (const b of s.blocks) {
+        if (b.type === 'task') { delete b.tips; delete b.tipsHide; delete b.solHide; }
+        if (CORE_CHECK.has(b.type)) { tasks++; if (b.pts == null) b.pts = b.type === 'quiz' ? (b.qs || []).length || 1 : b.type === 'gap' ? Math.max(1, gapCount(b)) : b.type === 'match' ? Math.max(1, (b.pairs || []).length) : b.type === 'essay' ? 4 : b.answer ? 1 : 2; }
+      }
+      if (!s.blocks.length) s.blocks.push({ id: uid(), type: 'text', html: '' });
+    }
+    return { d, from, tasks, removed };
+  }
+  const examTakenMsg = r => `Aus „${esc(r.from || 'Lernpfad')}“ übernommen: ${r.tasks} Aufgabe${r.tasks === 1 ? '' : 'n'}${r.removed ? `, ${r.removed} App-Baustein${r.removed === 1 ? '' : 'e'} weggelassen` : ''}. Lösche Erklärungen, die nicht in die Prüfung gehören, und prüfe die Punkte.`;
+  /** Neue Prüfung: aus einem Lernpfad, mit KI oder leer beginnen */
+  function examStart(view = 'start') {
+    if (pending) commit();
+    closeDlg(false);
+    const { el, bd } = dialog('ex-start'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
+    const SRC = opts.lernpfadStorage || P; // eingebettet in Probe: die Lernpfade aus PathFinder (gleiche Adresse)
+    const list = () => { try { return (JSON.parse(LS.get(SRC + '.docs')) || []).filter(d => d.form !== 'pruefung').sort((a, b) => b.t - a.t); } catch (e) { return []; } };
+    const load = id => { try { return JSON.parse(LS.get(SRC + '.doc.' + id)); } catch (e) { return null; } };
+    let sel = null;
+    const draw = () => {
+      if (view === 'start') { el.innerHTML = `<header><b>📝 Neue Prüfung</b><button data-x="1">Abbrechen</button></header><div class="ed-form"><span class="help">Womit möchtest du beginnen? Danach kannst du alles bearbeiten, Aufgaben ergänzen und Punkte anpassen.</span>
+        <div class="ex-choices">
+          <button data-v="lp"><span class="ic">📘</span><span class="tx"><b>Aus einem Lernpfad</b><span>Aufgaben eines Lernpfads übernehmen, mit dem deine Klasse gelernt hat – oder die KI neue Prüfungsaufgaben zu seinem Inhalt schreiben lassen.</span></span></button>
+          <button data-v="ki"><span class="ic">${KI_ICON}</span><span class="tx"><b>Mit KI erstellen</b><span>Jahrgangsstufe, Fach und Lernbereich wählen – die KI schreibt die ganze Prüfung.</span></span></button>
+          <button data-v="new"><span class="ic">＋</span><span class="tx"><b>Leere Prüfung</b><span>Aufgaben selbst zusammenstellen.</span></span></button>
+        </div></div>`; return; }
+      const L = list();
+      el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>Aus einem Lernpfad</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
+        <span class="help">Wähle den Lernpfad, mit dem deine Klasse gelernt hat. Er selbst bleibt unverändert.</span>
+        <div class="ex-lplist">${L.length ? L.map(d => `<div class="ex-lp${sel === d.id ? ' on' : ''}"><button data-pick="${esc(d.id)}"><b>${d.form === 'challenge' ? '⚡' : '📘'} ${esc(d.title)}</b><span>zuletzt ${new Date(d.t).toLocaleDateString('de-DE')}</span></button>${sel === d.id ? `<div class="ex-lpact"><button class="lp-btn" data-take="${esc(d.id)}">Aufgaben übernehmen</button><button class="lp-btn alt" data-kib="${esc(d.id)}">${KI_ICON} Neue Aufgaben mit KI</button></div><span class="help"><b>Übernehmen:</b> Quiz, Lückentexte, Zuordnungen und Aufgaben werden Prüfungsaufgaben mit Punkten; Tipps, Sperren und Zertifikat fallen weg. <b>Neue Aufgaben mit KI:</b> Die KI schreibt eine neue Prüfung zu genau diesen Inhalten.</span>` : ''}</div>`).join('') : '<span class="help">In diesem Browser sind keine Lernpfade gespeichert.</span>'}</div>
+        <button class="lp-btn alt" data-file="1">⤒ Lernpfad-Datei wählen</button><span class="help">Eine aus PathFinder exportierte HTML-Datei oder ein SCORM-Paket (.zip). Ihre Aufgaben werden übernommen.</span></div>`;
+    };
+    draw();
+    el.addEventListener('click', async e => {
+      const t = e.target.closest('button'); if (!t) return;
+      if (t.dataset.x) { closeDlg(false); return; }
+      if (t.dataset.v === 'start' || t.dataset.v === 'lp') { view = t.dataset.v; sel = null; draw(); return; }
+      if (t.dataset.v === 'new') { closeDlg(false); openDoc(emptyDoc('pruefung')); toast('Leere Prüfung angelegt – Titel antippen, Aufgaben über ＋ einfügen'); return; }
+      if (t.dataset.v === 'ki') { closeDlg(false); openKI({ art: 'pruefung' }); return; }
+      if (t.dataset.pick) { sel = sel === t.dataset.pick ? null : t.dataset.pick; draw(); return; }
+      if (t.dataset.take) { const d = load(t.dataset.take); if (!d) { toast('Lernpfad nicht gefunden'); return; } closeDlg(false); convertNext = true; openDoc(d); return; }
+      if (t.dataset.kib) { const d = load(t.dataset.kib); if (!d) { toast('Lernpfad nicht gefunden'); return; } const T = await loadText(); closeDlg(false); openKI({ art: 'pruefung', basis: { title: plain(d.title) || 'ohne Titel', text: T.docToText(migrate(d), textEnv(), { refs: true }) } }); return; }
+      if (t.dataset.file) {
+        closeDlg(false); const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.html,.htm,text/html,.zip,application/zip';
+        inp.onchange = async () => { const f = inp.files[0]; if (!f) return; convertNext = true; try { await openFile(f); } finally { convertNext = false; } }; inp.click();
+      }
+    });
+  }
+
   /* ---------- Knöpfe in Lernpfaden ---------- */
   function runAction(id, a) {
     const r = findBlock(id); if (!r) return;
@@ -2250,22 +2324,27 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   /* ---------- Öffnen ---------- */
   async function openChooser(anchor) {
     closePop(); pop = document.createElement('div'); pop.className = 'ed-pop';
-    pop.innerHTML = '<h3>Lernpfad öffnen</h3><div class="ed-pal" id="openList"><div class="grp">lädt …</div></div>';
+    pop.innerHTML = '<h3>Dokumente</h3><div class="ed-pal" id="openList"><div class="grp">lädt …</div></div>';
     document.body.appendChild(pop); placePop(anchor);
     let ex = []; if (opts.examples) { try { ex = await (await fetch(opts.examples, { cache: 'no-cache' })).json(); } catch (e) { } }
     const base = opts.examples ? opts.examples.replace(/[^/]*$/, '') : '';
     const mine = docList();
-    let h = '<div class="grp">Meine Lernpfade (in diesem Browser)</div>';
+    let h = '<div class="grp">Meine Dokumente (in diesem Browser)</div>';
     h += mine.map(d => `<button data-open="${esc(d.id)}" class="${d.id === doc.id ? 'hi' : ''}"><b>${d.form === 'challenge' ? '⚡' : d.form === 'pruefung' ? '📝' : '📘'} ${esc(d.title)}</b><span>zuletzt ${new Date(d.t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</span></button>`).join('') || '<div class="grp" style="text-transform:none;letter-spacing:0">noch keine</div>';
-    h += '<button data-new="lernpfad"><b>＋ Neuer Lernpfad</b><span>leer beginnen</span></button><button data-new="challenge"><b>＋ Neue Challenge</b><span>leer beginnen</span></button><button data-new="pruefung"><b>＋ Neue digitale Prüfung</b><span>Punkte je Aufgabe, ohne Rückmeldung – für die Prüfungsplattform</span></button><button data-imp="1"><b>⤒ Lernpfad-Datei öffnen</b><span>HTML-Lernpfad oder SCORM-Paket (.zip) aus PathFinder · fremde Lernpfad-Seiten behalten ihr Design</span></button>';
+    h += '<div class="grp">Neu</div>'
+      + (formOk('lernpfad') ? '<button data-new="lernpfad"><b>＋ Neuer Lernpfad</b><span>leer beginnen</span></button>' : '')
+      + (formOk('challenge') ? '<button data-new="challenge"><b>＋ Neue Challenge</b><span>leer beginnen</span></button>' : '')
+      + (formOk('pruefung') ? '<button data-exstart="1"><b>＋ Neue digitale Prüfung</b><span>leer, aus einem Lernpfad oder mit KI – für Probe</span></button>' : '')
+      + '<div class="grp">Datei</div><button data-imp="1"><b>⤒ Datei öffnen</b><span>HTML-Lernpfad, SCORM-Paket (.zip) oder Prüfungsdatei (.json) aus PathFinder · fremde Lernpfad-Seiten behalten ihr Design</span></button>';
     if (ex.length) h += `<div class="grp">${esc(opts.examplesTitle || 'Beispiele')}</div>` + ex.map(e => `<button data-ex="${esc(e.file)}"><b>${esc(e.title)}</b><span>${esc(e.note || '')}</span></button>`).join('');
     $('#openList', pop).innerHTML = h; placePop(anchor);
     pop.onclick = async ev => {
       const b = ev.target.closest('button'); if (!b) return;
       if (b.dataset.open) { const d = loadDoc(b.dataset.open); closePop(); if (d) openDoc(d); }
       if (b.dataset.new) { closePop(); openDoc(emptyDoc(b.dataset.new)); }
+      if (b.dataset.exstart) { closePop(); examStart(); }
       if (b.dataset.imp) {
-        closePop(); const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.html,.htm,text/html,.zip,application/zip';
+        closePop(); const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.html,.htm,text/html,.zip,application/zip,.json,application/json';
         inp.onchange = async () => { const f = inp.files[0]; if (f) openFile(f); }; inp.click();
       }
       if (b.dataset.ex) {
@@ -2289,6 +2368,10 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         if (!page) { toast('Im ZIP ist keine HTML-Seite – ist das ein SCORM-Paket aus PathFinder?', 4000); return; }
         return importPage(new TextDecoder().decode(page.data));
       } catch (e) { toast('ZIP ließ sich nicht öffnen: ' + esc(e.message), 4000); return; }
+    }
+    if (/\.json$/i.test(f.name) || f.type.includes('json')) { // Prüfungsdatei oder gespeichertes Dokument
+      try { const d = JSON.parse(await f.text()); if (!Array.isArray(d?.stations)) throw new Error('kein PathFinder-Dokument'); openDoc(d); toast(`„${esc(plain(d.title || 'ohne Titel'))}“ geöffnet`); return doc; }
+      catch (e) { toast('Datei ließ sich nicht öffnen: ' + esc(e.message), 4000); return null; }
     }
     return importPage(await f.text());
   }
@@ -2332,6 +2415,17 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   if ($('#viewSeg')) $('#viewSeg').onclick = e => { const x = e.target.closest('button[data-view]'); if (x) setSingle(x.dataset.view === 'one'); };
   $('#bDesign').onclick = openDesign;
   $('#bOpen').onclick = e => openChooser(e.currentTarget);
+  if (host.done) { // eingebettet (Probe): nur diese eine Prüfung; „Fertig“ gibt sie zurück
+    $('#bOpen').style.display = 'none';
+    const bDone = document.createElement('button'); bDone.className = 'ed-btn ed-lbl ed-done'; bDone.id = 'bDone';
+    bDone.textContent = '✓ ' + (host.doneLabel || 'Fertig'); bDone.title = host.doneTitle || 'Prüfung fertigstellen'; $('#bMore').before(bDone);
+    bDone.onclick = async () => {
+      if (pending) commit();
+      let warn = []; try { warn = (await import(modUrl('pfsplit.js'))).splitExam(doc).warnings; } catch (e) { }
+      if (warn.length && !confirm('Bitte prüfen:\n\n• ' + warn.join('\n• ') + '\n\nTrotzdem fertigstellen?')) return;
+      await host.done(clone(doc));
+    };
+  }
   if ($('#bKI')) $('#bKI').onclick = e => { // nur in der eigenständigen WebApp: Auswahl der KI-Prompts
     closePop(); pop = document.createElement('div'); pop.className = 'ed-pop ki-menu';
     pop.innerHTML = `<h3>KI-Tools</h3><div class="ed-pal ed-pal1">
@@ -2477,8 +2571,8 @@ ${SC}
     if (pending) commit();
     const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
     if (EXAMF()) { // eine exportierte Datei enthielte die Lösungen
-      el.innerHTML = `<header><b>⇩ Export</b><button class="ok" data-x="1">Schließen</button></header><div class="ed-form"><span class="help"><b>Digitale Prüfungen</b> werden nicht als HTML-Datei oder Lernpaket exportiert: Die Datei enthielte die Lösungen. Sie laufen über die Prüfungsplattform, die den Schülern nur eine Fassung ohne Lösungen schickt.</span><span class="help">Für Moodle: ⋯ → „Prüfung aus Lernpfad“ erstellt eine Fragensammlung (Moodle-XML).</span></div>`;
-      el.onclick = e => { if (e.target.closest('[data-x]')) closeDlg(false); };
+      el.innerHTML = `<header><b>⇩ Export</b><button class="ok" data-x="1">Schließen</button></header><div class="ed-form"><span class="help"><b>Digitale Prüfungen</b> werden nicht als HTML-Datei oder Lernpaket exportiert: Die Datei enthielte die Lösungen. Sie laufen über die Prüfungsplattform, die den Schülern nur eine Fassung ohne Lösungen schickt.</span><button class="lp-btn" data-json="1">⇩ Prüfungsdatei für Probe (.json)</button><span class="help">Die vollständige Prüfung mit Lösungen – nur für dich: In Probe lädst du sie in deine Prüfung (oder öffnest sie hier über 📂 Dokumente → Datei öffnen). Nicht an Schüler weitergeben.</span><span class="help">Für Moodle: ⋯ → „Prüfung aus Lernpfad“ erstellt eine Fragensammlung (Moodle-XML).</span></div>`;
+      el.onclick = e => { if (e.target.closest('[data-x]')) closeDlg(false); if (e.target.closest('[data-json]')) { download(new Blob([JSON.stringify(doc, null, 1)], { type: 'application/json' }), fileName('.probe.json')); closeDlg(false); toast('⇩ Prüfungsdatei erstellt'); } };
       return;
     }
     const appBlocks = doc.stations.flatMap(s => s.blocks.filter(b => def(b)?.exportAs));
@@ -2579,6 +2673,7 @@ ${SC}
     get answers() { return prog.ans; },
     examProtocol: () => examProtocol(),
     examPdf: async name => examPdf(name, await examCode(name)),
+    examStart: () => examStart(),
     setSubmitted: (v = true) => { doc.exam = { ...(doc.exam || {}), submitted: !!v }; render(); },
     /** vorhandene HTML-Lernpfad-Seite öffnen (Originaldesign); liefert das Dokument oder null */
     importHtml: html => importPage(html), openFile: f => openFile(f),
@@ -2586,5 +2681,6 @@ ${SC}
   save(); render(); updUndo();
   aiFloat();
   host.attach?.(ctx);
+  if (!PLAYER && ((startHere && formOk('pruefung')) || opts.startDialog)) setTimeout(() => examStart(), 250);
   return ctx;
 }
