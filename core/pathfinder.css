@@ -681,3 +681,22 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .lp[data-fx="winter"] .lp-nr { position: relative; }
 .lp[data-fx="winter"] .lp-nr::before { content: ""; position: absolute; left: -4px; right: -4px; top: -8px; height: 12px; background: #fff; border-radius: 12px 12px 8px 8px; box-shadow: 0 1px 2px rgba(0,0,0,.15); z-index: 1; }
 @media (prefers-reduced-motion: reduce) { .lp[data-fx] .lp-hero::before { animation: none; } }
+
+/* ---------- Digitale Prüfung: Antworten ohne Rückmeldung ---------- */
+.lp-quiz .opt.sel { border-color: var(--a1); background: color-mix(in srgb, var(--a1) 12%, var(--surface)); box-shadow: inset 4px 0 0 var(--a1); font-weight: 600; }
+.lp-match .slot.filled { border-color: var(--a1); border-style: solid; }
+.lp-exam .lp-state { color: var(--ink-2); font-weight: 600; }
+.lp-essay-in { display: block; width: 100%; box-sizing: border-box; margin-top: 10px; padding: 10px 12px; min-height: 4em; resize: vertical; border: 2px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font: calc(16px * var(--fz))/1.45 var(--font-body); }
+.lp-essay-in:focus, .lp-exam .lp-answer input:focus, .lp-exam.lp-gap input:focus { outline: none; border-color: var(--a1); }
+.lp-essay-in:disabled { opacity: .6; }
+.lp-exam .lp-answer input { width: 14em; max-width: 100%; }
+.lp-examfoot .seal { font-size: 24px; }
+.ex-prot h4 { margin: 14px 0 4px; font-size: 15px; }
+.ex-prot .ex-a { padding: 6px 0 8px; border-bottom: 1px dashed rgba(127, 127, 127, .35); font-size: 14px; white-space: pre-wrap; }
+.ex-prot .ex-a > div { margin-left: 12px; }
+.ex-trial { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ex-trial td { padding: 8px 4px; border-top: 1px solid rgba(127, 127, 127, .25); vertical-align: top; }
+.ex-trial .ex-part { margin-left: 10px; }
+.ex-trial .ex-part.ok { color: #2e8b57; }
+.ex-trial .ex-part.no { color: #c0392b; }
+.lp.exam-done .lp-exam .opt, .lp.exam-done .lp-exam .chip, .lp.exam-done .lp-exam .slot, .lp.exam-done .lp-exam .gchip, .lp.exam-done .lp-exam .gapslot { pointer-events: none; }

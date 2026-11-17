@@ -11,6 +11,22 @@ die Seite später sehen. Gebaut für das iPad (mit oder ohne Tastatur).
   **SCORM-1.2-Lernpaket** für die Aktivität „Lernpaket“: Moodle speichert den Fortschritt und erhält Punkte, Bestanden/nicht bestanden,
   Bearbeitungszeit und die gelösten Aufgaben. App-Bausteine (z. B. FlowPad-Aufgaben) werden dabei zur Selbstkontrolle umgewandelt.
 
+## Digitale Prüfung
+
+Neben „Lernpfad“ und „Challenge“ gibt es das Format **Digitale Prüfung** (`doc.form = 'pruefung'`, 📂 → ＋ Neue digitale Prüfung
+oder ⚙ Einstellungen → Art). Es ist die Grundlage für die geplante Prüfungsplattform:
+
+* Punkte für jede Aufgabe, keine Tipps, Lösungen, Sperren oder Zertifikat. Neuer Baustein **Freitext** mit Erwartungshorizont
+  (Teilaspekte mit Punkten). Aufgaben mit Ergebnis werden automatisch bewertet, Aufgaben ohne Ergebnis und Freitexte von der Lehrkraft.
+* In der Vorschau (und bei Schülern) gibt es **keine Rückmeldung**: Die Antworten werden nur erfasst (`prog.ans`).
+  „Abgeben“ zeigt im Editor eine Probe-Auswertung, ein „Protokoll (PDF)“ mit allen Antworten und Prüfcode entsteht jederzeit offline.
+* `core/pfsplit.js` zerlegt eine Prüfung in eine **Schülerfassung ohne Lösungen** und einen **Lösungsschlüssel** (`splitExam`)
+  und bewertet Antworten mit Teilpunkten, auf halbe Punkte abgerundet (`gradeExam`); dazu der Notenschlüssel (`gradeFor`, `pointsFor`).
+  Tests: `node tools/test-pfsplit.mjs`.
+* Abspielen für die Plattform: `startPathFinder({ player: true, doc: schuelerfassung, answers, host: { onAnswer, submit, studentName, examToken } })`.
+* Textformat und KI-Prompts kennen „Art: Prüfung“, „### Freitext“ mit „Erwartung: … (Punkte)“ und „Punkte: n“ je Aufgabe.
+* HTML- und SCORM-Export sind für Prüfungen gesperrt, weil die Datei die Lösungen enthielte.
+
 ## Kern und Erweiterungen
 
 `core/pathfinder.js` ist der Kern und kennt keine App. Apps wie **FlowPad**, **JPad** oder **QPad** binden den Kern ein
