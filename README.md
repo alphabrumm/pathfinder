@@ -19,6 +19,8 @@ oder ⚙ Einstellungen → Art). Es ist die Grundlage für die Prüfungsplattfor
 * Eine neue Prüfung beginnt mit der Wahl: **aus einem Lernpfad** (Aufgaben übernehmen oder von der KI neue Aufgaben zu seinem Inhalt
   schreiben lassen), **mit KI** oder **leer**. Der Lernpfad selbst bleibt unverändert.
 * `index.html?nur=pruefung` zeigt PathFinder so, wie er in Probe eingebettet ist: nur Prüfungen, Lernpfade werden beim Öffnen zur Prüfung.
+* Vorgaben für den KI-Dialog: `?fach=Physik&jg=8&min=45` (statt `jg` auch `klasse=8b`, dazu `kopf=…` für die Kopfzeile) bzw.
+  `startPathFinder({ ki: { fach, jg, min, kopf } })` – Fach, Jahrgangsstufe und Umfang sind dann schon ausgefüllt.
 * Eingebettet: `startPathFinder({ forms: ['pruefung'], doc, startDialog: true, lernpfadStorage: 'pathfinder', host: { saved(doc), done(doc), doneLabel } })`
   – `saved` bekommt jede Änderung, der Knopf „✓ Fertig“ ruft `done` auf (vorher Prüfung auf fehlende Lösungen); „Dokumente“ ist dann ausgeblendet.
 * Ohne Probe: ⋯ → Export → „Prüfungsdatei für Probe (.json)“; die Datei lässt sich über 📂 Dokumente → Datei öffnen wieder laden.

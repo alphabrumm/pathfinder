@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-17b';
+const PF_BUILD = '2026-11-17c';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1869,8 +1869,18 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
     const KK = (opts.storage || 'pathfinder') + '.ki';
     let info = {}; try { info = JSON.parse(LS.get(KK)) || {}; } catch (e) { }
-    if (preset.art) info.art = preset.art;
+    // Vorgaben von außen (Probe bzw. URL ?fach=…&jg=…&min=…): Art, Fach, Jahrgangsstufe und Umfang schon ausgefüllt
+    const pre = { ...(opts.ki || {}), ...preset };
+    if (pre.art) info.art = pre.art;
     if (!formOk(info.art || 'lernpfad')) info.art = FORMS_OK[0];
+    if (pre.fach) {
+      const f = String(pre.fach).trim(), hit = L.FAECHER.find(x => x.toLowerCase() === f.toLowerCase()) || '*';
+      if (hit !== info.fsel || (hit === '*' && info.ffrei !== f)) { info.lb = ''; info.inh = []; }
+      info.fsel = hit; if (hit === '*') info.ffrei = f;
+    }
+    if (+pre.jg >= 5 && +pre.jg <= 13) { if (String(info.jg) !== String(+pre.jg)) { info.lb = ''; info.inh = []; } info.jg = String(+pre.jg); }
+    if (+pre.min > 0) info.min = L.UMFANG.reduce((a, b) => Math.abs(b - pre.min) < Math.abs(a - pre.min) ? b : a);
+    if (pre.thema) info.thema = pre.thema;
     kiBasis = preset.basis || null; // Lernpfad als Grundlage für eine Prüfung (nicht gespeichert)
     // ältere Angaben (freie Felder) übernehmen
     if (info.fsel == null && info.fach) { info.fsel = L.FAECHER.includes(info.fach.trim()) ? info.fach.trim() : '*'; info.ffrei = info.fach; }
@@ -2251,6 +2261,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const d = migrate(clone(src)), from = plain(d.title || '').trim();
     d.id = uid(); d.form = 'pruefung'; d.pointsOn = true; d.cert = { ...d.cert, on: false }; d.goals = []; d.rank = ''; d.typeLines = []; delete d.skin; delete d.pass;
     d.title = from ? `Prüfung: ${from}` : '';
+    if (opts.ki?.kopf) d.kicker = opts.ki.kopf;
     let tasks = 0, removed = 0;
     for (const s of d.stations) {
       s.check = false; delete s.skin;
@@ -2291,7 +2302,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.x) { closeDlg(false); return; }
       if (t.dataset.v === 'start' || t.dataset.v === 'lp') { view = t.dataset.v; sel = null; draw(); return; }
-      if (t.dataset.v === 'new') { closeDlg(false); openDoc(emptyDoc('pruefung')); toast('Leere Prüfung angelegt – Titel antippen, Aufgaben über ＋ einfügen'); return; }
+      if (t.dataset.v === 'new') { closeDlg(false); const d = emptyDoc('pruefung'); if (opts.ki?.kopf) d.kicker = opts.ki.kopf; openDoc(d); toast('Leere Prüfung angelegt – Titel antippen, Aufgaben über ＋ einfügen'); return; }
       if (t.dataset.v === 'ki') { closeDlg(false); openKI({ art: 'pruefung' }); return; }
       if (t.dataset.pick) { sel = sel === t.dataset.pick ? null : t.dataset.pick; draw(); return; }
       if (t.dataset.take) { const d = load(t.dataset.take); if (!d) { toast('Lernpfad nicht gefunden'); return; } closeDlg(false); convertNext = true; openDoc(d); return; }
