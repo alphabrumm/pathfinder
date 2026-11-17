@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-17d';
+const PF_BUILD = '2026-11-17e';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -289,6 +289,7 @@ export function startPathFinder(opts = {}) {
   const saveDocList = l => LS.set(DOCS, JSON.stringify(l));
   const loadDoc = id => { try { const d = JSON.parse(LS.get(DOCKEY(id))); return d ? migrate(d) : null; } catch (e) { return null; } };
   const PLAYER = !!opts.player; // exportierter Lernpfad: nur abspielen, kein Editor
+  const RO = !PLAYER && !!opts.readOnly; // schreibgeschützt (z. B. Prüfung nach dem Start in Probe): ansehen mit Lösungen, Vorschau ausprobieren, nichts ändern
   let doc = null;
   // Erlaubte Formate (z. B. nur 'pruefung', wenn PathFinder in Probe eingebettet ist)
   const FORMS_OK = Array.isArray(opts.forms) && opts.forms.length ? opts.forms : ['lernpfad', 'challenge', 'pruefung'];
@@ -331,7 +332,7 @@ export function startPathFinder(opts = {}) {
 
   const lp = $('#lp'), scroller = $('#scroll');
   function save() {
-    if (PLAYER) return;
+    if (PLAYER || RO) return;
     const ok = LS.set(DOCKEY(doc.id), JSON.stringify(doc));
     LS.set(CUR, doc.id);
     host.saved?.(clone(doc)); // eingebettet (Probe): Entwurf beim Server sichern
@@ -996,6 +997,7 @@ export function startPathFinder(opts = {}) {
   /* ---------- Tastenkürzel ---------- */
   document.addEventListener('keydown', e => {
     if (PLAYER) return;
+    if (RO) { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') { e.preventDefault(); setMode(mode === 'edit' ? 'preview' : 'edit'); } return; }
     if (pop && pop._key && pop._key(e)) return;
     if ($('.ed-dlg')) { if (e.key === 'Escape') closeDlg(false); return; }
     if (!e.target.closest?.('#lp, body') || e.target.closest?.('.pf-side')) return; // Eingaben in der App nebenan nicht abfangen
@@ -2413,6 +2415,24 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   }
   function placePop(anchor) { const r = anchor.getBoundingClientRect(); pop.style.left = Math.max(10, Math.min(innerWidth - pop.offsetWidth - 10, r.right - pop.offsetWidth)) + 'px'; pop.style.top = (r.bottom + 6) + 'px'; }
 
+  /* ---------- Schreibgeschützt (opts.readOnly) ---------- */
+  // Die Bearbeiten-Ansicht bleibt (mit Lösungen, Punkten, Erwartungen), aber nichts lässt sich ändern; die Vorschau zum Ausprobieren bleibt.
+  function roSetup() {
+    document.documentElement.classList.add('pf-ro');
+    ['#bKI', '#bDesign', '#bUndo', '#bRedo', '#bOpen', '#bMore', '#saved'].forEach(s => { const x = $(s); if (x) x.style.display = 'none'; });
+    $$('.ed-bar .ed-sep').forEach(x => { x.style.display = 'none'; });
+    const tag = document.createElement('span'); tag.className = 'ed-ro'; tag.textContent = '🔒 ' + (opts.readOnlyLabel || 'Nur ansehen');
+    tag.title = opts.readOnlyTitle || 'Schreibgeschützt: Du kannst alles ansehen und in der Vorschau ausprobieren, aber nichts ändern.';
+    const sp = $('.ed-bar .sp'); if (sp) sp.after(tag); else $('.ed-bar')?.appendChild(tag);
+    const fix = () => { if (!E()) return; $$('[contenteditable="true"]', lp).forEach(x => x.setAttribute('contenteditable', 'false')); $$('input, select, textarea', lp).forEach(x => { x.disabled = true; }); };
+    new MutationObserver(fix).observe(lp, { childList: true, subtree: true }); fix();
+    const free = t => t.closest?.('[data-fz], #stops a, [data-skst], summary');
+    lp.addEventListener('click', ev => { if (!E() || free(ev.target)) return; ev.stopImmediatePropagation(); if (ev.target.closest('input, button, label, a')) ev.preventDefault(); }, true);
+    ['pointerdown', 'dblclick', 'paste', 'drop', 'dragstart', 'beforeinput', 'keydown'].forEach(n => lp.addEventListener(n, ev => {
+      if (!E() || free(ev.target)) return; ev.stopImmediatePropagation(); if (n !== 'pointerdown' && n !== 'keydown') ev.preventDefault();
+    }, true));
+  }
+
   /* ---------- Leiste oben ---------- */
   function setMode(m) {
     if (pending) commit();
@@ -2431,6 +2451,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   if ($('#viewSeg')) $('#viewSeg').onclick = e => { const x = e.target.closest('button[data-view]'); if (x) setSingle(x.dataset.view === 'one'); };
   $('#bDesign').onclick = openDesign;
   $('#bOpen').onclick = e => openChooser(e.currentTarget);
+  if (RO) roSetup();
   if (host.done) { // eingebettet (Probe): nur diese eine Prüfung; „Fertig“ gibt sie zurück
     $('#bOpen').style.display = 'none';
     const bDone = document.createElement('button'); bDone.className = 'ed-btn ed-lbl ed-done'; bDone.id = 'bDone';
@@ -2438,7 +2459,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     bDone.onclick = async () => {
       if (pending) commit();
       let warn = []; try { warn = (await import(modUrl('pfsplit.js'))).splitExam(doc).warnings; } catch (e) { }
-      if (warn.length && !confirm('Bitte prüfen:\n\n• ' + warn.join('\n• ') + '\n\nTrotzdem fertigstellen?')) return;
+      if (!RO && warn.length && !confirm('Bitte prüfen:\n\n• ' + warn.join('\n• ') + '\n\nTrotzdem fertigstellen?')) return;
       await host.done(clone(doc));
     };
   }

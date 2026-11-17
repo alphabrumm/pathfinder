@@ -719,3 +719,8 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .ed-done { font-weight: 700; }
 /* Knöpfe als <label> (z. B. „Datei der KI laden“ mit verstecktem Datei-Feld): Text mittig wie bei <button> */
 label.lp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-align: center; }
+/* Schreibgeschützt (opts.readOnly): keine Bearbeiten-Werkzeuge, keine Platzhalter */
+.pf-ro .editing .ed-plus, .pf-ro .editing .ed-tools, .pf-ro .editing .ed-station-tools, .pf-ro .editing .ed-add-station, .pf-ro .editing .ed-hint { display: none !important; }
+.pf-ro .editing [data-ph]:empty:not(td):not(th) { display: none; }
+.pf-ro .editing [contenteditable] { cursor: default; outline: none; }
+.ed-ro { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 99px; background: var(--ed-mid); color: var(--ed-ink); font-size: 13px; font-weight: 600; white-space: nowrap; }
