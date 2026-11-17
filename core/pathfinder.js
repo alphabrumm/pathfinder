@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-17c';
+const PF_BUILD = '2026-11-17d';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1860,6 +1860,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       inhalte: lb ? (info.inh || []).filter(k => lb.k.includes(k)) : [],
       alleInhalte: lb ? lb.k : [],
       extra: info.extra || '',
+      ...(info.art === 'pruefung' ? { types: Array.isArray(info.types) ? info.types : ['quiz', 'gapbank', 'gap', 'match', 'short', 'essay'] } : {}),
       ...(basisOf() ? { basis: basisOf().text, basisTitle: basisOf().title } : {})
     };
   }
@@ -1901,6 +1902,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
           <div class="ex-tri"><div class="ex-bar" id="kiBar"></div><input type="range" id="kiP1" min="0" max="100" step="5" value="${info.p1 ?? 40}" aria-label="Grenze Grundlagen / Fortgeschritten"><input type="range" id="kiP2" min="0" max="100" step="5" value="${info.p2 ?? 80}" aria-label="Grenze Fortgeschritten / Experte"></div>
           <div class="ex-lv" id="kiLv"></div>
         </div>
+        <div id="kiTypes" hidden><label>Aufgabenstile</label><div class="ex-types">${T.EXAM_STYLES.map(([k, n, h]) => `<label class="chk"><input type="checkbox" data-kty="${k}"${(info.types || T.EXAM_STYLES.map(s => s[0])).includes(k) ? ' checked' : ''}>${esc(n)} <span class="help">– ${esc(h)}</span></label>`).join('')}</div><span class="help">Die KI nimmt jede angekreuzte Art mindestens einmal auf – und keine anderen.</span></div>
         <div class="row"><label>Jahrgangsstufe<select data-k="jg">${opt('', '– wählen –', info.jg || '')}${[5, 6, 7, 8, 9, 10, 11, 12, 13].map(j => opt(j, j + '. Jahrgangsstufe', info.jg)).join('')}</select></label>
           <label>Fach<select data-k="fsel">${opt('', '– wählen –', info.fsel || '')}${L.FAECHER.map(f => opt(f, f, info.fsel)).join('')}${opt('*', 'anderes Fach …', info.fsel)}</select></label></div>
         <label id="kiFrei" hidden>Fach<input type="text" data-k="ffrei" value="${esc(info.ffrei || '')}" placeholder="z. B. Chemie"></label>
@@ -1960,6 +1962,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const drawBasis = () => { $('#kiBasis', el).innerHTML = kiBasis ? `<div class="ed-hint">📘 Grundlage: Lernpfad „${esc(kiBasis.title)}“ – die KI schreibt neue Prüfungsaufgaben zu genau diesen Inhalten. <button class="lp-btn alt" data-nobasis="1">✕ ohne Grundlage</button></div>` : ''; };
     drawBasis();
     const drawMix = () => {
+      $('#kiTypes', el).hidden = info.art !== 'pruefung';
       const ch = info.art === 'challenge' || info.art === 'pruefung'; $('#kiMix', el).hidden = !ch; if (!ch) return;
       const p1 = info.p1 ?? 40, p2 = info.p2 ?? 80, N = info.art === 'pruefung' ? ['AFB I – Reproduktion', 'AFB II – Transfer', 'AFB III – Problemlösen'] : ['Grundlagen', 'Fortgeschritten', 'Experte'];
       $('#kiBar', el).style.background = `linear-gradient(90deg, #8fd19e 0 ${p1}%, #f6bf3a ${p1}% ${p2}%, #ef8a7a ${p2}% 100%)`;
@@ -1991,6 +1994,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const ready = () => {
       const p = kiPromptInfo(info, L);
       if (!p.thema && !p.extra.trim() && !p.basis) { toast('Bitte einen Lernbereich wählen oder ein Thema eintragen'); return null; }
+      if (p.art === 'pruefung' && !p.types?.length) { toast('Bitte mindestens einen Aufgabenstil wählen'); return null; }
       return p;
     };
     el.addEventListener('change', async e => {
@@ -2009,6 +2013,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         if (k === 'art') drawMix();
         save();
       }
+      if (t.dataset.kty != null) { info.types = $$('[data-kty]', el).filter(x => x.checked).map(x => x.dataset.kty); save(); }
       if (t.id === 'kiP1' || t.id === 'kiP2') {
         let p1 = +$('#kiP1', el).value, p2 = +$('#kiP2', el).value;
         if (p1 > p2) { if (t.id === 'kiP1') p2 = p1; else p1 = p2; $('#kiP1', el).value = p1; $('#kiP2', el).value = p2; }
