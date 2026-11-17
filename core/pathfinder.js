@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-17b';
+const PF_BUILD = '2026-11-17c';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1730,7 +1730,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     let checked = null, direct = false;
     const A = await loadApi();
     const tasks = doc.stations.reduce((n, s) => n + s.blocks.filter(isCheck).length, 0);
-    el.innerHTML = `<header><b>${KI_ICON} Prüfung aus Lernpfad</b><button class="ok" data-x="1">Schließen</button></header>
+    el.innerHTML = `<header><b>${KI_ICON} Fragensammlung für ByCS generieren</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
         <div class="ki-api" id="kiApi"></div>
         <span class="help">Grundlage ist der geöffnete Lernpfad <b>„${esc(plain(doc.title) || 'ohne Titel')}“</b> (${doc.stations.length} Station${doc.stations.length === 1 ? '' : 'en'}, ${tasks} Aufgabe${tasks === 1 ? '' : 'n'}). Die KI erstellt daraus eine Fragensammlung für Moodle.</span>
@@ -1869,8 +1869,18 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
     const KK = (opts.storage || 'pathfinder') + '.ki';
     let info = {}; try { info = JSON.parse(LS.get(KK)) || {}; } catch (e) { }
-    if (preset.art) info.art = preset.art;
+    // Vorgaben von außen (Probe bzw. URL ?fach=…&jg=…&min=…): Art, Fach, Jahrgangsstufe und Umfang schon ausgefüllt
+    const pre = { ...(opts.ki || {}), ...preset };
+    if (pre.art) info.art = pre.art;
     if (!formOk(info.art || 'lernpfad')) info.art = FORMS_OK[0];
+    if (pre.fach) {
+      const f = String(pre.fach).trim(), hit = L.FAECHER.find(x => x.toLowerCase() === f.toLowerCase()) || '*';
+      if (hit !== info.fsel || (hit === '*' && info.ffrei !== f)) { info.lb = ''; info.inh = []; }
+      info.fsel = hit; if (hit === '*') info.ffrei = f;
+    }
+    if (+pre.jg >= 5 && +pre.jg <= 13) { if (String(info.jg) !== String(+pre.jg)) { info.lb = ''; info.inh = []; } info.jg = String(+pre.jg); }
+    if (+pre.min > 0) info.min = L.UMFANG.reduce((a, b) => Math.abs(b - pre.min) < Math.abs(a - pre.min) ? b : a);
+    if (pre.thema) info.thema = pre.thema;
     kiBasis = preset.basis || null; // Lernpfad als Grundlage für eine Prüfung (nicht gespeichert)
     // ältere Angaben (freie Felder) übernehmen
     if (info.fsel == null && info.fach) { info.fsel = L.FAECHER.includes(info.fach.trim()) ? info.fach.trim() : '*'; info.ffrei = info.fach; }
@@ -1880,11 +1890,11 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const save = () => { const p = kiPromptInfo(info, L); info.fach = p.fach; info.klasse = info.jg ? info.jg + '. Klasse' : ''; LS.set(KK, JSON.stringify(info)); };
     let parsed = null, lastAtt = {}, fileAtt = {}, tok = 0;
     const opt = (v, t, sel) => `<option value="${esc(v)}"${String(sel) === String(v) ? ' selected' : ''}>${esc(t)}</option>`;
-    el.innerHTML = `<header><b>${KI_ICON} KI-Lernpfad oder -Challenge</b><button class="ok" data-x="1">Schließen</button></header>
+    el.innerHTML = `<header><b>${KI_ICON} Lernpfad, Challenge oder Prüfung erstellen</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
         <div class="ki-api" id="kiApi"></div>
-        <div class="ki-step"><span class="n">1</span><b>Lernpfad beschreiben</b></div>
-        <label>Art des Lernpfades<select data-k="art">${formOk('lernpfad') ? opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad') : ''}${formOk('challenge') ? opt('challenge', 'Challenge – Übungsaufgaben', info.art) : ''}${formOk('pruefung') ? opt('pruefung', 'Digitale Prüfung – mit Punkten, ohne Rückmeldung', info.art) : ''}</select></label>
+        <div class="ki-step"><span class="n">1</span><b>Beschreibung</b></div>
+        <label>Art des Pfades<select data-k="art">${formOk('lernpfad') ? opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad') : ''}${formOk('challenge') ? opt('challenge', 'Challenge – Übungsaufgaben', info.art) : ''}${formOk('pruefung') ? opt('pruefung', 'Digitale Prüfung – mit Punkten, ohne Rückmeldung', info.art) : ''}</select></label>
         <div id="kiBasis"></div>
         <div id="kiMix" hidden>
           <label>Anteil der Aufgaben</label>
@@ -2251,6 +2261,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const d = migrate(clone(src)), from = plain(d.title || '').trim();
     d.id = uid(); d.form = 'pruefung'; d.pointsOn = true; d.cert = { ...d.cert, on: false }; d.goals = []; d.rank = ''; d.typeLines = []; delete d.skin; delete d.pass;
     d.title = from ? `Prüfung: ${from}` : '';
+    if (opts.ki?.kopf) d.kicker = opts.ki.kopf;
     let tasks = 0, removed = 0;
     for (const s of d.stations) {
       s.check = false; delete s.skin;
@@ -2291,7 +2302,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.x) { closeDlg(false); return; }
       if (t.dataset.v === 'start' || t.dataset.v === 'lp') { view = t.dataset.v; sel = null; draw(); return; }
-      if (t.dataset.v === 'new') { closeDlg(false); openDoc(emptyDoc('pruefung')); toast('Leere Prüfung angelegt – Titel antippen, Aufgaben über ＋ einfügen'); return; }
+      if (t.dataset.v === 'new') { closeDlg(false); const d = emptyDoc('pruefung'); if (opts.ki?.kopf) d.kicker = opts.ki.kopf; openDoc(d); toast('Leere Prüfung angelegt – Titel antippen, Aufgaben über ＋ einfügen'); return; }
       if (t.dataset.v === 'ki') { closeDlg(false); openKI({ art: 'pruefung' }); return; }
       if (t.dataset.pick) { sel = sel === t.dataset.pick ? null : t.dataset.pick; draw(); return; }
       if (t.dataset.take) { const d = load(t.dataset.take); if (!d) { toast('Lernpfad nicht gefunden'); return; } closeDlg(false); convertNext = true; openDoc(d); return; }
@@ -2429,8 +2440,8 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   if ($('#bKI')) $('#bKI').onclick = e => { // nur in der eigenständigen WebApp: Auswahl der KI-Prompts
     closePop(); pop = document.createElement('div'); pop.className = 'ed-pop ki-menu';
     pop.innerHTML = `<h3>KI-Tools</h3><div class="ed-pal ed-pal1">
-      <button data-k="ki"><b>${KI_ICON} KI-Lernpfad oder -Challenge</b><span>einen neuen Lernpfad, eine Challenge oder eine digitale Prüfung von einer KI schreiben lassen</span></button>
-      <button data-k="exam"><b>${KI_ICON} Prüfung aus offenem Lernpfad generieren</b><span>Fragensammlung für Moodle (Moodle-XML)</span></button></div>`;
+      <button data-k="ki"><b>${KI_ICON} Lernpfad, Challenge oder Prüfung erstellen</b><span>einen neuen Lernpfad, eine Challenge oder eine digitale Prüfung von einer KI schreiben lassen</span></button>
+      <button data-k="exam"><b>${KI_ICON} Fragensammlung für ByCS generieren</b><span>aus dem offenen Lernpfad: Fragen für Moodle/ByCS (Moodle-XML)</span></button></div>`;
     document.body.appendChild(pop); placePop(e.currentTarget);
     pop.onclick = ev => { const k = ev.target.closest('[data-k]')?.dataset.k; if (!k) return; closePop(); if (k === 'ki') openKI(); else openExam(); };
   };
@@ -2442,7 +2453,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       <button data-m="reset"><b>↺ Vorschau-Fortschritt zurücksetzen</b><span>Haken, Quiz, Sperren wieder leer</span></button>
       <button data-m="json"><b>{ } Dokument ansehen</b><span>so wird der Lernpfad gespeichert</span></button>
       <button data-m="ki"><b>${KI_ICON} Vorlage für KI</b><span>Lernpfad von einer KI schreiben lassen und einfügen</span></button>
-      <button data-m="exam"><b>${KI_ICON} Prüfung aus Lernpfad</b><span>Fragensammlung für Moodle von einer KI erstellen lassen</span></button>
+      <button data-m="exam"><b>${KI_ICON} Fragensammlung für ByCS generieren</b><span>aus dem Lernpfad Fragen für Moodle/ByCS von einer KI erstellen lassen</span></button>
       <button data-m="certcheck"><b>✓ Zertifikat prüfen</b><span>Prüfcode eines Schüler-Zertifikats nachrechnen</span></button>
       <button data-m="keys"><b>⌘ Tastenkürzel</b><span>für die iPad-Tastatur</span></button>
       <button data-m="del"><b>🗑 Diesen Lernpfad löschen</b><span>nur in diesem Browser</span></button>
@@ -2571,7 +2582,7 @@ ${SC}
     if (pending) commit();
     const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
     if (EXAMF()) { // eine exportierte Datei enthielte die Lösungen
-      el.innerHTML = `<header><b>⇩ Export</b><button class="ok" data-x="1">Schließen</button></header><div class="ed-form"><span class="help"><b>Digitale Prüfungen</b> werden nicht als HTML-Datei oder Lernpaket exportiert: Die Datei enthielte die Lösungen. Sie laufen über die Prüfungsplattform, die den Schülern nur eine Fassung ohne Lösungen schickt.</span><button class="lp-btn" data-json="1">⇩ Prüfungsdatei für Probe (.json)</button><span class="help">Die vollständige Prüfung mit Lösungen – nur für dich: In Probe lädst du sie in deine Prüfung (oder öffnest sie hier über 📂 Dokumente → Datei öffnen). Nicht an Schüler weitergeben.</span><span class="help">Für Moodle: ⋯ → „Prüfung aus Lernpfad“ erstellt eine Fragensammlung (Moodle-XML).</span></div>`;
+      el.innerHTML = `<header><b>⇩ Export</b><button class="ok" data-x="1">Schließen</button></header><div class="ed-form"><span class="help"><b>Digitale Prüfungen</b> werden nicht als HTML-Datei oder Lernpaket exportiert: Die Datei enthielte die Lösungen. Sie laufen über die Prüfungsplattform, die den Schülern nur eine Fassung ohne Lösungen schickt.</span><button class="lp-btn" data-json="1">⇩ Prüfungsdatei für Probe (.json)</button><span class="help">Die vollständige Prüfung mit Lösungen – nur für dich: In Probe lädst du sie in deine Prüfung (oder öffnest sie hier über 📂 Dokumente → Datei öffnen). Nicht an Schüler weitergeben.</span><span class="help">Für Moodle: ⋯ → „Fragensammlung für ByCS generieren“ erstellt Fragen für Moodle/ByCS (Moodle-XML).</span></div>`;
       el.onclick = e => { if (e.target.closest('[data-x]')) closeDlg(false); if (e.target.closest('[data-json]')) { download(new Blob([JSON.stringify(doc, null, 1)], { type: 'application/json' }), fileName('.probe.json')); closeDlg(false); toast('⇩ Prüfungsdatei erstellt'); } };
       return;
     }

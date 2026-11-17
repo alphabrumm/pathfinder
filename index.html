@@ -62,8 +62,11 @@ const sample = () => {
   };
 };
 
-// ?nur=pruefung: nur digitale Prüfungen (so wie eingebettet in Probe) – zum Ausprobieren
-const nur = new URLSearchParams(location.search).get('nur');
-startPathFinder({ appName: 'PathFinder', logo: 'icon.svg', storage: 'pathfinder', sample, examples: 'beispiele/index.json', ...(nur ? { forms: nur.split(',') } : {}) });
+// URL-Parameter: ?nur=pruefung (nur digitale Prüfungen, so wie eingebettet in Probe)
+// und Vorgaben für den KI-Dialog: ?fach=Physik&jg=8 (oder &klasse=8b)&min=45&kopf=Physik%20·%208b
+const q = new URLSearchParams(location.search), nur = q.get('nur');
+const ki = {}; if (q.get('fach')) ki.fach = q.get('fach'); const jg = q.get('jg') || (q.get('klasse') || '').match(/\d{1,2}/)?.[0]; if (jg) ki.jg = +jg;
+if (q.get('min')) ki.min = +q.get('min'); if (q.get('kopf')) ki.kopf = q.get('kopf');
+startPathFinder({ appName: 'PathFinder', logo: 'icon.svg', storage: 'pathfinder', sample, examples: 'beispiele/index.json', ...(nur ? { forms: nur.split(',') } : {}), ki });
 </script>
 </body></html>
