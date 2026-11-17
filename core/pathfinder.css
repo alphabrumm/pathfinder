@@ -717,3 +717,5 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .ex-lpact { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 8px 4px; }
 .ex-lp > .help { display: block; padding: 0 10px 8px; }
 .ed-done { font-weight: 700; }
+/* Knöpfe als <label> (z. B. „Datei der KI laden“ mit verstecktem Datei-Feld): Text mittig wie bei <button> */
+label.lp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-align: center; }
