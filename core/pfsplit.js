@@ -35,6 +35,24 @@ function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { co
 export const ptsOf = b => Math.max(0, +(b.pts ?? 1) || 0);
 /** Lücken eines Lückentexts: je Lücke die erlaubten Antworten */
 export const gapAnswers = html => [...String(html || '').matchAll(GAP_RE)].map(m => m[1].split('|').map(s => s.trim()));
+/** Lückenpaare, die zusammen eine ganze Gleichung bilden („[[3x]] = [[9]]“, davor nichts außer z. B. „I + II:“, dahinter Zeilenende):
+ *  dort ist auch die vertauschte Reihenfolge richtig (9 = 3x). Liefert [[i, j], …] */
+export function gapSwaps(html) {
+  const s = String(html || '').replace(/&nbsp;|\u00a0/g, ' '), m = [...s.matchAll(/\[\[(.+?)\]\]/g)], out = [];
+  const startOk = t => { t = t.replace(/\s+$/, ''); return !t || /(<(?!\/?su[bp]\b)[^>]*>|[:;,|⇒⇔→])$/.test(t); };
+  const endOk = t => { t = t.replace(/^\s+/, ''); return !t || /^(<(?!su[bp]\b)|[,;.|⇒⇔→])/.test(t); };
+  for (let i = 0; i + 1 < m.length; i++) {
+    const a = m[i], b = m[i + 1], ea = a.index + a[0].length, eb = b.index + b[0].length;
+    if (/^\s*=\s*$/.test(s.slice(ea, b.index)) && startOk(s.slice(0, a.index)) && endOk(s.slice(eb))) { out.push([i, i + 1]); i++; }
+  }
+  return out;
+}
+/** je Lücke richtig/falsch; ok(i, v) prüft Antwort v für Lücke i. Vertauschte Seiten einer Gleichung zählen als richtig. */
+export function gapOks(html, n, given, ok) {
+  const r = Array.from({ length: n }, (_, i) => ok(i, given?.[i]));
+  for (const [i, j] of gapSwaps(html)) if (!(r[i] && r[j]) && ok(i, given?.[j]) && ok(j, given?.[i])) r[i] = r[j] = true;
+  return r;
+}
 export const normAns = s => String(s ?? '').trim().toLowerCase().replace(/\s+/g, '').replace(',', '.');
 /** Antwort prüfen: Text ohne Groß/Klein und Leerzeichen, Zahlen auch mit Komma und kleinen Rundungsunterschieden (wie im Lernpfad) */
 export function isAnswer(expected, v) {
@@ -139,11 +157,8 @@ export function gradeExam(key, answers = {}, opt = {}) {
         it.parts.push({ label: t.qs.length > 1 ? strip(q.q) || `Frage ${qi + 1}` : 'Antwort', given: o ? strip(o.t) : '', ok: !!ok, expected: q.opts.filter(x => x.ok).map(x => strip(x.t)).join(' oder ') });
       });
     } else if (t.type === 'gap') {
-      t.gaps.forEach((alts, i) => {
-        const g = a?.[i] ?? '', all = alts.concat(acc[i] || []);
-        const ok = String(g).trim() !== '' && (t.bank ? all.some(x => normAns(x) === normAns(g)) : isAnswer(all.join('|'), g));
-        it.parts.push({ label: `Lücke ${i + 1}`, given: String(g), ok, expected: alts.join(' oder ') });
-      });
+      const oks = gapOks(t.html, t.gaps.length, a, (i, g) => { g = g ?? ''; const all = t.gaps[i].concat(acc[i] || []); return String(g).trim() !== '' && (t.bank ? all.some(x => normAns(x) === normAns(g)) : isAnswer(all.join('|'), g)); });
+      t.gaps.forEach((alts, i) => it.parts.push({ label: `Lücke ${i + 1}`, given: String(a?.[i] ?? ''), ok: oks[i], expected: alts.join(' oder ') }));
     } else if (t.type === 'match') {
       t.pairs.forEach(p => {
         const g = a?.[p.kb], got = t.pairs.find(x => x.ka === g);

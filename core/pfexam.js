@@ -82,7 +82,7 @@ REGELN
 
 VORLAGEN (genau dieses Format verwenden)
 ${types.map(([k, n]) => {
-    if (k === 'equation') return `${n}: wie „Drag & Drop mit Begriffen“ (type="ddwtos"). Ein Gleichungssystem wird Schritt für Schritt gelöst; Terme, Zahlen und Rechenzeichen werden in die Lücken [[n]] gezogen, dazu 2–3 falsche Bausteine als Ablenker. Gleichungen in <p>, Exponenten mit <sup>. Diesen Typ nur verwenden, wenn der Lernpfad Gleichungen oder Formeln enthält.`;
+    if (k === 'equation') return `${n}: wie „Drag & Drop mit Begriffen“ (type="ddwtos"). Ein Gleichungssystem wird Schritt für Schritt gelöst; Terme, Zahlen und Rechenzeichen werden in die Lücken [[n]] gezogen, dazu 2–3 falsche Bausteine als Ablenker. Gleichungen in <p>, Exponenten mit <sup>. Pro Gleichung höchstens eine Seite als Lücke (z. B. „3x = [[1]]“), weil Moodle vertauschte Seiten („9 = 3x“ statt „3x = 9“) als falsch werten würde. Diesen Typ nur verwenden, wenn der Lernpfad Gleichungen oder Formeln enthält.`;
     if (k === 'gapselect') return `${n} – [[n]] verweist auf die n-te <selectoption>; Optionen derselben <group> erscheinen gemeinsam im Auswahlmenü (Ablenker in dieselbe Gruppe):\n${tpl[k]}`;
     if (k === 'ddwtos') return `${n} – [[n]] verweist auf die n-te <dragbox>:\n${tpl[k]}`;
     return `${n}:\n${tpl[k]}`;
