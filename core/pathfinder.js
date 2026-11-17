@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-17e';
+const PF_BUILD = '2026-11-17f';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1957,7 +1957,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       const box = $('#kiInh', el), lb = L.lernbereiche(info.fsel, +info.jg || 0).find(x => x.id === info.lb);
       if (!lb) { box.innerHTML = ''; return; }
       info.inh = info.inh.filter(k => lb.k.includes(k));
-      box.innerHTML = `<div class="ki-inh-h"><b>Inhalte für den Lernpfad</b><span class="help">nichts angekreuzt = ganzer Lernbereich</span><button class="lp-btn alt sm" data-inh="all">${info.inh.length === lb.k.length ? 'keine' : 'alle'}</button></div>`
+      box.innerHTML = `<div class="ki-inh-h"><b>Inhalte für ${info.art === 'pruefung' ? 'die Prüfung' : info.art === 'challenge' ? 'die Challenge' : 'den Lernpfad'}</b><span class="help">nichts angekreuzt = ganzer Lernbereich</span><button class="lp-btn alt sm" data-inh="all">${info.inh.length === lb.k.length ? 'keine' : 'alle'}</button></div>`
         + lb.k.map(k => `<label class="chk"><input type="checkbox" data-kw="${esc(k)}"${info.inh.includes(k) ? ' checked' : ''}>${esc(k)}</label>`).join('');
     };
     drawLb();

@@ -1,12 +1,35 @@
 // LehrplanPLUS Bayern, Gymnasium (G9), Fachlehrpläne – Lernbereiche mit Inhalts-Schlagworten
-// Quelle: https://www.lehrplanplus.bayern.de (Fachlehrpläne), Stand der Übernahme: November 2026.
+// Quelle: https://www.lehrplanplus.bayern.de (Fachlehrpläne), Stand der Übernahme: November 2026 (weitere Fächer: 17.11.2026).
 // Schlagworte sind Kurzfassungen der „Inhalte zu den Kompetenzen“, keine wörtlichen Zitate.
 // Aufbau: LP[Fach][Jahrgangsstufe] = [[Nummer, Titel, [Schlagworte], Gruppe?], …]
 // Gruppe (optional) trennt Varianten, z. B. Anforderungsniveau oder Ausbildungsrichtung.
 
 export const SOURCE = 'LehrplanPLUS Bayern, Gymnasium, Fachlehrpläne';
+/** Pfad auf lehrplanplus.bayern.de für die neu aufgenommenen Fächer (Standardvariante wie in LP hinterlegt) */
+const OB = j => j >= 12 ? '/grundlegend' : '';
+const SLUG = {
+  Biologie: j => 'biologie' + OB(j),
+  Chemie: j => 'chemie' + (j === 9 || j === 10 ? '/ch' : OB(j)),
+  'Natur und Technik': () => 'nt_gym',
+  Englisch: j => 'englisch' + (j >= 6 && j <= 9 ? '/1-fremdsprache' : OB(j)),
+  Französisch: j => 'franzoesisch' + (j === 8 ? '/2fs' : j <= 9 ? '/2-fremdsprache' : j <= 11 ? '/1-2-fremdsprache' : '/grundlegend-1-2-3'),
+  Spanisch: j => 'spanisch' + (j >= 12 ? '/grundlegend-3' : j >= 10 ? '/3-fremdsprache' : ''),
+  Italienisch: j => 'italienisch' + (j >= 12 ? '/grundlegend-3' : j >= 10 ? '/3-fremdsprache' : ''),
+  Russisch: j => 'russisch' + (j >= 12 ? '/grundlegend-3' : j >= 10 ? '/3-fremdsprache' : ''),
+  Griechisch: j => 'griechisch' + OB(j),
+  Geographie: j => 'geographie' + OB(j),
+  'Wirtschaft und Recht': j => 'wirtschaft-und-recht' + (j === 10 || j === 11 ? '/andere' : OB(j)),
+  'Politik und Gesellschaft': j => 'pug' + (j === 10 ? '/einstuendig' : j === 11 ? '/zweistuendig' : OB(j)),
+  'Katholische Religionslehre': j => 'katholische-religionslehre' + OB(j),
+  'Evangelische Religionslehre': j => 'evangelische-religionslehre' + OB(j),
+  Ethik: j => 'ethik' + OB(j),
+  Musik: j => 'musik' + OB(j),
+  Kunst: j => 'kunst' + OB(j),
+  Wirtschaftsinformatik: () => 'wirtschaftsinformatik',
+};
 export const URL = (fach, jgst) => {
   jgst = +jgst;
+  if (SLUG[fach]) return `https://www.lehrplanplus.bayern.de/fachlehrplan/gymnasium/${jgst}/${SLUG[fach](jgst)}`;
   let f = ({ Mathematik: 'mathematik', Physik: 'physik', Informatik: 'informatik', Deutsch: 'deutsch', Geschichte: 'geschichte', Latein: 'latein' })[fach] || '';
   if ((fach === 'Physik' && (jgst === 5 || jgst === 7)) || (fach === 'Informatik' && jgst < 8)) f = 'nt_gym';
   else if ((fach === 'Physik' || fach === 'Informatik' || fach === 'Geschichte') && jgst >= 12 || fach === 'Latein' && jgst === 12) f += '/grundlegend';
@@ -19,6 +42,9 @@ export const URL = (fach, jgst) => {
 const NT = 'Natur und Technik';
 const GA = 'grundlegendes Anforderungsniveau', EA = 'erhöhtes Anforderungsniveau';
 const L1 = 'Latein als 1. Fremdsprache', L2 = 'Latein als 2. Fremdsprache';
+const NTG = 'Naturwissenschaftlich-technologisches Gymnasium (NTG)', CHA = 'HG, SG, MuG, WWG, SWG';
+const WWG = 'Wirtschaftswissenschaftliches Gymnasium (WWG)';
+const F2 = 'Französisch als 2. Fremdsprache', S3 = '3. Fremdsprache', G3 = '3. Fremdsprache';
 
 const DEUTSCH_SEK1_TITEL = {
   '1.1': 'Verstehend zuhören', '1.2': 'Zu und vor anderen sprechen', '1.3': 'Mit anderen sprechen', '1.4': 'Szenisch spielen',
@@ -431,9 +457,736 @@ export const LP = {
       '3.3': ['Kollaborativ überarbeiten'], '4.1': ['Sprachvarietäten, Spracherwerb', 'Sprache, Denken, Wirklichkeit', 'Sprache und Macht', 'Persuasive Strategien'],
       '4.2': ['Konnotation, Denotation', 'Verdichtung, Abstrahierung'], '4.3': ['Sprachnormen', 'Digitale Korrekturwerkzeuge']
     })
+  },
+  Biologie: {
+    8: [
+      ['1', 'Erkenntnisse gewinnen – kommunizieren – bewerten', ['Naturwissenschaftlicher Erkenntnisweg', 'Untersuchungen planen und durchführen', 'Daten auswerten und interpretieren', 'Fehlerquellen', 'Modelle und ihre Grenzen', 'Tabellen, Diagramme, Schemazeichnungen']],
+      ['2', 'Informationsaufnahme, -verarbeitung und Reaktion beim Menschen', ['Nervenzelle und Reiz-Reaktions-Kette', 'Auge, Lichtwahrnehmung, Sehfehler', 'Hörvorgang und Lärmschäden', 'Hormone: Schlüssel-Schloss-Prinzip', 'Blutzuckerregulation und Diabetes', 'Stressreaktion', 'Nerven- und Hormonsystem im Vergleich']],
+      ['3', 'Fortpflanzung und Individualentwicklung des Menschen', ['Bedeutung der Sexualität', 'Pubertät und hormonelle Steuerung', 'Menstruationszyklus', 'Schwangerschaft und Vorsorge', 'Empfängnisregulation', 'Schutz vor sexuell übertragbaren Krankheiten']],
+      ['4', 'Verhalten – genetisch bedingt und erlernt', ['Reize und innere Faktoren', 'Angeborenes Verhalten und Prägung', 'Kaspar-Hauser-Experimente', 'Klassische und operante Konditionierung', 'Lernfähigkeit des Menschen']],
+      ['5', 'Suchtgefahren und Gesundheit', ['Genuss und Sucht', 'Stoffgebundene und nicht stoffgebundene Sucht', 'Entstehung von Sucht', 'Folgen für Betroffene', 'Lebenskompetenzen']],
+      ['6', 'Ökosysteme unter dem Einfluss des Menschen', ['Sukzession', 'Wildnis und Kulturlandschaft', 'Eingriffe des Menschen', 'Renaturierung', 'Nachhaltigkeit und ökologischer Fußabdruck']],
+    ],
+    9: [
+      ['1', 'Erkenntnisse gewinnen – kommunizieren – bewerten', ['Versuchsplanung und Hypothesen', 'Fehlerquellen und Dateninterpretation', 'Mikroskopieren', 'Modelle kritisch betrachten', 'Pro- und Kontra-Argumente abwägen']],
+      ['2', 'Mikroorganismen in der Biotechnologie', ['Bau von Bakterien', 'Zweiteilung und Populationswachstum', 'Gärung und Zellatmung', 'Lebensmittelverderb und Konservierung', 'Nutzung in Lebensmitteln und Biogas']],
+      ['3', 'Genetik und Gentechnik', ['Proteine und Proteinbiosynthese', 'DNA als Informationsspeicher', 'Vom Gen zum Merkmal', 'Replikation und Zellzyklus', 'Meiose und Neukombination', 'Genommutationen', 'Ethik der Gentechnik']],
+      ['4', 'Evolution', ['Stammesgeschichte und Fossilien', 'Evolutionsfaktoren', 'Angepasstheit als Selektionsvorteil', 'Geographische Isolation und Artbildung']],
+      ['5', 'Biodiversität bei Wirbellosen – Variabilität und Angepasstheit', ['Außenskelett der Insekten', 'Tracheen und offener Kreislauf', 'Metamorphose', 'Nervensystem und Sinne', 'Staatenbildung', 'Mundwerkzeuge']],
+      ['6', 'Ökosystem Boden', ['Bodeneigenschaften und Bodenleben', 'Nahrungsnetz und Energiefluss', 'Humusbildung und Mineralisierung', 'Kohlenstoffkreislauf', 'Einflüsse des Menschen']],
+    ],
+    10: [
+      ['1', 'Erkenntnisse gewinnen – kommunizieren – bewerten', ['Hypothesen prüfen', 'Daten auswerten', 'Modelle kritisch betrachten', 'Quellen wählen', 'Entscheidungen begründen']],
+      ['2', 'Ökosystem Mensch', ['Symbionten und Krankheitserreger', 'Bakterien und Viren', 'Immunabwehr', 'Impfungen', 'Antibiotika und Resistenzen']],
+      ['3', 'Stoff- und Energieumwandlung im Menschen', ['Makro- und Mikronährstoffe', 'Enzyme und Verdauung', 'Gasaustausch und Blutkreislauf', 'Glucoseabbau und ATP']],
+      ['4', 'Vergangenheit und Zukunft des Menschen', ['Geschichte des Lebens', 'Einordnung des Homo sapiens', 'Fossilfunde', 'Kulturelle Evolution']],
+    ],
+    12: [
+      ['1', 'Erkenntnisse gewinnen – kommunizieren – bewerten', ['Sachkompetenz', 'Erkenntnisgewinnung', 'Kommunikation', 'Bewertung', 'Fachübergreifende Bezüge'], GA],
+      ['2', 'Genetik und Gentechnik', ['DNA und Proteinbiosynthese', 'Genregulation und Stammzellen', 'Replikation, PCR, Zellzyklus', 'Meiose, Mutationen, Gentechnik', 'Mendelsche Regeln', 'Humangenetik und DNA-Analytik'], GA],
+      ['3', 'Evolution', ['Molekulare Homologien und Stammbäume', 'Systematik', 'Synthetische Evolutionstheorie', 'Artbildung', 'Koevolution'], GA],
+      ['4', 'Verhaltensökologie – Evolution und Angepasstheit von Verhalten', ['Adaptiver Wert von Verhalten', 'Kosten-Nutzen-Analyse', 'Kooperation und Altruismus', 'Aggression und Rangordnung', 'Partnerwahl', 'Brutpflege'], GA],
+    ],
+    13: [
+      ['1', 'Erkenntnisse gewinnen – kommunizieren – bewerten', ['Hypothesen und Modelle', 'Quellenkritik', 'Argumentation', 'Bewertung'], GA],
+      ['2', 'Neuronale Informationsverarbeitung', ['Bau der Nervenzelle', 'Ruhe- und Aktionspotential', 'Erregungsleitung', 'Chemische Synapsen und Wirkstoffe', 'Depression und Monoamin-Hypothese'], GA],
+      ['3', 'Stoffwechselphysiologie der Zelle', ['Photosynthese und Außenfaktoren', 'Lichtreaktionen und Calvin-Zyklus', 'Enzymregulation', 'Anaerober und aerober Glucoseabbau', 'Photosynthese und Zellatmung im Vergleich'], GA],
+      ['4', 'Ökologie und Biodiversität', ['Biotop und Biozönose', 'Populationen und ökologische Nische', 'Ökosystemleistungen', 'Nachhaltige Nutzung', 'Globale Veränderungen der Biosphäre'], GA],
+    ],
+  },
+  Chemie: {
+    8: [
+      ['1', 'Wie Chemiker denken und arbeiten', ['Gefahrstoffe und Laborsicherheit', 'Experimentieren und Protokollieren', 'Modelle hinterfragen', 'Fachsprache', 'Nachhaltigkeit'], NTG],
+      ['2', 'Stoffe und ihre Eigenschaften', ['Kenneigenschaften', 'Teilchenmodell und Aggregatzustände', 'Reinstoffe und Gemische', 'Trennverfahren', 'Gasnachweise', 'Luft als Stoffgemisch'], NTG],
+      ['3', 'Chemische Reaktion', ['Stoff- und Energieumsatz', 'Exotherm und endotherm', 'Katalyse', 'Massenerhaltung', 'Atommasse und Molekülformel', 'Verbrennung und CO₂'], NTG],
+      ['4', 'Chemische Verbindungen und ihre Eigenschaften', ['Metallbindung', 'Moleküle und Ionengitter', 'Salze und Verhältnisformeln', 'Ionennachweise', 'Kern-Hülle-Modell'], NTG],
+    ],
+    9: [
+      ['1', 'Wie Chemiker denken und arbeiten', ['Gefahrstoffe und Sicherheit', 'Experimente und Protokolle', 'Erkenntnisweg und Modelle', 'Nomenklatur und Formelsprache'], CHA],
+      ['2', 'Stoffe und ihre Eigenschaften – vom Teilchenmodell', ['Teilchenmodell und Aggregatzustände', 'Kenneigenschaften von Reinstoffen', 'Stofftrennung', 'Gasnachweise'], CHA],
+      ['3', 'Chemische Reaktion – zum Daltonschen Atommodell', ['Stoff- und Energieumsatz', 'Massenerhaltung', 'Molekülformeln und Stoffmengen', 'Exotherm und endotherm', 'Katalyse'], CHA],
+      ['4', 'Chemische Verbindungen – zum Kern-Hülle-Modell', ['Grenzen des Dalton-Modells', 'Kern-Hülle-Modell', 'Metallbindung', 'Molekül- und Verhältnisformeln', 'Salzeigenschaften'], CHA],
+      ['5', 'Atombau und gekürztes Periodensystem', ['Energiestufenmodell', 'Ionisierungsenergie', 'Valenzelektronen', 'Edelgaskonfiguration', 'Ionenladungen'], CHA],
+      ['6', 'Donator-Akzeptor-Konzept – Elektronenübergänge', ['Elektrolyse von Salzlösungen', 'Salzbildung', 'Redoxreaktionen', 'Elektronenabgabe und -aufnahme', 'Batterien und Akkus'], CHA],
+      ['1', 'Wie Chemiker denken und arbeiten', ['Gefahrstoffe und Laborregeln', 'Arbeitstechniken', 'Erkenntnisweg', 'Darstellungsformen'], NTG],
+      ['2', 'Atombau und gekürztes Periodensystem', ['Energiestufenmodell', 'Ionisierungsenergie', 'Valenzelektronen und Ionenladung', 'Edelgasregel', 'Flammenfärbung'], NTG],
+      ['3', 'Donator-Akzeptor-Konzept – Elektronenübergänge', ['Elektrolyse', 'Salzbildung', 'Oxidation als Elektronenabgabe', 'Batterien', 'Reversibilität'], NTG],
+      ['4', 'Moleküle – vom Orbitalmodell zum EPA-Modell', ['Valenzstrichformeln', 'Orbitale und Elektronenpaarbindung', 'Mesomerie', 'Räumlicher Bau', 'Nomenklatur der Kohlenwasserstoffe'], NTG],
+      ['5', 'Wechselwirkungskonzept – Anziehung zwischen Teilchen', ['Elektronegativität und Polarität', 'Funktionelle Gruppen', 'Zwischenmolekulare Kräfte', 'Erdölprodukte', 'Besonderheiten des Wassers'], NTG],
+    ],
+    10: [
+      ['1', 'Wie Chemiker denken und arbeiten', ['Laborsicherheit', 'Lösungen definierter Konzentration', 'Erkenntnisweg', 'Reaktionsgleichungen', 'Bewertung'], CHA],
+      ['2', 'Moleküle – vom Orbitalmodell zum EPA-Modell', ['Valenzstrichformeln', 'Elektronenpaarbindung', 'Mesomerie', 'Molekülgeometrie', 'Nomenklatur', 'Alkene, Alkine, E/Z-Isomerie'], CHA],
+      ['3', 'Wechselwirkungskonzept – Anziehung zwischen Teilchen', ['Elektronegativität und Polarität', 'Funktionelle Gruppen', 'Zwischenmolekulare Kräfte', 'Erdölprodukte', 'Hydrophil, hydrophob, amphiphil'], CHA],
+      ['4', 'Donator-Akzeptor-Konzept bei Protonenübergängen', ['pH-Wert und Indikatoren', 'Brønsted-Säuren und -Basen', 'Carbonsäuren', 'Neutralisation und Titration', 'Konzentrationen berechnen'], CHA],
+      ['5', 'Redoxreaktionen in wässriger Lösung', ['Oxidationszahlen', 'Redoxteilgleichungen', 'Oxidation von Alkoholen', 'Aldehydnachweis', 'Brennstoffzellen'], CHA],
+      ['6', 'Nukleophil-Elektrophil-Reaktionen', ['Glucose, Fructose, Saccharose', 'Keto-Enol-Tautomerie', 'Estersynthese und Hydrolyse', 'Peptidbindung'], CHA],
+      ['1', 'Wie Chemiker denken und arbeiten', ['Laborsicherheit', 'Titration', 'Erkenntnisweg', 'Reaktionsgleichungen', 'Bewertung'], NTG],
+      ['2', 'Donator-Akzeptor-Konzept bei Protonenübergängen', ['Säuren, Basen, Neutralisation', 'pH-Skala und Indikatoren', 'Brønsted-Konzept und Ampholyte', 'Säure-Base-Titration'], NTG],
+      ['3', 'Redoxreaktionen', ['Metalle als Reduktionsmittel', 'Oxidationszahlen', 'Redoxgleichungen', 'Oxidation von Alkoholen', 'Batterien und Brennstoffzellen'], NTG],
+      ['4', 'Nukleophil-Elektrophil-Reaktionen', ['Esterbildung und -hydrolyse', 'Fette', 'Seifen und Tenside', 'Waschmittel', 'Fruchtester'], NTG],
+    ],
+    11: [
+      ['1', 'Wie Chemiker denken und arbeiten', ['Laborsicherheit', 'Analysemethoden', 'Hypothesen und Modelle', 'Datenauswertung', 'Bewerten'], NTG],
+      ['2', 'Lebensmittelchemie', ['Nährstoffe und Zusatzstoffe', 'Nachweise und Chromatographie', 'Chiralität', 'Kohlenhydrate, Fette, Proteine', 'Enzyme', 'Nachhaltige Ernährung'], NTG],
+      ['3', 'Pharmazie', ['Magensäure und Antazida', 'Schmerzmittel und Synthese', 'Wirkstoffe und Enzymhemmung', 'Darreichungsformen'], NTG],
+    ],
+    12: [
+      ['1', 'Wie Chemikerinnen und Chemiker denken und arbeiten', ['Sachkompetenz', 'Erkenntnisgewinnung', 'Kommunikation', 'Bewertung'], GA],
+      ['2', 'Atombau', ['Spektren', 'Quantenzahlen', 'Elektronenkonfiguration', 'Aufbau des Periodensystems'], GA],
+      ['3', 'Analytik', ['Ionennachweise', 'Nachweis funktioneller Gruppen', 'Blindproben'], GA],
+      ['4', 'Chemische Bindung', ['Bindungs- und Wechselwirkungstypen', 'Orbitale und Hybridisierung', 'Stoffklassen im Vergleich'], GA],
+      ['5', 'Kohlenwasserstoffe – Energieträger und Reaktionspartner', ['Fossile und nachwachsende Rohstoffe', 'Reaktionsenthalpie', 'Radikalische Substitution', 'Halogenkohlenwasserstoffe'], GA],
+      ['6', 'Reaktionsgeschwindigkeit', ['Mittlere und momentane Geschwindigkeit', 'Einflussfaktoren', 'Stoßtheorie', 'Katalyse'], GA],
+      ['7', 'Chemisches Gleichgewicht', ['Dynamisches Gleichgewicht', 'Prinzip von Le Chatelier', 'Massenwirkungsgesetz', 'Haber-Bosch-Verfahren'], GA],
+      ['8', 'Redoxgleichgewichte – Energetik und technische Anwendung', ['Galvanische Zellen', 'Spannungsreihe', 'Batterien und Brennstoffzellen', 'Entropie'], GA],
+    ],
+  },
+  'Natur und Technik': {
+    5: [
+      ['1.1', 'Naturwissenschaftliches Arbeiten: Arbeitsmethoden', ['Labor- und Werkstattarbeit', 'Größen messen', 'Einfache Nachweisreaktionen', 'Erkenntnisweg und Hypothesen', 'Dokumentation und Präsentation']],
+      ['1.2', 'Naturwissenschaftliches Arbeiten: Themenbereiche und Konzepte', ['Licht', 'Luft', 'Wasser', 'Boden und Gestein', 'Stoffe trennen', 'Teilchenmodell', 'Energieumwandlung']],
+      ['2.1', 'Biologie: Erkenntnisse gewinnen – kommunizieren – bewerten', ['Erkenntnisweg', 'Mikroskopieren', 'Modelle und Protokolle', 'Fachsprache']],
+      ['2.2', 'Biologie – die Wissenschaft von den Lebewesen', ['Kennzeichen von Lebewesen', 'Aufbau aus Zellen', 'Pflanzliche und tierische Zellen']],
+      ['2.3', 'Der Mensch als Lebewesen', ['Sinnesorgane', 'Bewegungsapparat', 'Atmung und Stoffwechsel', 'Blutkreislauf', 'Pubertät', 'Suchtgefahren']],
+      ['2.4', 'Samenpflanzen als Lebewesen', ['Blütenbau', 'Bestäubung', 'Blütendiagramme', 'Pflanzenfamilien']],
+      ['2.5', 'Ökosystem Grünland', ['Pflanzen bestimmen', 'Umweltfaktoren', 'Bewirtschaftung', 'Lebensgemeinschaft']],
+    ],
+    6: [
+      ['1.1', 'Biologie: Erkenntnisse gewinnen – kommunizieren – bewerten', ['Variablen und Kontrollversuch', 'Mikroskopie', 'Modelle', 'Darstellungsformen']],
+      ['1.2', 'Samenpflanzen als Lebewesen', ['Früchte und Samen', 'Ausbreitung', 'Bionik', 'Keimung', 'Photosynthese und Zellatmung']],
+      ['1.3', 'Biodiversität bei Wirbeltieren', ['Fortbewegung', 'Energiehaushalt', 'Fortpflanzung', 'Sinnesorgane']],
+      ['1.4', 'Verwandtschaft der Wirbeltiere und Evolution', ['Wirbeltierklassen', 'Züchtung und Evolution', 'Heim- und Nutztiere']],
+      ['1.5', 'Ökosystem Gewässer', ['Freilanduntersuchung', 'Artenkenntnis', 'Nahrungsnetz', 'Gewässerschutz']],
+      ['2.1', 'Informatik: Informationsdarstellung mit Grafik-, Text- und Multimediadokumenten', ['Objekte, Attribute, Methoden', 'Vektor- und Pixelgrafik', 'Textdokumente', 'Software-Grundfunktionen']],
+      ['2.2', 'Informatik: Projekt Multimediapräsentation', ['Gestaltungskriterien', 'Urheberrecht', 'Quellenangaben']],
+      ['2.3', 'Informatik: Hierarchische Informationsstrukturen – Dateisystem', ['Baumstrukturen', 'Ordner und Dateien', 'Pfade']],
+    ],
+  },
+  Englisch: {
+    5: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Einfache Gespräche verstehen', 'Kurze Texte lesen', 'Über sich selbst sprechen', 'E-Mails, Postkarten, Dialoge', 'Einfache Sprachmittlung']],
+      ['1.2', 'Wortschatz', ['Alltagswortschatz', 'Unregelmäßige Verben', 'Classroom phrases', 'Idioms und Collocations']],
+      ['1.2', 'Grammatik', ['Nomen, Artikel, Pronomen', 'Fragen und Kurzantworten', 'Verneinung und Wortstellung', 'Present simple und progressive', 'Simple past', 'Hilfs- und Modalverben']],
+      ['2', 'Interkulturelle Kompetenzen', ['Geographie von UK und USA', 'Alltagskultur in Großbritannien', 'Höfliches Verhalten', 'Englisch als Weltsprache']],
+      ['3', 'Text- und Medienkompetenzen', ['Sach-, Dialog- und Erzähltexte', 'Reime und Lieder', 'Einfache Filmsequenzen']],
+      ['5', 'Themengebiete', ['Leben im sozialen Umfeld', 'Britische Inseln und Nordamerika', 'London, Washington D.C., New York', 'Aktuelle Anlässe']],
+    ],
+    6: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Alltagsgespräche verstehen', 'Berichte lesen', 'Kurzvortrag mit Stichwortzettel', 'E-Mails und Bildergeschichten', 'Persönliche Briefe', 'Sprachmittlung im Alltag']],
+      ['1.2', 'Wortschatz', ['Freizeit, Sport, Musik', 'Reisen, Wetter, Wegbeschreibung', 'Gesundheit', 'Phrasal verbs']],
+      ['1.2', 'Grammatik', ['Present perfect simple', 'Past progressive', 'Futur: going to, will, timetable', 'Modalverben could, may, might, should', 'Konditionalsatz I', 'Relativsätze', 'Question tags']],
+      ['2', 'Interkulturelle Kompetenzen', ['Geographie und Geschichte UK/USA', 'Alltagskultur Gleichaltriger', 'Höfliche Kommunikation']],
+      ['3', 'Text- und Medienkompetenzen', ['Sach- und Erzähltexte', 'Websites von Sehenswürdigkeiten', 'Kreatives Schreiben und Rollenspiel', 'Filmsequenzen mit Untertiteln']],
+      ['5', 'Themengebiete', ['Sport, Musik und Reisen', 'Stadt- und Landleben', 'Cornwall oder Lake District', 'Florida oder Rocky Mountains', 'Kelten und Römer in Britannien', 'Feste und Bräuche']],
+    ],
+    7: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Interviews und Vlogs verstehen', 'Jugendartikel lesen', 'Short talk', 'Artikel und Interviews schreiben', 'Sprachmittlung im Alltag']],
+      ['1.2', 'Wortschatz', ['Schule und Freizeit', 'Sport und Mediennutzung', 'Bräuche und Feste', 'Idioms und phrasal verbs']],
+      ['1.2', 'Grammatik', ['Adverbien und Steigerung', 'Reflexive und reziproke Pronomen', 'one/ones und Possessivpronomen', 'Present perfect und past perfect', 'Konditionalsätze II und III', 'Zeitenfolge']],
+      ['2', 'Interkulturelle Kompetenzen', ['Grundwissen UK und USA', 'Andere Lebensweisen verstehen', 'Angemessenes Verhalten']],
+      ['3', 'Text- und Medienkompetenzen', ['Sachtexte und Jugendliteratur', 'Kreatives Schreiben, Tagebuch', 'Filmsequenzen', 'Kritischer Umgang mit Medien']],
+      ['5', 'Themengebiete', ['Jugendliche in Nordamerika', 'Chancen und Risiken der Mediennutzung', 'Wales und Desert South-West', 'Englische und amerikanische Geschichte', 'Aktuelle Anlässe']],
+    ],
+    8: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Interviews und Podcasts verstehen', 'Reportagen und Detektivgeschichten', 'Reiseblog und Zeitungsartikel', 'Stadtführung', 'Referate und Rollenspiele']],
+      ['1.2', 'Wortschatz', ['Geschichte, Politik, Wirtschaft', 'Idioms', 'Verknüpfungswörter', 'Britisches und amerikanisches Englisch', 'Präsentationssprache']],
+      ['1.2', 'Grammatik', ['Gerund als Subjekt', 'Infinitiv und Gerund nach Präpositionen', 'Verben mit zwei Objekten', 'Passiv in allen Zeiten', 'Artikelgebrauch', 'Stellung der Adverbien']],
+      ['2', 'Interkulturelle Kompetenzen', ['UK, USA, Kanada', 'Umgang mit anderen Kulturen', 'Eigene Einstellungen reflektieren']],
+      ['3', 'Text- und Medienkompetenzen', ['Sach- und fiktionale Texte', 'Filmsequenzen', 'Kreatives Weiterschreiben', 'Digitale Textformen']],
+      ['5', 'Themengebiete', ['London als Großstadt', 'Politische Systeme von UK und USA', 'Kanada und Inuit', 'Entstehung der USA', 'Besiedlung des Westens']],
+    ],
+    9: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Interviews und Podcasts verstehen', 'Reiseberichte und Blogs lesen', 'Leserbrief', 'Bewerbungsschreiben', 'Präsentationen', 'Sprachmittlung']],
+      ['1.2', 'Wortschatz', ['Konsum und Medien', 'Nachhaltigkeit', 'Bildungssysteme', 'Berufswelt und Bewerbung', 'Meinungsäußerung']],
+      ['1.2', 'Grammatik', ['Nicht notwendige Relativsätze', 'would und used to', 'Zukunftsformen und Zeitenfolge', 'Partizipialkonstruktionen', 'Gerund und Infinitiv', 'Emphase mit do', 'Indirekte Rede']],
+      ['2', 'Interkulturelle Kompetenzen', ['Englischsprachige Länder', 'Bildungssysteme UK und USA', 'Werte im Vergleich']],
+      ['3', 'Text- und Medienkompetenzen', ['Informierende und argumentative Texte', 'Literarische Kurzformen', 'Wirkung von Filmsequenzen', 'Stellungnahme verfassen']],
+      ['5', 'Themengebiete', ['Australien und Neuseeland', 'Schule in UK und USA', 'Praktikum, Ferienjob, Auslandsaufenthalt', 'Konsum- und Medienverhalten', 'Kurze literarische Texte']],
+    ],
+    10: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Interviews und Reden verstehen', 'Komplexe Texte lesen', 'Diskutieren und Stellung nehmen', 'Argumentative Texte und Zusammenfassungen', 'Filmrezension', 'Sprachmittlung']],
+      ['1.2', 'Wortschatz', ['Phrasal verbs und false friends', 'Themenwortschatz', 'Argumentationsmittel', 'Sprachvarietäten']],
+      ['1.2', 'Grammatik', ['Zeitenfolge', 'Passiv', 'Konditionalsätze', 'Indirekte Rede', 'Adjektiv und Adverb']],
+      ['2', 'Interkulturelle Kompetenzen', ['Landeskundliches Grundwissen', 'Stereotype hinterfragen', 'Perspektivwechsel']],
+      ['3', 'Text- und Medienkompetenzen', ['Informierende und erzählende Texte', 'Literarische Grundbegriffe', 'Filmanalyse', 'Seriöse Nachrichten erkennen']],
+      ['5', 'Themengebiete', ['Schottland', 'African Americans in den USA', 'Jugendkultur', 'Musik und Gesellschaft', 'Literatur und Film']],
+    ],
+    11: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Hör-/Hörsehverstehen', 'Leseverstehen', 'Sprechen', 'Schreiben', 'Sprachmittlung']],
+      ['1.2', 'Verfügen über sprachliche Mittel', ['Wortschatz Politik und digitale Welt', 'Partizipien', 'Aspekt', 'Relativsätze', 'Emphase']],
+      ['2', 'Interkulturelle Kompetenzen', ['UK, USA, Commonwealth', 'Perspektivwechsel', 'Kulturelle Prägung von Nachrichten', 'Leben in der Großstadt']],
+      ['3', 'Text- und Medienkompetenzen', ['Sach- und literarische Texte analysieren', 'Filmanalyse', 'Seriöse Nachrichten erkennen', 'Argumentative und kreative Texte']],
+      ['5', 'Themengebiete', ['Kolonialisierung und Postkolonialismus', 'London oder New York', 'Industrialisierung, Globalisierung, Digitalisierung', 'Englisch als Weltsprache', 'Zukunftsvisionen']],
+    ],
+    12: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Hör- und Hörsehtexte', 'Komplexe Lesetexte', 'Diskussionen führen', 'Präsentationen', 'Kommentar und Argumentation', 'Sprachmittlung'], GA],
+      ['1.2', 'Verfügen über sprachliche Mittel', ['Differenzierter Wortschatz', 'Sichere Grammatik', 'Orthographie und Zeichensetzung'], GA],
+      ['2', 'Interkulturelle Kompetenzen', ['Orientierungswissen Zielkulturen', 'Vorurteile reflektieren', 'Missverständnisse klären'], GA],
+      ['3', 'Text- und Medienkompetenzen', ['Literarische und Sachtexte analysieren', 'Mediale Gestaltungsmittel', 'Kreatives Schreiben'], GA],
+      ['5', 'Themengebiete', ['Irland: Troubles und Brexit', 'Anglophones Afrika oder Asien', 'Kulturleben in UK und USA', 'Wissenschaft, Technik, Umwelt', 'Multikulturelle Gesellschaften', 'Politik und internationale Beziehungen', 'Medien und Informationsgesellschaft', 'Literatur, Drama, Film'], GA],
+    ],
+  },
+  Französisch: {
+    6: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Begrüßen und vorstellen', 'Steckbrief und Einladung', 'E-Mails und Kurznachrichten', 'Einfache Fragen beantworten', 'Sprachmittlung im Alltag'], F2],
+      ['1.2', 'Wortschatz', ['Familie und Alltag', 'Hobbys', 'Schule und Arbeitsanweisungen', 'Zahlen, Daten, Uhrzeiten', 'Mengen und Wünsche'], F2],
+      ['1.2', 'Grammatik', ['Artikel und Plural', 'Possessiv- und Demonstrativbegleiter', 'Verneinung ne … pas', 'Personal- und Objektpronomen', 'Fragebildung', 'Präsens und futur composé', 'Imperativ'], F2],
+      ['2', 'Interkulturelle Kompetenzen', ['Geographie Frankreichs', 'Alltag in Deutschland und Frankreich', 'Höfliche Umgangsformen'], F2],
+      ['5', 'Themengebiete', ['Feste und Traditionen', 'Persönliches Umfeld', 'Reisen und Wegbeschreibung', 'Französische Kunst und Kultur'], F2],
+    ],
+    7: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Wetterbericht verstehen', 'Telefonate und Sprachnachrichten', 'Dialoge und E-Mails', 'Wegbeschreibungen und Rezepte'], F2],
+      ['1.2', 'Wortschatz', ['Alltagsbedürfnisse', 'Interessen', 'Zahlen bis eine Million', 'Bildbeschreibung', 'Vorlieben und Vorschläge'], F2],
+      ['1.2', 'Grammatik', ['Relativsätze mit qui, que, où', 'Teilungsartikel und en', 'Komparativ und Superlativ', 'Indirekte Rede', 'Passé composé und imparfait', 'Verben auf -ir', 'Reflexive Verben'], F2],
+      ['2', 'Interkulturelle Kompetenzen', ['Bretagne', 'Jugendliche in Deutschland und Frankreich', 'Schulalltag in Frankreich'], F2],
+      ['5', 'Themengebiete', ['Paris, Lyon, Nantes, Bretagne', 'Reisen und Austausch', 'Gallier und Römer: Astérix', 'Bandes dessinées'], F2],
+    ],
+    8: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Interviews und Podcasts', 'Durchsagen verstehen', 'Briefe und E-Mails', 'Chatbeiträge und Posts', 'Kurzvortrag', 'Sprachmittlung'], F2],
+      ['1.2', 'Wortschatz', ['Alltag und Routine', 'Musik und Freunde', 'Meinung äußern', 'Zahlen und Brüche', 'Wortbildung'], F2],
+      ['1.2', 'Grammatik', ['Präpositionen bei Ländernamen', 'Adverbien auf -ment', 'Verneinungen wie personne ne', 'Mise en relief', 'Inversionsfrage und lequel', 'Plus-que-parfait', 'Reflexive Verben im passé composé'], F2],
+      ['2', 'Interkulturelle Kompetenzen', ['Regionen Frankreichs', 'Großstädte und Migration', 'Québec und Bayern'], F2],
+      ['5', 'Themengebiete', ['Alltag Jugendlicher', 'Französisches Schulsystem', 'Internationaler Austausch', 'Rittertum und Burg', 'Standardsprache und Umgangssprache'], F2],
+    ],
+    9: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Streitgespräche und Nachrichten', 'Auszüge aus Jugendromanen', 'Kurzpräsentation', 'Blogbeitrag und E-Mail', 'Sprachmittlung'], F2],
+      ['1.2', 'Wortschatz', ['Kommunikationssituationen', 'Grammatische Fachbegriffe', 'Umschreibungsstrategien', 'Diagramme beschreiben'], F2],
+      ['1.2', 'Grammatik', ['Conditionnel présent und passé', 'Bedingungssätze I bis III', 'Pronomen y und en', 'Futur simple', 'Unregelmäßige Verben'], F2],
+      ['2', 'Interkulturelle Kompetenzen', ['Jugendliche in Frankreich und der Schweiz', 'Deutsch-französische Freundschaft', 'Kulturelle Unterschiede'], F2],
+      ['5', 'Themengebiete', ['Konflikte in Freundeskreis, Schule, Familie', 'Traumberuf und Praktikum', 'Grand Est und Schweiz', 'Sonnenkönig und Versailles'], F2],
+    ],
+    10: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Hör- und Hörsehtexte', 'Presse und Jugendliteratur', 'Präsentation und Diskussion', 'Bewerbungsgespräch', 'Leserbrief und Rezension', 'Sprachmittlung']],
+      ['1.2', 'Wortschatz', ['Meinungen und Gefühle', 'Argumentieren', 'Text- und Medienbegriffe']],
+      ['1.2', 'Grammatik', ['Subjonctif présent', 'Indirekte Rede in der Vergangenheit', 'Indirekte Frage', 'Passiv', 'Passé simple rezeptiv', 'Angleichung des participe passé', 'ne … ni … ni']],
+      ['2', 'Interkulturelle Kompetenzen', ['Jugendliche in Frankreich und im Maghreb', 'Deutsch-französische Freundschaft', 'Perspektivwechsel']],
+      ['5', 'Themengebiete', ['14 juillet', 'Leben in Nice und Grenoble', 'Ein Land des Maghreb', 'Élysée-Vertrag und Aachener Vertrag', 'Französischer Film', 'Jugendroman und Comic']],
+    ],
+    11: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Präsentation zu Gesellschaftsthemen', 'Bewerbung und Lebenslauf', 'Diskussion', 'Commentaire personnel', 'Sprachmittlung']],
+      ['1.2', 'Wortschatz', ['Gesellschaft und Zukunft', 'Bewerbung', 'Argumentation', 'Digitale Medien', 'Wortschatz zur Textarbeit']],
+      ['1.2', 'Grammatik', ['sans, après, avant de + Infinitiv', 'Gérondif', 'Zwei Objektpronomen, en und y', 'Demonstrativpronomen', 'ce qui, ce que', 'dont und lequel']],
+      ['2', 'Interkulturelle Kompetenzen', ['Frankophone Länder', 'Frankreich und Belgien im Vergleich', 'Europäischer Gedanke']],
+      ['5', 'Themengebiete', ['Junge Menschen in der Gesellschaft', 'Berufliche Orientierung', 'Belgien und Umwelt', 'Deutsch-französische Beziehungen und EU', 'Digitalisierung und Manipulation', 'Kulturelle Identität Frankreichs']],
+    ],
+  },
+  Spanisch: {
+    8: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Durchsagen und Sprachnachrichten', 'Anzeigen und E-Mails lesen', 'Alltagsgespräche und Einkauf', 'Charla de un minuto', 'Tagebuch, Blog, Postkarte'], S3],
+      ['1.2', 'Wortschatz', ['Uhrzeit und Datum', 'Alltag und Einkauf', 'Schule', 'Familie und Wohnen', 'Freizeit und Vorlieben'], S3],
+      ['1.2', 'Grammatik', ['Präsens regelmäßig und unregelmäßig', 'Pretérito indefinido', 'ir a + Infinitiv', 'estar + gerundio', 'Objekt- und Reflexivpronomen', 'Komparativ und Superlativ', 'Bejahter Imperativ', 'ser, estar, hay'], S3],
+      ['2', 'Interkulturelle Kompetenzen', ['Spanischer Sprachraum', 'Alltag in Deutschland und Spanien', 'Tutear und usted'], S3],
+      ['5', 'Themengebiete', ['Soziales Umfeld', 'Persönlichkeiten aus Kunst und Sport', 'Spanischsprachige Länder und Hauptstädte', 'Autonome Regionen und Mehrsprachigkeit'], S3],
+    ],
+    9: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Gespräche im Alltag', 'Über Erlebnisse berichten', 'Präsentationen', 'Blogeinträge', 'E-Mail mit Ratschlägen', 'Sprachmittlung'], S3],
+      ['1.2', 'Wortschatz', ['Bildbeschreibung', 'Verpflichtungen ausdrücken', 'Umgangssprache', 'Hispanoamerikanische Varianten'], S3],
+      ['1.2', 'Grammatik', ['Imperfecto', 'Pretérito perfecto', 'Pluscuamperfecto', 'Presente de subjuntivo', 'Realer Bedingungssatz', 'donde und lo que', 'Possessivpronomen'], S3],
+      ['2', 'Interkulturelle Kompetenzen', ['Spanienbild und Klischees', 'Lebensweise im Vergleich', 'Vielfalt des Sprachraums'], S3],
+      ['5', 'Themengebiete', ['Lebenswelt Jugendlicher', 'Balearen', 'Galicien', 'Argentinien', 'Medienverhalten'], S3],
+    ],
+    10: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Interviews, Werbespots, canciones', 'Sach- und erste literarische Texte', 'Diskussion und Präsentation', 'Reisebericht, Artikel, Anfrage', 'Sprachmittlung'], S3],
+      ['1.2', 'Wortschatz', ['Operatoren für Text- und Bildanalyse', 'Statistiken beschreiben', 'Meinungsäußerung', 'Enlaces'], S3],
+      ['1.2', 'Grammatik', ['Relativsätze mit el que, quien', 'Pasiva refleja', 'Infinitivkonstruktionen', 'Superlativ auf -ísimo', 'Futuro simple', 'Subjuntivo in Temporal- und Konzessivsätzen', 'Condicional', 'Irreale Bedingungssätze'], S3],
+      ['2', 'Interkulturelle Kompetenzen', ['Spanien und Hispanoamerika', 'Fremde Wertesysteme', 'Stereotype'], S3],
+      ['5', 'Themengebiete', ['Präkolumbische Kulturen und Conquista', 'Andalusien', 'Peru', 'Medienlandschaft', 'Jugendroman, Lieder, Kurzfilm'], S3],
+    ],
+    11: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Nachrichten und Reportagen', 'Zeitungs- und Sachtexte', 'Diskussion und Vorstellungsgespräch', 'Digitale Präsentation', 'Texto de opinión', 'Sprachmittlung'], S3],
+      ['1.2', 'Wortschatz', ['Verbalperiphrasen', 'Konnektoren und Redemittel', 'Beruf und Studium'], S3],
+      ['1.2', 'Grammatik', ['cuyo und el cual', 'Subjuntivo im Relativsatz', 'Voz pasiva', 'Zeitenfolge mit subjuntivo', 'Indirekte Rede'], S3],
+      ['2', 'Interkulturelle Kompetenzen', ['Geschichte und Kultur', 'Werte aus fremder Perspektive'], S3],
+      ['5', 'Themengebiete', ['Spanien vom Bürgerkrieg bis heute', 'Leben in Großstädten', 'Mexiko, USA und Migration', 'Spanglish', 'Film, Musik und Kunst'], S3],
+    ],
+  },
+  Italienisch: {
+    8: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Durchsagen und Audioguides', 'Plakate und Webseiten lesen', 'Kurzvortrag und Alltagsgespräch', 'Persönliche Mitteilungen', 'Dolmetschen im Alltag'], S3],
+      ['1.2', 'Wortschatz', ['Zahlen, Daten, Uhrzeit', 'Farben und Mengen', 'tutto und molto', 'Wortbildung mit -ino und -issimo'], S3],
+      ['1.2', 'Grammatik', ['Artikel, Substantive, Pronomen', 'Präpositionen und Possessivbegleiter', 'Imperativ und Fragesätze', 'Präsens und unregelmäßige Verben', 'Passato prossimo', 'Condizionale semplice', 'Relativsätze mit che', 'Si impersonale'], S3],
+      ['2', 'Interkulturelle Kompetenzen', ['Alltag und Feste im Vergleich', 'Gruß- und Anredeformen', 'Missverständnisse'], S3],
+      ['5', 'Themengebiete', ['Feste im Jahreslauf', 'Familie und Alltag', 'Schule', 'Geographie Italiens', 'Rom und die Toskana', 'Persönlichkeiten und Musik'], S3],
+    ],
+    9: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Hörtexte', 'Speisekarten und Sachtexte', 'Gespräche und Kurzvorträge', 'Briefe und Nachrichten', 'Sprachmittlung'], S3],
+      ['1.2', 'Wortschatz', ['Alltagssituationen', 'Meinung äußern', 'Sätze verknüpfen', 'Wortbildung'], S3],
+      ['1.2', 'Grammatik', ['Steigerung und Vergleich', 'Adverbien', 'Relativsätze mit cui, quello che', 'Pronomen ci und ne', 'Congiuntivo nach Meinungsverben', 'Futuro semplice', 'Passato prossimo und imperfetto', 'Indirekte Rede'], S3],
+      ['2', 'Interkulturelle Kompetenzen', ['Gemeinsamkeiten und Klischees', 'Höflichkeit', 'Digitale Kommunikation'], S3],
+      ['5', 'Themengebiete', ['Feste und Sagre', 'Stadt- und Landleben', 'Reisen', 'Regionen Italiens', 'Made in Italy', 'Festival di Sanremo'], S3],
+    ],
+    10: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Gespräche und Vorträge', 'Berichte und kreative Texte', 'Formeller Brief', 'Sprachmittlung'], S3],
+      ['1.2', 'Wortschatz', ['Wortbildung', 'Umschreibungsstrategien', 'Wörterbucharbeit'], S3],
+      ['1.2', 'Grammatik', ['Passiv mit essere und venire', 'Doppelpronomen', 'Condizionale und congiuntivo', 'Bedingungssätze', 'Trapassato prossimo', 'Indirekte Rede und Zeitenfolge'], S3],
+      ['2', 'Interkulturelle Kompetenzen', ['Andere Verhaltensweisen verstehen', 'Vorurteile reflektieren', 'Begegnungen in Tourismus und Ehrenamt'], S3],
+      ['5', 'Themengebiete', ['Karneval in Venedig, Palio di Siena', 'Nord-Süd-Gefälle', 'Natur und Erdbeben', 'Medici und Florenz', 'Dialekte'], S3],
+    ],
+    11: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Blogeintrag und Erfahrungsbericht', 'Bewerbung um ein Praktikum', 'Vortrag und Debatte', 'Sprachmittlung'], S3],
+      ['1.2', 'Wortschatz', ['Arbeitswelt', 'Digitale Medien', 'Wirtschaft und Werbung', 'Kultur und Kunst'], S3],
+      ['1.2', 'Grammatik', ['Passato remoto', 'Futuro anteriore', 'Passiv mit andare', 'Relativsätze mit il cui', 'Gerundio und Partizipien', 'lasciare/fare + Infinitiv'], S3],
+      ['2', 'Interkulturelle Kompetenzen', ['Fremde Verhaltensmuster', 'Missverständnisse klären', 'eTwinning'], S3],
+      ['5', 'Themengebiete', ['Made in Italy', 'Arbeit und Studium', 'Leben in Großstädten', 'Risorgimento', 'Commedia dell’Arte', 'Film, Musik, Kunst'], S3],
+    ],
+  },
+  Russisch: {
+    8: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Alltagsdialoge verstehen', 'Speisekarten und Stadtpläne', 'Über Vorlieben sprechen', 'Steckbrief und Postkarte', 'Messenger-Nachrichten'], S3],
+      ['1.2', 'Wortschatz', ['Schule und Freizeit', 'Familie und Wohnen', 'Einkaufen und Verkehrsmittel', 'Essen und Trinken', 'Internationalismen'], S3],
+      ['1.2', 'Grammatik', ['Kyrillische Schrift', 'Substantive I. und II. Deklination', 'Personal-, Possessiv-, Demonstrativpronomen', 'кто, что, какой', 'Präsens e- und i-Konjugation', 'Verben der Bewegung', 'есть/нет mit Genitiv'], S3],
+      ['2', 'Interkulturelle Kompetenzen', ['Anrede mit Vatersnamen', 'Kurzformen der Vornamen', 'Höflichkeit', 'Bräuche'], S3],
+      ['5', 'Themengebiete', ['Soziales Umfeld', 'Essen und Alltag', 'Geographie Russlands', 'Neujahr und Ostern', 'Persönlichkeiten'], S3],
+    ],
+    9: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Dialoge und Umfragen', 'Briefe und Blogs', 'Gespräche und Präsentationen', 'E-Mail, Tagebuch, Interview', 'Dolmetschen'], S3],
+      ['1.2', 'Wortschatz', ['Familie und Alltag', 'Schule', 'Reisen und Verkehr', 'Freizeit, Sport, Musik', 'Gesundheit und Wetter'], S3],
+      ['1.2', 'Grammatik', ['Plural und Deklination', 'Adjektive: Plural und Steigerung', 'Zahlen, Datum, Ordnungszahlen', 'Relativpronomen', 'Reflexive Verben und Aspekt', 'Präteritum und Imperativ', 'Futur'], S3],
+      ['2', 'Interkulturelle Kompetenzen', ['Höflichkeit im Alltag', 'Gedenken an den Zweiten Weltkrieg', 'Glückwünsche'], S3],
+      ['5', 'Themengebiete', ['Familie, Alltag, Schule', 'Feste und Bräuche', 'Geographie Russlands', 'Persönlichkeiten aus Kultur und Geschichte'], S3],
+    ],
+    10: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Dialoge und Interviews', 'Kurztexte', 'Kurzreferat', 'Blog und E-Mail', 'Sprachmittlung'], S3],
+      ['1.2', 'Wortschatz', ['Restaurant und Rezepte', 'Bildungssystem', 'Geographie und Klima', 'Feste'], S3],
+      ['1.2', 'Grammatik', ['Substantive auf -ия/-ие', 'i-Deklination', 'Zahlen ab 200', 'Doppelte Verneinung', 'Perfektives Futur', 'Konjunktiv und Konditionalsätze', 'Finalsätze mit чтобы', 'Indirekte Fragen'], S3],
+      ['2', 'Interkulturelle Kompetenzen', ['Geschichte und Zarenreich', 'Stereotype', 'Rolle der Kirche'], S3],
+      ['5', 'Themengebiete', ['Restaurantbesuch', 'Bildungssystem Russlands', 'Geographie und Klima', 'Kultur und Geschichte'], S3],
+    ],
+    11: [
+      ['1.1', 'Kommunikative Fertigkeiten', ['Interviews und Vlogs', 'Textzusammenfassung', 'Bildbeschreibung', 'Kurzpräsentation', 'Sprachmittlung'], S3],
+      ['1.2', 'Wortschatz', ['Studium und Beruf', 'Digitale Medien', 'Landeskunde', 'Wortfamilien'], S3],
+      ['1.2', 'Grammatik', ['Substantive auf -анин', 'Familien- und Vatersnamen', 'Genitiv des Vergleichs', 'Präfigierte Verben der Bewegung', 'Konditionalsätze', 'Konzessivsätze mit хотя', 'Passivkonstruktionen'], S3],
+      ['2', 'Interkulturelle Kompetenzen', ['Missverständnisse', 'Andere Werte respektieren', 'Diminutive'], S3],
+      ['5', 'Themengebiete', ['Jugend und Alltag', 'Digitalisierung', 'Geschichte im 18. und 19. Jahrhundert', 'Film, Musik, Kunst', 'Erzählungen und Jugendroman'], S3],
+    ],
+  },
+  Griechisch: {
+    8: [
+      ['1', 'Texte', ['Kreta und Peloponnes', 'Frühzeit und archaische Zeit', 'Frauen und Sklaven', 'Spartanische Erziehung', 'Götter, Kult und Mythen', 'Olympia, Delphi, Epidauros'], G3],
+      ['2', 'Sprachliche Basis', ['Griechisches Alphabet', 'Grundwortschatz', 'Präsens, Imperfekt, Futur, Aorist', 'Nomina und Pronomina', 'AcI und Partizip', 'Negationen οὐ und μή'], G3],
+      ['3', 'Kultureller Kontext', ['Kreta als Wiege Europas', 'Mykene', 'Heiligtum von Olympia', 'Sparta und Phalanx', 'Götter und Helden'], G3],
+      ['4', 'Methodik', ['Übersetzungstechniken', 'Texterschließung', 'Lernstrategien'], G3],
+    ],
+    9: [
+      ['1', 'Texte', ['Athenische Demokratie unter Perikles', 'Perserkriege', 'Vorsokratiker und Sophisten', 'Sokrates und Platon'], G3],
+      ['2', 'Sprachliche Basis', ['Wortfamilien und Fremdwörter', 'Verba contracta', 'Wurzelaorist', 'Konjunktiv und Optativ', 'Verba liquida', 'Kasusfunktionen', 'Final- und Konditionalsätze'], G3],
+      ['3', 'Kultureller Kontext', ['Polis und Demokratie', 'Akropolis und Agora', 'Säulenordnungen', 'Griechische Philosophie'], G3],
+      ['4', 'Methodik', ['Übersetzungstechniken', 'Erschließungsfragen', 'Kreative Textrezeption'], G3],
+    ],
+    10: [
+      ['1', 'Spracherwerb', ['Makedonien und Hellenismus', 'Präsensreduplikation', 'Verben auf -νυμι', 'Verbaladjektive auf -τός und -τέος', 'Relativsätze'], G3],
+      ['2', 'Übergangslektüre', ['Adaptierte Prosa, z. B. Lukian', 'Textgliederung und Paraphrase'], G3],
+      ['3', 'Texte und ihr kultureller Kontext', ['Platon und Xenophon', 'Sokrates', 'Sokratische Wende', 'Dialektik und Elenktik'], G3],
+      ['4', 'Sprachliche Basis (Lektürephase)', ['Lektürewortschatz', 'Infinitiv- und Partizipialkonstruktionen', 'Ellipse im Dialog'], G3],
+    ],
+    11: [
+      ['1', 'Texte und ihr kultureller Kontext', ['Herodot, Historien', 'Homer, Odyssee', 'Athen und die Demokratie', 'Lysias, Rede', 'Drama'], G3],
+      ['2', 'Sprachliche Basis', ['Autorenwortschatz', 'Historisches Präsens', 'Relativsätze mit Attraktion', 'Ionischer Dialekt, epische Sprache'], G3],
+      ['3', 'Methodik', ['Übersetzungsstrategien', 'Kursorisches Lesen', 'Zweisprachige Ausgaben'], G3],
+    ],
+  },
+  Geographie: {
+    5: [
+      ['1', 'Geographische Arbeitstechniken', ['Karten und Atlas', 'Globus und Geomedien', 'Gradnetz und Maßstab', 'Kartentypen', 'Messungen und Diagramme', 'Kartenskizzen']],
+      ['2', 'Planet Erde', ['Sonnensystem und Erdaufbau', 'Einzigartigkeit der Erde', 'Schutz der Lebensgrundlagen', 'Orientierung mit Geomedien']],
+      ['3', 'Naturräume in Bayern und Deutschland', ['Naturräumliche Gliederung', 'Alpen und Alpenvorland', 'Mittelgebirge', 'Küste und Wattenmeer', 'Oberflächenformen', 'Naturgefahren']],
+      ['4', 'Ländliche Räume in Bayern und Deutschland', ['Merkmale ländlicher Räume', 'Einflussfaktoren der Landwirtschaft', 'Konventionelle und ökologische Landwirtschaft', 'Weg der Lebensmittel']],
+      ['5', 'Städtische Räume in Bayern und Deutschland', ['Stadt-Umland-Beziehungen', 'Verdichtungsräume', 'Funktionen der Stadt', 'Suburbanisierung', 'Nachhaltiger Stadtumbau']],
+    ],
+    7: [
+      ['1', 'Geographische Arbeitstechniken', ['Karten und Skizzen', 'Bild- und Satellitenbilder', 'Diagramme und Statistiken', 'Digitale Geomedien']],
+      ['2', 'Einheit und Vielfalt in Europa', ['Orientierung in Europa', 'Idee und Aufgaben der EU', 'Sprachen und Minderheiten', 'Migration']],
+      ['3', 'Naturgeographie Europas im Überblick', ['Naturräumliche Gliederung', 'Klima- und Vegetationszonen', 'Plattengrenzen, Vulkane, Erdbeben', 'Klimawandel']],
+      ['4', 'Ländliche Räume Europas', ['Intensive und extensive Landnutzung', 'Nachhaltige Lebensmittel', 'Periphere Räume und Disparitäten', 'Arbeitsmigration']],
+      ['5', 'Metropolen und Verdichtungsräume in Europa', ['Merkmale und Probleme von Metropolen', 'Standortfaktoren', 'Infrastrukturprojekte', 'Energieverbund']],
+      ['6', 'Meere und Küsten Europas', ['Europäische Meere', 'Küstenformen', 'Fischerei und Aquakultur', 'Seehäfen', 'Küstentourismus', 'Meeresschutz und Plastikmüll']],
+    ],
+    10: [
+      ['1', 'Geographische Arbeitstechniken', ['Klima- und Vegetationskarten', 'Klimadiagramme', 'Blockbilder und Kausalprofile', 'Stadtmodelle']],
+      ['2', 'Leben in der Einen Welt', ['Entwicklungsindikatoren', 'Ungleiche Entwicklung', 'Entwicklungszusammenarbeit', 'Fluchtursachen']],
+      ['3', 'Klima- und Vegetationszonen der Tropen und ariden Subtropen', ['Strahlung und Temperatur', 'Passatzirkulation', 'Regenzeiten', 'Regenwald, Savanne, Wüste', 'Nutzung und Verwundbarkeit']],
+      ['4', 'Klima im Wandel', ['Anthropogener Treibhauseffekt', 'Klimaszenarien', 'Extremwetter', 'Anpassung und Klimaschutz']],
+      ['5', 'Nordafrika, Naher und Mittlerer Osten', ['Naturräume', 'Orientalische Stadt', 'Wassermangel', 'Nomadismus und Oasen', 'Erdöl und Erdgas']],
+      ['6', 'Afrika südlich der Sahara', ['Desertifikation im Sahel', 'Entwicklungshemmnisse', 'Direktinvestitionen', 'Nachhaltige Entwicklung']],
+      ['7', 'Mittel- und Südamerika, Karibik', ['Verwundbarkeit der Karibik', 'Abholzung des Amazonas', 'Megastädte und Marginalsiedlungen', 'Plantagen und Tourismus', 'Höhenstufen']],
+    ],
+    11: [
+      ['1', 'Geographische Arbeitstechniken', ['Karten und Diagramme', 'Quellenkritik', 'Geographische Modelle', 'Mediale Raumdarstellungen']],
+      ['2', 'Einblick in die Globalisierung', ['Globalisierung im Alltag', 'Akteure', 'Nachhaltigkeitsdimensionen', 'Produktweg von Jeans oder Smartphone']],
+      ['3', 'Die USA im Spannungsfeld globaler Einflüsse', ['Naturräume und Klima', 'Agrobusiness und Industrie', 'IT-Branche', 'Nordamerikanische Stadt', 'Migration und Disparitäten']],
+      ['4', 'Russland – Raum als Potenzial und Herausforderung', ['Naturausstattung', 'Kontinentalklima', 'Erschließung peripherer Räume', 'Geopolitik']],
+      ['5', 'China – Global Player', ['Naturräumliches Potenzial', 'Bevölkerungspolitik', 'Weltwirtschaft', 'Umweltprobleme', 'Wasserbauprojekte']],
+      ['6', 'Australien und Ozeanien', ['Extremereignisse', 'Sensible Ökosysteme', 'Indigene Bevölkerung', 'Ferntourismus']],
+    ],
+    12: [
+      ['1', 'Geographische Arbeitstechniken', ['Karten und Diagramme', 'Klimadiagramme', 'Strukturskizzen', 'Recherche und Präsentation'], GA],
+      ['2', 'Klima und Klimawandel', ['Strahlungshaushalt', 'Drei-Zellen-Modell', 'Monsun', 'Ozeanzirkulation und ENSO', 'Klimawandel und Handlungsoptionen'], GA],
+      ['3', 'Mensch-Umwelt-Beziehungen in den Tropen', ['Tropische Ökosysteme', 'Immerfeuchte Tropen', 'Nachhaltige Nutzung', 'Desertifikation'], GA],
+      ['4', 'Subpolare und polare Zone', ['Naturgeographische Besonderheiten', 'Rohstoffgewinnung', 'Permafrost', 'Antarktisvertrag'], GA],
+      ['5', 'Ressourcenkonflikte in Mittleren Breiten und Subtropen Europas', ['Wassermanagement', 'Hochwasser und Risikomanagement', 'Raumplanung', 'Waldmanagement'], GA],
+      ['6', 'Nutzung und Vulnerabilität von Hochgebirgsräumen', ['Gebirgsbildung', 'Massenbewegungen', 'Gletscherrückgang', 'Eingriffe des Menschen'], GA],
+      ['7', 'Risikomanagement bei tektonischen Ereignissen', ['Plattentektonik', 'Gefährdungspotenzial', 'Grenzen des Risikomanagements', 'Japan'], GA],
+    ],
+    13: [
+      ['1', 'Geographische Arbeitstechniken', ['Satellitenbilder', 'Recherche und Präsentation', 'Modelle bewerten'], GA],
+      ['2', 'Wirtschaftliche Entwicklungen in einer globalisierten Welt', ['Entwicklungsindikatoren', 'Globale Lieferketten', 'Fragmentierende Entwicklung', 'Entwicklungsstrategien', 'Ferntourismus'], GA],
+      ['3', 'Ressourcen und nachhaltige Entwicklung', ['Rohstoffverfügbarkeit', 'Rohstoffabbau', 'Regenerative Energien', 'Energiemanagement'], GA],
+      ['4', 'Bevölkerung und Migration', ['Demographischer Übergang', 'Ursachen von Migration', 'Flucht', 'Bevölkerungsentwicklung Deutschlands'], GA],
+      ['5', 'Stadtentwicklung und urbane Räume', ['Urbanisierung und Stadtmodelle', 'Megastädte', 'Global Cities', 'Smart Cities'], GA],
+    ],
+  },
+  'Wirtschaft und Recht': {
+    8: [
+      ['1.1', 'Entscheidungen beim Konsum', ['Knappheit und Bedürfnisse', 'Opportunitätskosten', 'Kosten-Nutzen-Analyse', 'Testberichte und Vergleichsportale', 'Entscheidungsmatrix', 'Preis-Qualitäts-Illusion'], WWG],
+      ['1.2', 'Entscheidungen beim Umgang mit Geld', ['Geldfunktionen und Geldwert', 'Zahlungsarten', 'Digitales Bezahlen', 'Haushaltsplan', 'Überschuldung'], WWG],
+      ['2.1', 'Betriebliche Abläufe und Arbeitsteilung', ['Arbeitsteilung', 'Aufbau- und Ablauforganisation', 'Fertigungstypen', 'Werkstatt- und Fließfertigung'], WWG],
+      ['2.2', 'Marketingentscheidungen', ['Marktanalyse', 'Produkt- und Sortimentspolitik', 'Preispolitik', 'Distributionspolitik', 'Kommunikationspolitik'], WWG],
+      ['3', 'Rechtlich verantwortliches Handeln', ['Funktionen des Rechts', 'Zivil- und Strafrecht', 'Deliktsfähigkeit und Strafmündigkeit', 'Tatbestand und Rechtsfolge', 'Medien- und Urheberrecht'], WWG],
+    ],
+    9: [
+      ['1', 'Recht als Handlungsrahmen', ['Vertragsschluss', 'Pflichten im Kaufvertrag', 'Verpflichtungs- und Erfüllungsgeschäft', 'Besitz und Eigentum', 'Geschäftsfähigkeit', 'Gewährleistung'], WWG],
+      ['2', 'Unternehmerisch denken und entscheiden', ['Geschäftsmodell und Marketing', 'Preiskalkulation, Standort, Rechtsform', 'Kapitalbedarf und Finanzierung', 'Bilanz und GuV', 'Kennzahlen'], WWG],
+    ],
+    10: [
+      ['1', 'Ökonomisches Handeln auf dem Markt', ['Verbraucherentscheidungen und Nachhaltigkeit', 'Werbung und Verhaltensökonomie', 'Zahlungsarten', 'Geldanlage: Rendite, Liquidität, Sicherheit', 'Marktmodell und Gleichgewichtspreis']],
+      ['2', 'Recht als Handlungsrahmen', ['Kaufvertrag', 'Besitz und Eigentum', 'Geschäftsfähigkeit', 'Mangelhafte Lieferung', 'Unerlaubte Handlung']],
+      ['3', 'Entwicklung eines Geschäftsmodells', ['Geschäftsidee und Kernprozess', 'Unternehmerische Entscheidungen', 'Vereinfachte Bilanz', 'Projektmanagement']],
+    ],
+    11: [
+      ['1', 'Die Wirtschaftsordnung als Handlungsrahmen', ['Preisfunktionen', 'Markt- und Zentralverwaltungswirtschaft', 'Soziale Marktwirtschaft', 'Steuern und soziale Sicherung', 'Strukturwandel']],
+      ['2', 'Recht als Handlungsrahmen', ['Gerechtigkeit', 'Rechtsstaatsprinzipien', 'Gliederung des Rechts', 'Naturrecht und Rechtspositivismus', 'Eigentumsordnung']],
+      ['3', 'Internationale wirtschaftliche Verflechtung', ['Freihandel und Handelshemmnisse', 'Kreislaufmodell', 'Wechselkurse', 'Wirtschafts- und Währungsunion']],
+      ['4', 'Globale Zukunftstrends', ['Arbeitswelt', 'Finanzmärkte', 'Weltwirtschaft', 'Ressourcen']],
+    ],
+    12: [
+      ['1', 'Betriebswirtschaftslehre', ['Unternehmensziele', 'Break-even-Analyse', 'Investitionsrechnung', 'Eigen- und Fremdfinanzierung', 'Rentabilität'], GA],
+      ['2', 'Volkswirtschaftslehre', ['Magisches Viereck', 'Konjunkturzyklus', 'Arbeitslosigkeit', 'Bruttoinlandsprodukt', 'Steuern und Beiträge'], GA],
+      ['3', 'Recht', ['Aufbau des BGB', 'Kaufvertrag und Trennungsprinzip', 'Herausgabeanspruch', 'Schadensersatz nach § 823 BGB'], GA],
+    ],
+    13: [
+      ['1.1', 'Zivilrecht – Interessenausgleich beim Kauf', ['Leistungsstörungen', 'Schadensersatz', 'Verzug', 'Aliud-Lieferung', 'Widerruf bei Fernabsatz'], GA],
+      ['1.2', 'Strafrecht', ['Aufbau einer Straftat', 'Tatbestand, Rechtswidrigkeit, Schuld', 'Strafzwecktheorien', 'Strafzumessung'], GA],
+      ['2.1', 'Geld und Preisniveau', ['Preisniveaustabilität', 'Geldpolitik der EZB', 'Transmissionsmechanismus', 'Grenzen der Geldpolitik'], GA],
+      ['2.2', 'Außenhandel und Währung', ['Leistungsbilanz', 'Außenwirtschaftliches Gleichgewicht', 'Wechselkursbildung', 'Wechselkursschwankungen'], GA],
+    ],
+  },
+  'Politik und Gesellschaft': {
+    10: [
+      ['1', 'Werte leben im demokratischen Staat', ['Grundgesetz und Zusammenleben', 'Menschenwürde, Art. 1 GG', 'Grundrechte im Konflikt', 'Unveränderlicher Verfassungskern', 'Medien in der Demokratie']],
+      ['2', 'Politische Verantwortung übernehmen für sich und andere', ['Mitwirkungsmöglichkeiten', 'Parteien', 'Wahlrechtsgrundsätze und Wahlsystem', 'Interessengruppen und Medien']],
+      ['3', 'Das Zusammenwirken der politischen Institutionen in Deutschland verstehen', ['Politikzyklus', 'Gesetzgebungsverfahren', 'Bundesregierung, Bundestag, Bundesrat', 'Freies Mandat, Art. 38 GG']],
+      ['4', 'Grundzüge der internationalen Zusammenarbeit erfassen', ['Ziele deutscher Außenpolitik', 'Internationale Organisationen', 'Verfassungsrechtliche Grundlagen']],
+    ],
+    11: [
+      ['1', 'Demografische Entwicklung und gesellschaftlicher Zusammenhalt', ['Bevölkerungsstruktur', 'Demografischer Wandel', 'Generationenvertrag', 'Politische Lösungsansätze']],
+      ['2', 'Politische Willensbildung im Medienzeitalter reflektieren', ['Medien als vierte Gewalt', 'Chancen und Gefahren medialer Vermittlung', 'Verschwörungsmythen', 'Desinformation im Netz']],
+      ['3', 'Für den demokratischen Rechtsstaat eintreten', ['Rechtsstaatlichkeit', 'Wehrhafte Demokratie', 'Extremismus und Terrorismus', 'Populismus']],
+      ['4', 'Die föderale Demokratie Deutschlands mitgestalten', ['Kommunalpolitik', 'Repräsentative und direkte Demokratie', 'Föderalismus und Zentralismus']],
+      ['5', 'Die politische Gestaltung globalen Zusammenlebens reflektieren', ['Globalisierung', 'Bi- und multilaterale Politik', 'Vereinte Nationen', 'Gegenbewegungen']],
+    ],
+    12: [
+      ['1', 'Frieden und Sicherheit als Motive deutscher Außenpolitik', ['Negativer und positiver Frieden', 'Erweiterter Sicherheitsbegriff', 'Hybride Bedrohungen', 'Zivile Konfliktbearbeitung'], GA],
+      ['2', 'Das europäische Projekt verstehen und mitgestalten', ['Werte der EU', 'EU-Organe', 'Rechtsetzung in der EU', 'EU in der Weltpolitik', 'Zukunftsszenarien'], GA],
+      ['3', 'Politische Systeme vergleichen und Demokratie wertschätzen', ['Menschenrechte als Maßstab', 'Hybride Regime', 'Parlamentarische und präsidentielle Demokratie', 'Antidemokratische Tendenzen'], GA],
+      ['4', 'Möglichkeiten der Demokratieförderung beurteilen', ['State building', 'Demokratisierung von innen', 'Demokratieförderung von außen'], GA],
+    ],
+    13: [
+      ['1', 'Modernisierungsprozesse und Zusammenleben in Deutschland', ['Familienformen', 'Familienpolitik', 'Geschlechterrollen', 'Sexismus'], GA],
+      ['2', 'Soziale Ungleichheit und soziale Mobilität', ['Dimensionen sozialer Ungleichheit', 'Modelle sozialer Differenzierung', 'Aufstiegschancen und -barrieren'], GA],
+      ['3', 'Der Sozialstaat und aktuelle Herausforderungen', ['Subsidiarität und Solidarität', 'Versicherungs- und Äquivalenzprinzip', 'Herausforderungen des Sozialstaats'], GA],
+      ['4', 'Internationale Konfliktbearbeitung und Völkerrecht', ['Internationale Konflikte', 'NATO', 'Völkerrecht', 'Internationaler Strafgerichtshof'], GA],
+    ],
+  },
+  'Katholische Religionslehre': {
+    5: [
+      ['1', 'Gott offenbart sich: die Bibel als Heilige Schrift des Christentums', ['Bibel im Alltag', 'Entstehung und Aufbau der Bibel', 'Umgang mit Bibeltexten', 'Bund zwischen Gott und Mensch', 'Psalmen']],
+      ['2', 'Gott wird Mensch in Jesus Christus', ['Lebenswelt zur Zeit Jesu', 'Geburtserzählung bei Lukas', 'Advent und Weihnachten', 'Menschwerdung']],
+      ['3', 'Menschen fragen nach Gott – Zugänge zum christlichen Gottesverständnis', ['Gottesbilder', 'Biblisches Gottesbild', 'Gott als liebender Vater', 'Credo', 'Gebet und Wallfahrt']],
+      ['4', 'Wir sind alle Kinder des einen Gottes – miteinander leben', ['Vielfalt der Persönlichkeit', 'Gemeinschaft in der Klasse', 'Jesus als Vorbild', 'Vaterunser', 'Gebetsformen']],
+      ['5', 'Heilige Orte: Kirchen als Mittelpunkte christlichen Glaubens', ['Kirchenraum: Altar, Ambo, Tabernakel', 'Baustile', 'Kirchenpatrone und Heilige', 'Eucharistiefeier', 'Gemeindeleben']],
+    ],
+    6: [
+      ['1', 'Staunen und Nachdenken über Gottes Welt', ['Ursprung der Welt', 'Weltbilder von Römern und Germanen', 'Christliche Sinnantwort', 'Schöpfung']],
+      ['2', 'Zwischen Scheitern und Gelingen – Erfahrungen im Alten Testament', ['Kain und Abel', 'Jakob und Esau', 'Josef und seine Brüder', 'Saul, David, Salomo']],
+      ['3', 'Jesus Christus – Hoffnung in Leid und Tod', ['Leiderfahrungen', 'Option für die Armen', 'Kreuzigung und Auferstehung', 'Osterfestkreis', 'Emmaus']],
+      ['4', 'Christliches Gemeindeleben: die Begeisterung des Anfangs', ['Pfingsten', 'Urgemeinde', 'Apostelkonzil', 'Konstantinische Wende']],
+      ['5', 'Vielfalt der Kulturen – Solidarität im Namen Gottes', ['Lebensbedingungen von Kindern weltweit', 'Konsum und Lebensstil', 'Nächstenliebe', 'Kirchliche Hilfswerke']],
+    ],
+    7: [
+      ['1', 'Auf dem Weg zu mir selbst – Herausforderungen im Jugendalter', ['Identitätsfindung', 'Selbstwertgefühl', 'Konflikte lösen', 'Vorbilder']],
+      ['2', 'Symbole und Sakramente', ['Zeichen und Symbole', 'Christliche Symbole', 'Kirche als Grundsakrament', 'Messfeier', 'Taufe und Firmung']],
+      ['3', 'Das Markusevangelium – Botschaft vom Reich Gottes', ['Gattung Evangelium', 'Zwei-Quellen-Theorie', 'Reich Gottes', 'Kaiserkult']],
+      ['4', 'Kirche zwischen Macht und Spiritualität im Mittelalter', ['Klosterleben', 'Kirchenbau und Pilgern', 'Ketzerverfolgung', 'Kreuzzüge']],
+      ['5', 'Muslimen begegnen – Glaube, Geschichte und Kultur des Islam', ['Fünf Säulen', 'Sunniten und Schiiten', 'Gottesverständnis', 'Nostra Aetate']],
+    ],
+    8: [
+      ['1', 'Was ist der Mensch? Der Mensch in der Schöpfung', ['Menschenbilder', 'Gottebenbildlichkeit', 'Schöpfungsmythen', 'Schöpfungsspiritualität']],
+      ['2', 'Von Gott berufen: prophetische Impulse für eine gerechtere Welt', ['Exodus und Dekalog', 'Amos, Jeremia, Jesaja', 'Soziale Missstände', 'Zivilcourage']],
+      ['3', 'Reformation und katholische Reform', ['Frömmigkeit im Spätmittelalter', 'Luther und die Rechtfertigung', 'Konzil von Trient', 'Ökumene']],
+      ['4', 'Zur Kirche gehören – aus dem Glauben handeln', ['Hilfswerke und Verbände', 'Fußwaschung', 'Pilgerndes Gottesvolk', 'Kirchenasyl']],
+      ['5', 'Unterscheiden können: Vielfalt religiöser Angebote', ['Motive von Religiosität', 'Sekten und Fundamentalismus', 'Christliches Menschenbild als Maßstab']],
+    ],
+    9: [
+      ['1', 'Christliche Verantwortung im Alltag: Orientierung in Entscheidungen', ['Gewissen und Gewissensfreiheit', 'Dekalog', 'Goldene Regel', 'Aktuelle Beispiele']],
+      ['2', 'Jesus von Nazaret – Gott nimmt sich des Menschen an', ['Jesusdarstellungen', 'Zuwendung zu Ausgegrenzten', 'Vergebung', 'Sakrament der Versöhnung']],
+      ['3', 'Freundschaft – Partnerschaft – Liebe', ['Schönheitsideale und Rollenbilder', 'Respekt und Achtsamkeit', 'Sexualität', 'Sakrament der Ehe']],
+      ['4', 'Christsein in gesellschaftlicher Bedrängnis', ['Diskriminierung und Verfolgung', 'Anpassung und Widerstand', 'Religionsfreiheit']],
+      ['5', 'Begegnung mit dem jüdischen Glauben', ['Jüdisches Leben vor Ort', 'Tora', 'Jüdische Identität', 'Der Jude Jesus', 'Geschichte des Judentums']],
+    ],
+    10: [
+      ['1', 'Unantastbar: Recht auf Leben und Menschenwürde', ['Pränataldiagnostik', 'Schwangerschaftsabbruch', 'Sterbehilfe', 'Todesstrafe', 'Gewissen']],
+      ['2', 'Tod und Auferstehung – christliche Hoffnung', ['Umgang mit dem Tod', 'Biblische Auferstehungsbotschaft', 'Reinkarnation', 'Hospizbewegung']],
+      ['3', 'Jesus, der Christus', ['Auferweckung Jesu', 'Glaubensbekenntnis von Nizäa-Konstantinopel', 'Erlösung', 'Jesus in Judentum und Islam']],
+      ['4', 'Auf der Suche nach Orientierung und Glück', ['Glücksversprechen der Medien', 'Hedonismus und Altruismus', 'Kohelet']],
+      ['5', 'Begegnung mit Hinduismus und Buddhismus', ['Karma und Dharma', 'Vier edle Wahrheiten', 'Achtfacher Pfad', 'Nostra Aetate']],
+    ],
+    11: [
+      ['1', 'Kirche im gesellschaftlichen Modernisierungsprozess', ['Autonomie der Vernunft', 'Pluralismus', 'Säkularisierung', 'Religionsfreiheit']],
+      ['2', 'Der Mensch angesichts des medizinisch-technischen Fortschritts', ['Selbstoptimierung', 'In-vitro-Fertilisation', 'Leihmutterschaft', 'Palliativmedizin']],
+      ['3', 'Theodizee – Ernstfall der Gottesfrage', ['Leiderfahrung', 'Theodizeeproblem', 'Tun-Ergehen-Zusammenhang', 'Compassion nach Metz']],
+      ['4', 'Erkenntnis und Sprache – Zugänge zur religiösen Wirklichkeit', ['Wege der Welterfahrung', 'Grundfragen der Existenz', 'Religiöse Sprache', 'Negative Theologie']],
+    ],
+    12: [
+      ['1.1', 'Personalität: Der Mensch und die Frage „Wer bin ich?“', ['Erwachsenwerden', 'Freiheit und Entscheidung', 'Konformismus', 'Menschenrechte'], GA],
+      ['1.2', 'Das christliche Menschenbild als Leitlinie und Maßstab', ['Personalität und Sozialität', 'Gottebenbildlichkeit', 'Erlösungsbedürftigkeit', 'Menschenbilder'], GA],
+      ['2.1', 'Der Mensch auf der Suche nach Gott', ['Religiöse Erfahrung', 'Religion und Glaube', 'Atheismus und Agnostizismus', 'Argumente für und gegen Gott'], GA],
+      ['2.2', 'Gott sucht den Menschen', ['Bibel als Gotteswort', 'Fundamentalismus', 'Personalität Gottes', 'Trinität'], GA],
+    ],
+    13: [
+      ['1.1', 'Sozialität: Ethische Grundlegung', ['Ethische Modelle', 'Gewissen', 'Christliche Ethik'], GA],
+      ['1.2', 'Anwendung: Ethik der Lebensbereiche', ['Medizinethik', 'Wirtschafts- und Sozialethik', 'Umweltethik', 'Friedensethik'], GA],
+      ['2', 'Existentielle Fragen und christliche Antwortangebote', ['Wahrheitsansprüche', 'Hoffnung', 'Tod und Vollendung'], GA],
+    ],
+  },
+  'Evangelische Religionslehre': {
+    5: [
+      ['1', 'Ich und die anderen', ['Schulwechsel', 'Zehn Gebote', 'Doppelgebot der Liebe', 'Fairness']],
+      ['2', 'Die Bibel und ihre Geschichten', ['Altes und Neues Testament', 'Bücher, Kapitel, Verse', 'Bibel als Glaubensbuch', 'Sprachbilder der Bibel']],
+      ['3', 'Lebenswege mit Gott', ['Symbol Weg', 'Psalmen', 'Gottesbilder im Alten Testament', 'Gott als Befreier']],
+      ['4', 'Von Gott erschaffen', ['Biblische Schöpfungstexte', 'Glaubensbekenntnis', 'Kleiner Katechismus', 'Würde jedes Menschen']],
+      ['5', 'Spuren des Glaubens', ['Kirchengebäude', 'Kreuz, Taube, Licht', 'Kirchengemeinde', 'Taufe, Abendmahl, Konfirmation']],
+    ],
+    6: [
+      ['1', 'In Beziehung', ['Familie', 'Freundschaft', 'Umgang mit Konflikten']],
+      ['2', 'Zwischen Galiläa und Jerusalem', ['Leben zur Zeit Jesu', 'Gruppen im Judentum', 'Jüdischer Glaube', 'Jüdisches Leben heute']],
+      ['3', 'Mitten unter euch – Jesu Botschaft und Leben', ['Evangelien', 'Reich Gottes', 'Reaktionen auf Jesus', 'Passion und Ostern']],
+      ['4', 'Feste und Auszeiten', ['Bedeutung von Festen', 'Kirchenjahr', 'Christliche Feste gestalten']],
+      ['5', 'Anders – fremd – verschieden', ['Fremdsein', 'Verschiedenheit als Bereicherung', 'Vorurteile']],
+    ],
+    7: [
+      ['1', 'Glaube findet Sprache', ['Glaubensbekenntnis, 3. Artikel', 'Kirchenbau in Epochen', 'Elemente des Gottesdienstes']],
+      ['2', 'Kirche hat Geschichte', ['Pfingsten', 'Ausbreitung des Christentums', 'Christenverfolgung', 'Konstantinische Wende']],
+      ['3', 'Islam', ['Fünf Säulen', 'Mohammed in Mekka und Medina', 'Vielfalt des Islam', 'Islam im Alltag']],
+      ['4', 'Ich und meine Wünsche', ['Wünsche und Träume', 'Medien und Idole', 'Sucht und Abhängigkeit']],
+      ['5', 'Nächstenliebe und diakonisches Handeln der Kirche', ['Hilfsbedürftigkeit', 'Grenzen des Helfens', 'Anfänge der Diakonie', 'Johann Hinrich Wichern']],
+    ],
+    8: [
+      ['1', 'Voraussetzungen und Folgen der Reformation', ['Ablasswesen', 'Thesenanschlag', 'Bauernkrieg', 'Bildersturm']],
+      ['2', 'Propheten und die Frage nach Gerechtigkeit', ['Exodustradition', 'Berufung und Visionen', 'Jeremia und Amos', 'Einsatz für Schwache']],
+      ['3', 'Die Welt als Gottes Schöpfung', ['Sach- und Sinnfragen', 'Ebenbildlichkeit und Herrschaftsauftrag', 'Kreationismus und Evolution']],
+      ['4', 'Ich in der Zeit', ['Zeitdruck', 'Lebenszeit als Gabe', 'Gott als Herr der Zeit']],
+      ['5', 'Vielfalt des Glaubens', ['Konfessionen', 'Ämter und Abendmahl', 'Taizé', 'Toleranz']],
+    ],
+    9: [
+      ['1', 'Frei im Netz!?', ['Internetnutzung', 'Chancen digitaler Vernetzung', 'Abhängigkeiten', 'Menschenwürde im Netz']],
+      ['2', 'Der Glaube an Jesus Christus', ['Christliche Bekenntnisse', 'Tod und Auferstehung', 'Evangelientexte', 'Jesus in anderen Religionen']],
+      ['3', 'Judentum', ['Jüdischer Glaube', 'Jüdische Feste und Kultur', 'Strömungen des Judentums', 'Antisemitismus']],
+      ['4', 'Das Verhältnis von Kirche und Staat', ['Kirche und Staat in Deutschland', 'Kirche im Nationalsozialismus', 'Kirche in der DDR']],
+      ['5', 'Liebe – der Himmel auf Erden?', ['Beziehungen', 'Bedeutungen von Liebe', 'Liebe zwischen Gott und Mensch']],
+    ],
+    10: [
+      ['1', 'Wie halt ich’s mit der Religion?', ['Religionssoziologie', 'Religionspsychologie', 'Religionsbegriffe', 'Religion, Kirche, Glaube']],
+      ['2', 'Buddhismus', ['Meditation', 'Reinkarnation', 'Lehre Buddhas', 'Lebensführung']],
+      ['3', 'Zum Glück?!', ['Dimensionen von Glück', 'Glücksforschung', 'Antike Glücksvorstellungen', 'Gelingendes Leben biblisch']],
+      ['4', 'Mitten im Tod: das Leben', ['Abschied und Trauer', 'Auferstehungsglaube', 'Sterbehilfe']],
+      ['5', 'Gerechtigkeit und Frieden in der einen Welt', ['Globale Vernetzung', 'Gerechtigkeitsbegriffe', 'Biblische Friedensvisionen', 'Kirchliche Initiativen']],
+    ],
+    11: [
+      ['1', 'Glaube und Vernunft', ['Aufklärung und Mündigkeit', 'Deismus und Pietismus', 'Glaube und Naturwissenschaft', 'Fundamentalismus']],
+      ['2', 'Freiheit leben', ['Freiheit und Bedingtheit', 'Biblische Freiheitsmotive', 'Luther: Von der Freiheit', 'Gewissen']],
+      ['3', 'Sola scriptura!? – Zugänge zur Bibel', ['Aufbau der Bibel', 'Historisch-kritische Auslegung', 'Weitere Lesarten', 'Evangelisches Schriftverständnis']],
+      ['4', 'Judentum, Christentum, Islam', ['Stereotype', 'Beziehungen der Religionen', 'Abraham', 'Wahrheitsansprüche']],
+    ],
+    12: [
+      ['1', 'Woran dein Herz hängt – Sinnfrage und Gottesfrage', ['Sinnangebote', 'Gottesfrage', 'Theodizee bei Hiob', 'Feuerbachs Projektionstheorie'], GA],
+      ['2', 'Der im-perfekte Mensch', ['Perfektion', 'Identität', 'Aggression', 'Sünde und Rechtfertigung'], GA],
+      ['3', 'Homo faber – der Mensch und seine Möglichkeiten', ['Leistung', 'Philosophische Anthropologie', 'Beruf und Berufung bei Luther', 'Entfremdung bei Marx'], GA],
+      ['4', 'Christsein in der Gesellschaft', ['Individuum und Gesellschaft', 'Zoon politikon', 'Rolle der Kirche', 'Zwei-Reiche-Lehre'], GA],
+    ],
+    13: [
+      ['1', 'Die Frage nach dem guten Leben und richtigen Handeln', ['Gutes Leben', 'Ethische Grundbegriffe', 'Ethische Modelle', 'Christliche Ethik'], GA],
+      ['2', 'Differenzierte Perspektiven auf ethische Probleme', ['Medizin-, Friedens-, Umweltethik', 'Urteilsbildung', 'Kognitive Verzerrungen'], GA],
+      ['3', 'Christliche Hoffnungsbilder', ['Zukunftsvisionen', 'Endlichkeit', 'Überwindung des Todes', 'Eschatologie'], GA],
+    ],
+  },
+  Ethik: {
+    5: [
+      ['1', 'Wahrnehmung und Bedürfnisse', ['Sinneswahrnehmung', 'Vorurteil und Stereotyp', 'Grundbedürfnisse', 'Goldene Regel']],
+      ['2', 'Familie', ['Familienformen', 'Entscheidungen in der Familie', 'Zuhören und Ich-Botschaften', 'Armut']],
+      ['3', 'Spielen', ['Spielregeln', 'Fairness', 'Gesellschafts- und Theaterspiele']],
+      ['4', 'Feste', ['Feste in der Schule', 'Private Feste', 'Laubhüttenfest', 'Weihnachten und Ostern']],
+    ],
+    6: [
+      ['1', 'Judentum und Christentum', ['Heilige Schriften', 'Bergpredigt', 'Barmherziger Samariter']],
+      ['2', 'Umgang mit Medien', ['Täuschung und Manipulation', 'Eigene Mediennutzung', 'Selbstkontrolle']],
+      ['3', 'Dem Anderen begegnen', ['Selbstentfaltung und Selbstbegrenzung', 'Kommunikation unter Gleichaltrigen', 'Der Andere als Bereicherung']],
+      ['4', 'Konsum und Freizeit', ['Verantwortungsbewusster Konsum', 'Werbung', 'Marken als Statussymbole']],
+    ],
+    7: [
+      ['1', 'Islam', ['Mohammed', 'Fünf Säulen', 'Muslime und Islamisten', 'Muslime in Deutschland']],
+      ['2', 'Konflikte und ihre Regelung', ['Sach- und Beziehungsebene', 'Konfliktursachen', 'Mobbing', 'Umgang mit Wut']],
+      ['3', 'Erwachsen werden', ['Identität', 'Rechte und Pflichten Jugendlicher', 'Jugendschutz und Strafmündigkeit', 'Lebensentwürfe']],
+    ],
+    8: [
+      ['1', 'Sinnsuche', ['Selbsttranszendenz', 'Sucht- und Depressionsprävention', 'Sinn in Ausnahmesituationen', 'Sekten']],
+      ['2', 'Soziales Engagement', ['Engagement vor Ort', 'Globales Engagement', 'Ehrenamt', 'Vorbilder']],
+      ['3', 'Liebe, Freundschaft, Sexualität', ['Freundschaft', 'Verliebtheit und Liebe', 'Erwartungen in Beziehungen', 'Geschlechterrollen']],
+      ['4', 'Umwelt- und Tierethik', ['Begründungen für Umweltschutz', 'Lebensgewohnheiten', 'Moralischer Status von Tieren', 'Massentierhaltung']],
+    ],
+    9: [
+      ['1', 'Fernöstliche Religionen', ['Samsara', 'Vier Edle Wahrheiten', 'Achtfacher Pfad']],
+      ['2', 'Gewissen und Verantwortung', ['Gewissen als innerer Gerichtshof', 'Über-Ich und Ich-Ideal', 'Folgen einer Handlung']],
+      ['3', 'Friedensethik', ['Krieg in Medien', 'Gewaltfreie Kommunikation', 'Deeskalation', 'Pazifismus']],
+      ['4', 'Arbeitsethik', ['Status und Selbstwert', 'Work-Life-Balance', 'Gleichberechtigung']],
+    ],
+    10: [
+      ['1', 'Ursprünge des Philosophierens', ['Staunen und Zweifeln', 'Gedankenexperiment', 'Mythos und Logos', 'Skeptizismus']],
+      ['2', 'Religionsphilosophie und vergleichende Religionsbetrachtung', ['Theodizee', 'Gottesbeweise', 'Religionskritik', 'Atheismus und Agnostizismus']],
+      ['3', 'Wirtschaftsethik', ['Entfremdete Arbeit', 'Warenfetischismus', 'Homo oeconomicus', 'Ultimatumspiel']],
+      ['4', 'Medienethik', ['Realität und Virtualität', 'Information und Meinung', 'Pressekodex', 'Datenschutz und Urheberrecht']],
+    ],
+    11: [
+      ['1', 'Philosophische Deutung des Menschen', ['Evolution des Menschen', 'Freuds Instanzenmodell', 'Höhlengleichnis', 'Kategorischer Imperativ']],
+      ['2', 'Politische Ethik', ['Staatsformen', 'Gesellschaftsvertrag: Hobbes, Rousseau', 'Widerstandsrecht', 'Populismus']],
+      ['3', 'Medizinethik', ['Praktischer Syllogismus', 'Sein-Sollen-Fehlschluss', 'Dammbruchargument', 'Person und moralischer Status']],
+    ],
+    12: [
+      ['1', 'Theorie und Praxis des Handelns', ['Handlung, Absicht, Mittel', 'Tugendethik', 'Kategorischer Imperativ', 'Utilitarismus'], GA],
+      ['2', 'Freiheit und Determination', ['Willensschwäche', 'Autonomie des Willens', 'Positive und negative Freiheit', 'Libet-Experiment'], GA],
+    ],
+    13: [
+      ['1', 'Recht und Gerechtigkeit', ['Ausgleichende und verteilende Gerechtigkeit', 'Rechtspositivismus', 'Strafzwecktheorien', 'Täter-Opfer-Ausgleich'], GA],
+      ['2', 'Sinnorientierung und Lebensgestaltung', ['Eudaimonie', 'Ataraxie und Autarkie', 'Sinnsetzung', 'Flow'], GA],
+    ],
+  },
+  Musik: {
+    5: [
+      ['1', 'Sprechen – Singen – Musizieren', ['Volksmusik in Mundart', 'Bräuche und Jahreszeiten', 'Sprechstücke', 'Vor- und Nachspiele']],
+      ['2', 'Musik – Mensch – Zeit', ['Mozart als Wunderkind', 'Haydn: Esterházy und London', 'Sinfonie, Streichquartett, Oratorium', 'Melodie und Dreiklang']],
+      ['3', 'Bewegung – Tanz – Szene', ['Bodypercussion', 'Volkstanzschritte', 'Schattenspiel']],
+      ['4', 'Musik und ihre Grundlagen', ['Violin- und Bassschlüssel', 'Notenwerte bis Sechzehntel', 'Dur-Tonleitern', 'Dur-Dreiklang', 'Tempobezeichnungen']],
+    ],
+    6: [
+      ['1', 'Sprechen – Singen – Musizieren', ['Lieder und Kanons', 'Europäische Volksmusik', 'Liedbegleitung', 'Stimmbildung']],
+      ['2', 'Musik – Mensch – Zeit', ['Bach: Inventionen', 'Brandenburgische Konzerte', 'Kantate und Passion']],
+      ['3', 'Bewegung – Tanz – Szene', ['Menuett', 'Pavane', 'Kontratanz', 'Pantomime']],
+      ['4', 'Musik und ihre Grundlagen', ['Imitation und unisono', 'Legato, staccato, Akzent', 'Triole und Taktwechsel', 'Zusammengesetzte Taktarten', 'Intervalle', 'Umkehrungen des Dreiklangs']],
+    ],
+    7: [
+      ['1', 'Sprechen – Singen – Musizieren', ['Lateinamerikanische Lieder', 'Akkordfolgen in Rock und Rap', 'Stimme in der Mutation']],
+      ['2', 'Musik – Mensch – Zeit', ['Beethoven', 'Schubert: Lied und Sinfonie', 'Dvořák und der Nationalgedanke', 'Bernstein']],
+      ['3', 'Bewegung – Tanz – Szene', ['Bodypercussion', 'Blues, Hardrock, Rap', 'Standbild und Schattenspiel']],
+      ['4', 'Musik und ihre Grundlagen', ['Kadenz', 'Haupt- und Nebenstufen', 'Synkope und Off-Beat', 'Dominantseptakkord']],
+    ],
+    8: [
+      ['1', 'Sprechen – Singen – Musizieren', ['Funktion von Instrumenten', 'Musik in Ritualen', 'Improvisation', 'Arrangements']],
+      ['2', 'Musik – Mensch – Zeit', ['Filmmusik und Soundtracks', 'Musikpsychologie', 'Musik in Werbung und Alltag', 'Stile der Popularmusik']],
+      ['3', 'Bewegung – Tanz – Szene', ['Afrikanischer Maskentanz', 'Capoeira', 'Musicalverfilmung']],
+      ['4', 'Musik und ihre Grundlagen', ['Rock’n’Roll, Punk, Techno', 'Tonvorrat', 'Naturtonreihe']],
+    ],
+    9: [
+      ['1', 'Sprechen – Singen – Musizieren', ['Klavierlied', 'Leitmotivtechnik', 'Improvisation nach Formabläufen', 'Dirigieren']],
+      ['2', 'Musik – Mensch – Zeit', ['Sonatensatzform', 'Romantik', 'Oper und Musical', 'Programmmusik']],
+      ['3', 'Bewegung – Tanz – Szene', ['Pantomime', 'Rollenspiel', 'Bühnenbild']],
+      ['4', 'Musik und ihre Grundlagen', ['Instrumentierung', 'Charakterstück', 'Sinfonische Dichtung', 'Rezitativ', 'Zwischendominante']],
+    ],
+    10: [
+      ['1', 'Sprechen – Singen – Musizieren', ['Musizieren im Jazz', 'Atonales Komponieren', 'Barocke Strukturen', 'Multimedia']],
+      ['2', 'Musik – Mensch – Zeit', ['Konzert', 'Kantate und Oratorium', 'Debussy und Impressionismus', 'Zweite Wiener Schule', 'Blues, Swing, Bebop, Cool Jazz']],
+      ['3', 'Bewegung – Tanz – Szene', ['Modern Dance', 'Cakewalk und Charleston']],
+      ['4', 'Musik und ihre Grundlagen', ['Concerto, Suite, Oratorium', 'Zwölftontechnik', 'Collage', 'Triosonate und Generalbass']],
+    ],
+    11: [
+      ['1', 'Musik politisch', ['Politisches Lied im 19. Jahrhundert', 'Märsche und Kampflieder', 'Entartete Musik', 'Musik im Nationalsozialismus']],
+      ['2', 'Musik interdisziplinär', ['Pythagoras und Intervalle', 'Goldener Schnitt', 'Gabrieli in Venedig', 'Wagner in Bayreuth']],
+      ['3', 'Musik kreativ', ['Notensatzprogramm', 'Soundscape', 'Zwölftonreihe', 'Aleatorik und Minimal Music']],
+      ['4', 'Musik explorativ', ['Sinfonie, Sonate, Oper', 'Dirigieren: Schlagfiguren', 'Probengestaltung', 'Interpretation']],
+    ],
+    12: [
+      ['1', 'Entwicklungen abendländischer Vokalmusik', ['Kantate und Oratorium', 'Oper der Wiener Klassik', 'Kunstlied der Romantik', 'Schubert und Schumann'], GA],
+      ['2.1', 'Musik und Tradition', ['Volksmusik in der Kunstmusik', 'Dies irae', 'Traditionsbrüche', 'Emanzipation der Dissonanz'], GA],
+      ['2.2', 'Musik und Technik', ['Digitale Verfahren', 'Elektronische Instrumente', 'Verbreitung von Musik', 'Musik des 20. und 21. Jahrhunderts'], GA],
+    ],
+    13: [
+      ['1', 'Entwicklungen abendländischer Instrumentalmusik', ['Barock und Polyphonie', 'Concerto-Prinzip', 'Klassik', 'Programmmusik und absolute Musik'], GA],
+      ['2', 'Ausgewählte Musik seit Beginn des 20. Jahrhunderts', ['Impressionismus', 'Minimal Music', 'Klangflächen', 'Reihentechnik', 'Grafische Notation'], GA],
+    ],
+  },
+  Kunst: {
+    5: [
+      ['1', 'Bildende Kunst', ['Pigmente und Bindemittel', 'Deckender und lasierender Farbauftrag', 'Farbkontraste', 'Bedeutungsperspektive', 'Modellieren mit Ton']],
+      ['2', 'Architektur und Produktdesign', ['Schmuck und Alltagsgegenstände', 'Pfahlbau und Pyramide', 'Sakrale und profane Bauten', 'Modellbau']],
+      ['3', 'Interaktion, Inszenierung und Kommunikation', ['Bilderschrift und Lautschrift', 'Schmuckschrift', 'Szenisches Spiel', 'Filmische Mittel']],
+    ],
+    6: [
+      ['1', 'Bildende Kunst', ['Raumdarstellung in der Zeichnung', 'Archaik, Klassik, Hellenismus', 'Kontrapost, Relief, Mosaik', 'Fresko und Tempera', 'Mythologie']],
+      ['2', 'Architektur und Produktdesign', ['Gefäße aus Ton', 'Engobe und Glasur', 'Tempel, Basilika, Forum', 'Römisches Wohnhaus']],
+      ['3', 'Interaktion, Inszenierung und Kommunikation', ['Bildergeschichte und Plakat', 'Capitalis quadrata', 'Fotografische Mittel']],
+    ],
+    7: [
+      ['1', 'Bildende Kunst', ['Kontur und Schraffur', 'Parallelperspektive', 'Komplementärkontrast', 'Mittelalterliche Ikonografie']],
+      ['2', 'Architektur und Produktdesign', ['Rund- und Spitzbogen', 'Tonnen- und Kreuzrippengewölbe', 'Romanik und Gotik', 'Kirche und Moschee']],
+      ['3', 'Interaktion, Inszenierung und Kommunikation', ['Figur und Grund', 'Linie und Fläche', 'Drucktechniken', 'Buchdruck']],
+    ],
+    8: [
+      ['1', 'Bildende Kunst', ['Zentralperspektive', 'Fluchtpunkt', 'Ölmalerei', 'Goldener Schnitt', 'Renaissance und Barock']],
+      ['2', 'Architektur und Produktdesign', ['Grundriss, Schnitt, Ansicht', 'Modellbau', 'Licht und Raum']],
+      ['3', 'Interaktion, Inszenierung und Kommunikation', ['Layout und Fotografie', 'Form und Inhalt', 'Logo und Wiedererkennung', 'Typografie']],
+    ],
+    9: [
+      ['1', 'Bildende Kunst', ['Porträt und Figur', 'Proportionen', 'Klassizismus, Romantik, Realismus', 'Komposition']],
+      ['2', 'Architektur und Produktdesign', ['Moodboard', 'Mode und Kleidung', 'Schmuck und Ornament', 'Product-Placement']],
+      ['3', 'Interaktion, Inszenierung und Kommunikation', ['Jugendkulturen', 'Blende, Schärfentiefe, Licht', 'Street-Art und Graffiti', 'Recht am eigenen Bild']],
+    ],
+    10: [
+      ['1', 'Bildende Kunst', ['Lokalfarbe', 'Additive und subtraktive Farbmischung', 'Farbkontraste nach Itten', 'Impressionismus']],
+      ['2', 'Architektur und Produktdesign', ['Funktionen von Design', 'Möbel und Innenarchitektur', 'Industrieprodukt und Unikat', 'Ressourcen']],
+      ['3', 'Interaktion, Inszenierung und Kommunikation', ['Erklärende Zeichnung', 'Bildserie', 'Presse- und Werbefotografie', 'Bildbearbeitung']],
+    ],
+    11: [
+      ['1', 'Bildende Kunst', ['Klassische Moderne', 'Figuration und Abstraktion', 'Kunst und Politik', 'Intermediale Experimente']],
+      ['2', 'Architektur und Produktdesign', ['Lageplan und Grundriss', 'Urban Sketching', 'Idealstadt und Gartenstadt', 'Denkmalschutz']],
+      ['3', 'Interaktion und Kommunikation', ['Moodboard', 'Forschungsplakat', 'AIDA-Formel', 'Branding']],
+    ],
+    12: [
+      ['1', 'Objekt', ['Explosionszeichnung', 'Readymade', 'Assemblage', 'Stillleben'], GA],
+      ['2', 'Raum', ['Grund- und Aufriss', 'Schnitt', 'Minimal Housing', 'Raumillusion'], GA],
+    ],
+    13: [
+      ['1', 'Körper', ['Figuration', 'Abstraktion', 'Deformation', 'Vergänglichkeit'], GA],
+      ['2', 'Interaktion und Transformation', ['Klimawandel', 'Migration', 'Performance', 'Installation'], GA],
+    ],
+  },
+  Wirtschaftsinformatik: {
+    9: [
+      ['1', 'Informationstechnologie im Unternehmen', ['Hardware und EVA-Prinzip', 'Softwarearten', 'Client-Server-Prinzip', 'Netzwerktopologien'], WWG],
+      ['2.1', 'Beschaffung und Aufbereitung von Informationen', ['Informationsquellen', 'Informationen filtern', 'Tabellenkalkulation: Formatierung', 'Relative und absolute Zellbezüge'], WWG],
+      ['2.2', 'Darstellung des Unternehmens nach außen', ['Corporate Identity', 'Zielgruppengerechte Information', 'Diagramme', 'Layoutregeln'], WWG],
+      ['3', 'Datenspuren und Datenschutz', ['Digitale Datenspuren', 'Personenbezogene Daten', 'Datenschutzrecht'], WWG],
+      ['4', 'IT-Sicherheit und Internetkriminalität', ['Schutzziele der IT-Sicherheit', 'Schutzmaßnahmen', 'Verschlüsselung', 'Angriffsarten'], WWG],
+    ],
+    10: [
+      ['1.1', 'Das Unternehmen als synergetisches System', ['Organigramm', 'Ereignisgesteuerte Prozessketten', 'Aufbau- und Ablauforganisation'], WWG],
+      ['1.2', 'Logistik als bereichsübergreifender Prozess', ['6R der Logistik', 'Beschaffungs-, Produktions-, Distributionslogistik', 'Routenplanung'], WWG],
+      ['1.3', 'Beschaffung, Produktion und Absatz', ['Erweiterte EPK', 'Qualität, Zeit, Kosten', 'Just-in-time', 'E-Commerce'], WWG],
+      ['2', 'Algorithmik', ['Algorithmusbegriff', 'Variablen', 'Felder und Listen', 'Kontrollstrukturen', 'Sortierverfahren'], WWG],
+      ['3', 'Informationstechnologische Zukunftstrends', ['Künstliche Intelligenz', 'Cyberphysische Systeme', 'Blockchain', 'Sprachverarbeitung'], WWG],
+    ],
   }
 };
 LP.Deutsch[13] = LP.Deutsch[12];
+LP.Englisch[13] = LP.Englisch[12];
 
 export const FAECHER = Object.keys(LP).sort((a, b) => a.localeCompare(b, "de"));
 export const UMFANG = [5, 10, 20, 30, 45, 60, 90];
@@ -452,5 +1205,27 @@ export const HINWEIS = {
   'Deutsch|13': 'Der Fachlehrplan Deutsch gilt für 12 und 13 gemeinsam.',
   'Latein|9': 'Ab Jahrgangsstufe 9 gilt ein gemeinsamer Lehrplan für Latein als 1. und 2. Fremdsprache.',
   'Geschichte|12': 'Hinterlegt ist das grundlegende Anforderungsniveau.',
-  'Geschichte|13': 'Hinterlegt ist das grundlegende Anforderungsniveau.'
+  'Geschichte|13': 'Hinterlegt ist das grundlegende Anforderungsniveau.',
+  'Biologie|5': 'Biologie ist in Jahrgangsstufe 5 und 6 Teil von Natur und Technik.',
+  'Biologie|6': 'Biologie ist in Jahrgangsstufe 5 und 6 Teil von Natur und Technik.',
+  'Biologie|11': 'Der Fachlehrplan Biologie 11 wird gerade überarbeitet und ist deshalb noch nicht hinterlegt.',
+  'Chemie|9': 'Hinterlegt sind beide Varianten: NTG und HG, SG, MuG, WWG, SWG.',
+  'Chemie|10': 'Hinterlegt sind beide Varianten: NTG und HG, SG, MuG, WWG, SWG.',
+  'Chemie|11': 'Chemie 11 gibt es nur am NTG.',
+  'Chemie|13': 'Chemie 13 ist noch nicht hinterlegt – bitte den Fachlehrplan öffnen.',
+  'Englisch|6': 'Hinterlegt ist Englisch als 1. Fremdsprache.', 'Englisch|7': 'Hinterlegt ist Englisch als 1. Fremdsprache.',
+  'Englisch|8': 'Hinterlegt ist Englisch als 1. Fremdsprache.', 'Englisch|9': 'Hinterlegt ist Englisch als 1. Fremdsprache.',
+  'Englisch|12': 'Der Fachlehrplan gilt für 12 und 13 gemeinsam; hinterlegt ist das grundlegende Anforderungsniveau.',
+  'Englisch|13': 'Der Fachlehrplan gilt für 12 und 13 gemeinsam; hinterlegt ist das grundlegende Anforderungsniveau.',
+  'Französisch|6': 'Hinterlegt ist Französisch als 2. Fremdsprache.', 'Französisch|7': 'Hinterlegt ist Französisch als 2. Fremdsprache.',
+  'Französisch|8': 'Hinterlegt ist Französisch als 2. Fremdsprache.', 'Französisch|9': 'Hinterlegt ist Französisch als 2. Fremdsprache.',
+  'Französisch|12': 'Französisch 12/13 ist noch nicht hinterlegt – bitte den Fachlehrplan öffnen.',
+  'Französisch|13': 'Französisch 12/13 ist noch nicht hinterlegt – bitte den Fachlehrplan öffnen.',
+  'Wirtschaft und Recht|8': 'Wirtschaft und Recht 8 und 9 gibt es am WWG.', 'Wirtschaft und Recht|9': 'Wirtschaft und Recht 8 und 9 gibt es am WWG.',
+  'Wirtschaft und Recht|10': 'Hinterlegt ist der Lehrplan für HG, SG, NTG, MuG und SWG.', 'Wirtschaft und Recht|11': 'Hinterlegt ist der Lehrplan für HG, SG, NTG, MuG und SWG.',
+  'Politik und Gesellschaft|10': 'Hinterlegt ist der Lehrplan für HG, SG, NTG, MuG und WWG.', 'Politik und Gesellschaft|11': 'Hinterlegt ist der Lehrplan für HG, SG, NTG, MuG und WWG.',
+  'Wirtschaftsinformatik|9': 'Wirtschaftsinformatik gibt es am WWG.', 'Wirtschaftsinformatik|10': 'Wirtschaftsinformatik gibt es am WWG.',
 };
+for (const f of ['Spanisch', 'Italienisch', 'Russisch', 'Griechisch']) for (const j of [8, 9, 10, 11]) HINWEIS[f + '|' + j] = `Hinterlegt ist ${f} als 3. Fremdsprache.`;
+for (const f of ['Biologie', 'Chemie', 'Geographie', 'Wirtschaft und Recht', 'Politik und Gesellschaft', 'Katholische Religionslehre', 'Evangelische Religionslehre', 'Ethik', 'Musik', 'Kunst'])
+  for (const j of [12, 13]) HINWEIS[f + '|' + j] = HINWEIS[f + '|' + j] || 'Hinterlegt ist das grundlegende Anforderungsniveau.';
