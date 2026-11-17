@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-17c';
+const PF_BUILD = '2026-11-17f';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -289,6 +289,7 @@ export function startPathFinder(opts = {}) {
   const saveDocList = l => LS.set(DOCS, JSON.stringify(l));
   const loadDoc = id => { try { const d = JSON.parse(LS.get(DOCKEY(id))); return d ? migrate(d) : null; } catch (e) { return null; } };
   const PLAYER = !!opts.player; // exportierter Lernpfad: nur abspielen, kein Editor
+  const RO = !PLAYER && !!opts.readOnly; // schreibgeschützt (z. B. Prüfung nach dem Start in Probe): ansehen mit Lösungen, Vorschau ausprobieren, nichts ändern
   let doc = null;
   // Erlaubte Formate (z. B. nur 'pruefung', wenn PathFinder in Probe eingebettet ist)
   const FORMS_OK = Array.isArray(opts.forms) && opts.forms.length ? opts.forms : ['lernpfad', 'challenge', 'pruefung'];
@@ -331,7 +332,7 @@ export function startPathFinder(opts = {}) {
 
   const lp = $('#lp'), scroller = $('#scroll');
   function save() {
-    if (PLAYER) return;
+    if (PLAYER || RO) return;
     const ok = LS.set(DOCKEY(doc.id), JSON.stringify(doc));
     LS.set(CUR, doc.id);
     host.saved?.(clone(doc)); // eingebettet (Probe): Entwurf beim Server sichern
@@ -996,6 +997,7 @@ export function startPathFinder(opts = {}) {
   /* ---------- Tastenkürzel ---------- */
   document.addEventListener('keydown', e => {
     if (PLAYER) return;
+    if (RO) { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') { e.preventDefault(); setMode(mode === 'edit' ? 'preview' : 'edit'); } return; }
     if (pop && pop._key && pop._key(e)) return;
     if ($('.ed-dlg')) { if (e.key === 'Escape') closeDlg(false); return; }
     if (!e.target.closest?.('#lp, body') || e.target.closest?.('.pf-side')) return; // Eingaben in der App nebenan nicht abfangen
@@ -1860,6 +1862,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       inhalte: lb ? (info.inh || []).filter(k => lb.k.includes(k)) : [],
       alleInhalte: lb ? lb.k : [],
       extra: info.extra || '',
+      ...(info.art === 'pruefung' ? { types: Array.isArray(info.types) ? info.types : ['quiz', 'gapbank', 'gap', 'match', 'short', 'essay'] } : {}),
       ...(basisOf() ? { basis: basisOf().text, basisTitle: basisOf().title } : {})
     };
   }
@@ -1901,6 +1904,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
           <div class="ex-tri"><div class="ex-bar" id="kiBar"></div><input type="range" id="kiP1" min="0" max="100" step="5" value="${info.p1 ?? 40}" aria-label="Grenze Grundlagen / Fortgeschritten"><input type="range" id="kiP2" min="0" max="100" step="5" value="${info.p2 ?? 80}" aria-label="Grenze Fortgeschritten / Experte"></div>
           <div class="ex-lv" id="kiLv"></div>
         </div>
+        <div id="kiTypes" hidden><label>Aufgabenstile</label><div class="ex-types">${T.EXAM_STYLES.map(([k, n, h]) => `<label class="chk"><input type="checkbox" data-kty="${k}"${(info.types || T.EXAM_STYLES.map(s => s[0])).includes(k) ? ' checked' : ''}>${esc(n)} <span class="help">– ${esc(h)}</span></label>`).join('')}</div><span class="help">Die KI nimmt jede angekreuzte Art mindestens einmal auf – und keine anderen.</span></div>
         <div class="row"><label>Jahrgangsstufe<select data-k="jg">${opt('', '– wählen –', info.jg || '')}${[5, 6, 7, 8, 9, 10, 11, 12, 13].map(j => opt(j, j + '. Jahrgangsstufe', info.jg)).join('')}</select></label>
           <label>Fach<select data-k="fsel">${opt('', '– wählen –', info.fsel || '')}${L.FAECHER.map(f => opt(f, f, info.fsel)).join('')}${opt('*', 'anderes Fach …', info.fsel)}</select></label></div>
         <label id="kiFrei" hidden>Fach<input type="text" data-k="ffrei" value="${esc(info.ffrei || '')}" placeholder="z. B. Chemie"></label>
@@ -1953,13 +1957,14 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       const box = $('#kiInh', el), lb = L.lernbereiche(info.fsel, +info.jg || 0).find(x => x.id === info.lb);
       if (!lb) { box.innerHTML = ''; return; }
       info.inh = info.inh.filter(k => lb.k.includes(k));
-      box.innerHTML = `<div class="ki-inh-h"><b>Inhalte für den Lernpfad</b><span class="help">nichts angekreuzt = ganzer Lernbereich</span><button class="lp-btn alt sm" data-inh="all">${info.inh.length === lb.k.length ? 'keine' : 'alle'}</button></div>`
+      box.innerHTML = `<div class="ki-inh-h"><b>Inhalte für ${info.art === 'pruefung' ? 'die Prüfung' : info.art === 'challenge' ? 'die Challenge' : 'den Lernpfad'}</b><span class="help">nichts angekreuzt = ganzer Lernbereich</span><button class="lp-btn alt sm" data-inh="all">${info.inh.length === lb.k.length ? 'keine' : 'alle'}</button></div>`
         + lb.k.map(k => `<label class="chk"><input type="checkbox" data-kw="${esc(k)}"${info.inh.includes(k) ? ' checked' : ''}>${esc(k)}</label>`).join('');
     };
     drawLb();
     const drawBasis = () => { $('#kiBasis', el).innerHTML = kiBasis ? `<div class="ed-hint">📘 Grundlage: Lernpfad „${esc(kiBasis.title)}“ – die KI schreibt neue Prüfungsaufgaben zu genau diesen Inhalten. <button class="lp-btn alt" data-nobasis="1">✕ ohne Grundlage</button></div>` : ''; };
     drawBasis();
     const drawMix = () => {
+      $('#kiTypes', el).hidden = info.art !== 'pruefung';
       const ch = info.art === 'challenge' || info.art === 'pruefung'; $('#kiMix', el).hidden = !ch; if (!ch) return;
       const p1 = info.p1 ?? 40, p2 = info.p2 ?? 80, N = info.art === 'pruefung' ? ['AFB I – Reproduktion', 'AFB II – Transfer', 'AFB III – Problemlösen'] : ['Grundlagen', 'Fortgeschritten', 'Experte'];
       $('#kiBar', el).style.background = `linear-gradient(90deg, #8fd19e 0 ${p1}%, #f6bf3a ${p1}% ${p2}%, #ef8a7a ${p2}% 100%)`;
@@ -1991,6 +1996,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const ready = () => {
       const p = kiPromptInfo(info, L);
       if (!p.thema && !p.extra.trim() && !p.basis) { toast('Bitte einen Lernbereich wählen oder ein Thema eintragen'); return null; }
+      if (p.art === 'pruefung' && !p.types?.length) { toast('Bitte mindestens einen Aufgabenstil wählen'); return null; }
       return p;
     };
     el.addEventListener('change', async e => {
@@ -2009,6 +2015,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         if (k === 'art') drawMix();
         save();
       }
+      if (t.dataset.kty != null) { info.types = $$('[data-kty]', el).filter(x => x.checked).map(x => x.dataset.kty); save(); }
       if (t.id === 'kiP1' || t.id === 'kiP2') {
         let p1 = +$('#kiP1', el).value, p2 = +$('#kiP2', el).value;
         if (p1 > p2) { if (t.id === 'kiP1') p2 = p1; else p1 = p2; $('#kiP1', el).value = p1; $('#kiP2', el).value = p2; }
@@ -2408,6 +2415,25 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   }
   function placePop(anchor) { const r = anchor.getBoundingClientRect(); pop.style.left = Math.max(10, Math.min(innerWidth - pop.offsetWidth - 10, r.right - pop.offsetWidth)) + 'px'; pop.style.top = (r.bottom + 6) + 'px'; }
 
+  /* ---------- Schreibgeschützt (opts.readOnly) ---------- */
+  // Die Bearbeiten-Ansicht bleibt (mit Lösungen, Punkten, Erwartungen), aber nichts lässt sich ändern; die Vorschau zum Ausprobieren bleibt.
+  function roSetup() {
+    document.documentElement.classList.add('pf-ro');
+    ['#bKI', '#bDesign', '#bUndo', '#bRedo', '#bOpen', '#bMore', '#saved'].forEach(s => { const x = $(s); if (x) x.style.display = 'none'; });
+    $$('.ed-bar .ed-sep').forEach(x => { x.style.display = 'none'; });
+    const tag = document.createElement('span'); tag.className = 'ed-ro'; tag.textContent = '🔒 ' + (opts.readOnlyLabel || 'Nur ansehen');
+    tag.title = opts.readOnlyTitle || 'Schreibgeschützt: Du kannst alles ansehen und in der Vorschau ausprobieren, aber nichts ändern.';
+    const sp = $('.ed-bar .sp'); if (sp) sp.after(tag); else $('.ed-bar')?.appendChild(tag);
+    const eb = $('#modeSeg [data-mode="edit"]'); if (eb) { eb.textContent = EXAMF() ? '👁 Mit Lösungen' : '👁 Ansicht'; eb.title = 'Alles ansehen – bei Prüfungen mit Lösungen, Punkten und Erwartungen'; }
+    const fix = () => { if (!E()) return; $$('[contenteditable="true"]', lp).forEach(x => x.setAttribute('contenteditable', 'false')); $$('input, select, textarea', lp).forEach(x => { x.disabled = true; }); };
+    new MutationObserver(fix).observe(lp, { childList: true, subtree: true }); fix();
+    const free = t => t.closest?.('[data-fz], #stops a, [data-skst], summary');
+    lp.addEventListener('click', ev => { if (!E() || free(ev.target)) return; ev.stopImmediatePropagation(); if (ev.target.closest('input, button, label, a')) ev.preventDefault(); }, true);
+    ['pointerdown', 'dblclick', 'paste', 'drop', 'dragstart', 'beforeinput', 'keydown'].forEach(n => lp.addEventListener(n, ev => {
+      if (!E() || free(ev.target)) return; ev.stopImmediatePropagation(); if (n !== 'pointerdown' && n !== 'keydown') ev.preventDefault();
+    }, true));
+  }
+
   /* ---------- Leiste oben ---------- */
   function setMode(m) {
     if (pending) commit();
@@ -2416,7 +2442,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     if (m === 'preview') { prog.visited[curSid] = 1; animDone.clear(); panelBack = panelOpen; hidePanel(); }
     else if (panelBack && panelFits()) showPanel();
     render();
-    toast(m === 'preview' ? (EXAMF() ? '▶ Vorschau – so sehen es die Schüler, ohne Rückmeldung. „Abgeben“ zeigt eine Probe-Auswertung.' : '▶ Vorschau – so sehen es die Schüler. Fortschritt wird hier nur probeweise gezählt.') : '✎ Bearbeiten');
+    toast(m === 'preview' ? (EXAMF() ? '▶ Vorschau – so sehen es die Schüler, ohne Rückmeldung. „Abgeben“ zeigt eine Probe-Auswertung.' : '▶ Vorschau – so sehen es die Schüler. Fortschritt wird hier nur probeweise gezählt.') : RO ? (EXAMF() ? '👁 Mit Lösungen' : '👁 Ansicht') : '✎ Bearbeiten');
   }
   if (!PLAYER) {
   $('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
@@ -2426,6 +2452,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   if ($('#viewSeg')) $('#viewSeg').onclick = e => { const x = e.target.closest('button[data-view]'); if (x) setSingle(x.dataset.view === 'one'); };
   $('#bDesign').onclick = openDesign;
   $('#bOpen').onclick = e => openChooser(e.currentTarget);
+  if (RO) roSetup();
   if (host.done) { // eingebettet (Probe): nur diese eine Prüfung; „Fertig“ gibt sie zurück
     $('#bOpen').style.display = 'none';
     const bDone = document.createElement('button'); bDone.className = 'ed-btn ed-lbl ed-done'; bDone.id = 'bDone';
@@ -2433,7 +2460,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     bDone.onclick = async () => {
       if (pending) commit();
       let warn = []; try { warn = (await import(modUrl('pfsplit.js'))).splitExam(doc).warnings; } catch (e) { }
-      if (warn.length && !confirm('Bitte prüfen:\n\n• ' + warn.join('\n• ') + '\n\nTrotzdem fertigstellen?')) return;
+      if (!RO && warn.length && !confirm('Bitte prüfen:\n\n• ' + warn.join('\n• ') + '\n\nTrotzdem fertigstellen?')) return;
       await host.done(clone(doc));
     };
   }

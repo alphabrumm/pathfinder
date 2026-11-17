@@ -414,6 +414,17 @@ export function docToText(doc, env, out = {}) {
   return L.join('\n').replace(/\n{3,}/g, '\n\n') + '\n';
 }
 
+/* ---------- Aufgabenstile für digitale Prüfungen (KI-Dialog) ---------- */
+// [Schlüssel, Name, Hinweis im Dialog, Anweisung für die KI]
+export const EXAM_STYLES = [
+  ['quiz', 'Multiple Choice', 'Quiz mit einer richtigen Antwort', '„### Quiz“ – Fragen mit genau einer richtigen Antwort und plausiblen falschen Antworten'],
+  ['gapbank', 'Lückentext mit Begriffen', 'Begriffe in Lücken ziehen', '„### Lückentext“ mit „Wortbank: ja“ und zwei bis drei Ablenkern unter „Extra:“'],
+  ['gap', 'Lückentext zum Eintippen', 'Schüler tippen die Wörter selbst', '„### Lückentext“ ohne Wortbank (Schüler tippen; eindeutige Fachbegriffe, alle richtigen Schreibweisen mit | angeben)'],
+  ['match', 'Zuordnen', 'Paare per Drag & Drop', '„### Zuordnen“ mit vier bis sechs Paaren'],
+  ['short', 'Rechnen / kurze Antwort', 'Ergebnis wird automatisch bewertet', '„### Aufgabe“ mit „Antwort:“ (Zahl ohne Einheit oder ein Wort; mehrere richtige mit | trennen) – die erwartete Einheit steht im Auftrag'],
+  ['essay', 'Freitext', 'mit Erwartungshorizont, du bewertest', '„### Freitext“ mit Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“'],
+];
+
 /* ---------- Anleitung für die KI ---------- */
 export function formatHelp(env) {
   const extra = (env.plugins || []).flatMap(p => Object.values(p.text || {}).map(t => t.help).filter(Boolean));
@@ -512,11 +523,13 @@ export function promptFor(info, env) {
 - KEINE Erklärungen, Merkkästen, Figuren, Tipps, Lösungen zum Aufdecken oder Sperren – nur kurze Arbeitsanweisungen, Material (Texte, Tabellen, Abbildungen) und Aufgaben.
 - Gliedere die Prüfung in Stationen als Teilaufgaben oder Themenblöcke (z. B. „## Station: Teil A | Grundwissen“).
 - Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Freitext) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken.
-- Rechenaufgaben mit eindeutigem Ergebnis als „### Aufgabe“ mit „Antwort:“ (Zahl, ohne Einheit, mehrere richtige mit | trennen) – sie werden automatisch bewertet. Schreibe die erwartete Einheit in den Auftrag.
-- Offene Aufgaben (erklären, begründen, beschreiben, beurteilen) als „### Freitext“ mit Erwartungshorizont: mehrere Zeilen „Erwartung: … (Punkte)“; die Summe ergibt die Punkte der Aufgabe.
-- Anforderungsbereiche: etwa ${mix[0]} % der Punkte Reproduktion (AFB I), ${mix[1]} % Anwendung und Transfer (AFB II), ${mix[2]} % Problemlösen und Beurteilen (AFB III); von leicht nach schwer.
-- Quizfragen mit genau einer richtigen Antwort und plausiblen falschen Antworten; Rückmeldungen nach // sind nicht nötig.
-- Lückentexte ohne Wortbank werden tolerant bewertet (Groß/Klein egal); mehrdeutige Lücken vermeiden oder alle richtigen Antworten mit | angeben.
+${!info.types?.length || info.types.includes('short') ? `- Rechenaufgaben mit eindeutigem Ergebnis als „### Aufgabe“ mit „Antwort:“ (Zahl, ohne Einheit, mehrere richtige mit | trennen) – sie werden automatisch bewertet. Schreibe die erwartete Einheit in den Auftrag.` : ''}
+${!info.types?.length || info.types.includes('essay') ? `- Offene Aufgaben (erklären, begründen, beschreiben, beurteilen) als „### Freitext“ mit Erwartungshorizont: mehrere Zeilen „Erwartung: … (Punkte)“; die Summe ergibt die Punkte der Aufgabe.` : ''}
+${info.types?.length ? `- AUFGABENSTILE – verwende AUSSCHLIESSLICH diese Aufgabenarten, und zwar JEDE mindestens einmal (sinnvoll auf die Prüfung verteilt):
+${EXAM_STYLES.filter(s => info.types.includes(s[0])).map(s => `  • ${s[1]}: ${s[3]}`).join('\n')}
+` : ''}- Anforderungsbereiche: etwa ${mix[0]} % der Punkte Reproduktion (AFB I), ${mix[1]} % Anwendung und Transfer (AFB II), ${mix[2]} % Problemlösen und Beurteilen (AFB III); von leicht nach schwer.
+${!info.types?.length || info.types.includes('quiz') ? `- Quizfragen mit genau einer richtigen Antwort und plausiblen falschen Antworten; Rückmeldungen nach // sind nicht nötig.` : ''}
+${!info.types?.length || info.types.includes('gap') ? `- Lückentexte ohne Wortbank werden tolerant bewertet (Groß/Klein egal); mehrdeutige Lücken vermeiden oder alle richtigen Antworten mit | angeben.` : ''}
 `
     : ch
     ? `- Schreibe im Kopf die Zeile „Art: Challenge“ und „Punkte: ja“.
@@ -541,10 +554,10 @@ REGELN
 - Halte dich exakt an das unten beschriebene PathFinder-Textformat, damit der Lernpfad ohne Nacharbeit eingelesen werden kann.
 - Wenn du Dateien zum Herunterladen erzeugen kannst, liefere denselben Inhalt zusätzlich als eine Textdatei „lernpfad.txt“.
 - Sprache: Deutsch, Schüler werden mit „du“ angesprochen, kurze Sätze.
-${(info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')) ? `- Schreibe im Kopf die Zeile „Kopfzeile: ${info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')}“.\n` : ''}${info.lehrplan ? '- Bleib beim Lehrplanbezug: Inhalte, Fachbegriffe und Schwierigkeit passend zu dieser Jahrgangsstufe, nichts vorwegnehmen, was erst später im Lehrplan kommt.\n' : ''}${artRules}- Aufgaben mit eindeutiger Lösung bekommen eine „Antwort:“-Zeile, damit sie automatisch geprüft werden.
-- Tipps bauen aufeinander auf: zuerst ein kleiner Denkanstoß, zuletzt fast die Lösung.
+${(info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')) ? `- Schreibe im Kopf die Zeile „Kopfzeile: ${info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')}“.` : ''}${info.lehrplan ? '- Bleib beim Lehrplanbezug: Inhalte, Fachbegriffe und Schwierigkeit passend zu dieser Jahrgangsstufe, nichts vorwegnehmen, was erst später im Lehrplan kommt.\n' : ''}${artRules}- Aufgaben mit eindeutiger Lösung bekommen eine „Antwort:“-Zeile, damit sie automatisch geprüft werden.
+${ex ? '' : `- Tipps bauen aufeinander auf: zuerst ein kleiner Denkanstoß, zuletzt fast die Lösung.
 - Beim Quiz: 3–4 Antworten, genau eine oder mehrere mit [x], zu falschen Antworten eine kurze Rückmeldung.
-- Bilder und Animationen: Zeichne passende Abbildungen selbst als SVG – im Abschnitt ## Anhang am Ende als „name: <svg …> … </svg>“, oben mit anhang:name einbinden. SVG darf animiert sein (<animate>, <animateTransform>, <animateMotion> oder CSS-@keyframes in <style> innerhalb des SVG). Immer viewBox angeben, gut lesbare Schrift (font-family="sans-serif"), keine Skripte, keine externen Links, Schriften oder Bilder. Lieber wenige, aussagekräftige Grafiken (z. B. Schaubild, Ablauf, Beispiel-Tabelle) als Deko.
+`}- Bilder und Animationen: Zeichne passende Abbildungen selbst als SVG – im Abschnitt ## Anhang am Ende als „name: <svg …> … </svg>“, oben mit anhang:name einbinden. SVG darf animiert sein (<animate>, <animateTransform>, <animateMotion> oder CSS-@keyframes in <style> innerhalb des SVG). Immer viewBox angeben, gut lesbare Schrift (font-family="sans-serif"), keine Skripte, keine externen Links, Schriften oder Bilder. Lieber wenige, aussagekräftige Grafiken (z. B. Schaubild, Ablauf, Beispiel-Tabelle) als Deko.
 - Rasterbilder (PNG, GIF, JPG) nur als data:image/…;base64,…, und nur wenn du die Datei wirklich erzeugt hast (z. B. mit einem Code-Werkzeug) – niemals Base64 ausdenken. Sonst ein Bild-Platzhalter: ![Beschreibung]()
 - Keine Bilder aus dem Internet.
 - Innerhalb eines ###-Abschnitts (Aufgabe, Quiz, Lückentext, Zuordnen …) keine Bild-Zeilen und keine Infokästen: Sie beenden den Abschnitt. Bilder und Kästen gehören davor oder dahinter (bei Aufgaben stattdessen „Bild: anhang:name“).
