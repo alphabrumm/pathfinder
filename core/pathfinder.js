@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-17f';
+const PF_BUILD = '2026-11-17g';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -686,7 +686,7 @@ export function startPathFinder(opts = {}) {
         if (b.bank) {
           const answers = [...(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].map(m => m[1].split('|')[0]);
           const words = shuffled(answers.concat(b.extra || []), b.id), used = Object.values(got), seen = {};
-          const html = (b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const i = n++; const v = got[i]; const st = prog.quiz[b.id + ':chk'] ? (v != null && isGapOk(b, i, v) ? ' ok' : ' no') : ''; return `<span class="gapslot${v != null ? ' filled' : ''}${st}" data-gslot="${i}" role="button" tabindex="0">${v != null ? esc(v) : ''}</span>`; });
+          const html = (b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const i = n++; const v = got[i]; const st = prog.quiz[b.id + ':chk'] ? (v != null && isGapOk(b, i, v, got) ? ' ok' : ' no') : ''; return `<span class="gapslot${v != null ? ' filled' : ''}${st}" data-gslot="${i}" role="button" tabindex="0">${v != null ? esc(v) : ''}</span>`; });
           return wrap(b, `<div class="lp-card lp-gap${b.heft ? ' heft' : ''}">${head}${xpTag(b)}<div>${html}</div><div class="bank"><span class="bl">Begriffe · ziehen oder erst Begriff, dann Lücke antippen</span>${words.map(w => { const k = seen[w] = (seen[w] || 0) + 1; return `<span class="gchip${used.filter(x => x === w).length >= k ? ' used' : ''}" data-gchip="${esc(w)}">${esc(w)}</span>`; }).join('')}</div><div><button class="lp-btn" data-run="gapcheck">Prüfen</button><span class="lp-state" style="margin-left:8px">${ok ? '✓ alles richtig' : ''}</span></div></div>`);
         }
         const html = (b.html || '').replace(/\[\[(.+?)\]\]/g, () => `<input data-gap="${n}" value="${esc(got[n] || '')}" autocomplete="off" autocapitalize="off" spellcheck="false" data-n="${n++}">`);
@@ -812,7 +812,21 @@ export function startPathFinder(opts = {}) {
     const num = x => { const t = String(x).trim().replace(/\s|€|%/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'); return /^[-+]?\d*\.?\d+$/.test(t) ? parseFloat(t) : NaN; };
     return String(expected || '').split('|').some(e => { const a = num(e), b = num(v); if (!isNaN(a) && !isNaN(b)) return Math.abs(a - b) <= Math.max(1e-9, Math.abs(a) * 1e-9, 0.005); return normAns(e) === normAns(v); });
   }
-  function isGapOk(b, i, v) { const a = [...(b.html || '').matchAll(/\[\[(.+?)\]\]/g)][i]; return !!a && a[1].split('|').some(x => normAns(x) === normAns(v)); }
+  /** Lücke i richtig? got = alle Eingaben des Lückentexts: bei „[[a]] = [[b]]“ zählt auch die vertauschte Reihenfolge (wie gapSwaps in pfsplit.js) */
+  function isGapOk(b, i, v, got) {
+    const G = [...(b.html || '').matchAll(/\[\[(.+?)\]\]/g)], one = (k, x) => x != null && !!G[k] && G[k][1].split('|').some(y => normAns(y) === normAns(x));
+    if (one(i, v) || !got) return one(i, v);
+    const s = String(b.html || '').replace(/&nbsp;|\u00a0/g, ' '), m = [...s.matchAll(/\[\[(.+?)\]\]/g)];
+    const startOk = t => { t = t.replace(/\s+$/, ''); return !t || /(<(?!\/?su[bp]\b)[^>]*>|[:;,|⇒⇔→])$/.test(t); };
+    const endOk = t => { t = t.replace(/^\s+/, ''); return !t || /^(<(?!su[bp]\b)|[,;.|⇒⇔→])/.test(t); };
+    for (let k = 0; k + 1 < m.length; k++) {
+      const a = m[k], c = m[k + 1];
+      if (!(/^\s*=\s*$/.test(s.slice(a.index + a[0].length, c.index)) && startOk(s.slice(0, a.index)) && endOk(s.slice(c.index + c[0].length)))) continue;
+      if (k === i || k + 1 === i) { const j = k === i ? k + 1 : k; return one(i, got[j]) && one(j, got[i]); }
+      k++;
+    }
+    return false;
+  }
 
   /* ---------- Eingaben im Bearbeiten-Modus ---------- */
   function setPath(obj, path, val) { const ks = path.split('.'); let o = obj; while (ks.length > 1) { const k = ks.shift(); if (o[k] == null) o[k] = {}; o = o[k]; } o[ks[0]] = val; }
@@ -895,7 +909,8 @@ export function startPathFinder(opts = {}) {
     if (E()) return; const inp = ev.target.closest('[data-gap]'); if (!inp) return;
     const id = inp.closest('.blk').dataset.id, r = findBlock(id); (prog.quiz[id] || (prog.quiz[id] = {}))[inp.dataset.n] = inp.value;
     let all = true;
-    $$('[data-gap]', inp.closest('.blk')).forEach((e, i) => { const good = isGapOk(r.b, i, e.value); e.classList.toggle('ok', good); e.classList.toggle('no', !good && e.value.trim() !== ''); if (!good) all = false; });
+    const vals = $$('[data-gap]', inp.closest('.blk')).map(e => e.value);
+    $$('[data-gap]', inp.closest('.blk')).forEach((e, i) => { const good = isGapOk(r.b, i, e.value, vals); e.classList.toggle('ok', good); e.classList.toggle('no', !good && e.value.trim() !== ''); if (!good) all = false; });
     if (all && !prog.solved[id]) solve(id, true);
   });
   function placeChip(id, chip, slot) {
@@ -1904,7 +1919,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
           <div class="ex-tri"><div class="ex-bar" id="kiBar"></div><input type="range" id="kiP1" min="0" max="100" step="5" value="${info.p1 ?? 40}" aria-label="Grenze Grundlagen / Fortgeschritten"><input type="range" id="kiP2" min="0" max="100" step="5" value="${info.p2 ?? 80}" aria-label="Grenze Fortgeschritten / Experte"></div>
           <div class="ex-lv" id="kiLv"></div>
         </div>
-        <div id="kiTypes" hidden><label>Aufgabenstile</label><div class="ex-types">${T.EXAM_STYLES.map(([k, n, h]) => `<label class="chk"><input type="checkbox" data-kty="${k}"${(info.types || T.EXAM_STYLES.map(s => s[0])).includes(k) ? ' checked' : ''}>${esc(n)} <span class="help">– ${esc(h)}</span></label>`).join('')}</div><span class="help">Die KI nimmt jede angekreuzte Art mindestens einmal auf – und keine anderen.</span></div>
+        <div id="kiTypes" hidden><label>Aufgabenstile</label><div class="ex-types">${T.EXAM_STYLES.map(([k, n, h]) => `<label class="chk"><input type="checkbox" data-kty="${k}"${(info.types || T.EXAM_STYLES_DEFAULT).includes(k) ? ' checked' : ''}>${esc(n)} <span class="help">– ${esc(h)}</span></label>`).join('')}</div><span class="help">Die KI nimmt jede angekreuzte Art mindestens einmal auf – und keine anderen.</span></div>
         <div class="row"><label>Jahrgangsstufe<select data-k="jg">${opt('', '– wählen –', info.jg || '')}${[5, 6, 7, 8, 9, 10, 11, 12, 13].map(j => opt(j, j + '. Jahrgangsstufe', info.jg)).join('')}</select></label>
           <label>Fach<select data-k="fsel">${opt('', '– wählen –', info.fsel || '')}${L.FAECHER.map(f => opt(f, f, info.fsel)).join('')}${opt('*', 'anderes Fach …', info.fsel)}</select></label></div>
         <label id="kiFrei" hidden>Fach<input type="text" data-k="ffrei" value="${esc(info.ffrei || '')}" placeholder="z. B. Chemie"></label>
@@ -2334,7 +2349,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (okA) solve(id); else { prog.tries[id] = (prog.tries[id] || 0) + 1; render(); }
     }
     if (a === 'copy') { if (host.copyCode) host.copyCode(b); else { navigator.clipboard?.writeText(b.code || '').then(() => toast('⧉ kopiert'), () => toast('Kopieren nicht möglich')); } }
-    if (a === 'gapcheck') { prog.quiz[id + ':chk'] = 1; const n = [...(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].length, got = prog.quiz[id] || {}; let all = true; for (let i = 0; i < n; i++) if (got[i] == null || !isGapOk(b, i, got[i])) all = false; if (all) solve(id); else { render(); toast('Noch nicht alles richtig – rote Lücken nochmal ansehen.'); } }
+    if (a === 'gapcheck') { prog.quiz[id + ':chk'] = 1; const n = [...(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].length, got = prog.quiz[id] || {}; let all = true; for (let i = 0; i < n; i++) if (got[i] == null || !isGapOk(b, i, got[i], got)) all = false; if (all) solve(id); else { render(); toast('Noch nicht alles richtig – rote Lücken nochmal ansehen.'); } }
     if (a === 'download') { if (!b.data) { toast('Noch keine Datei – ⚙'); return; } const bin = atob(b.data), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); const url = URL.createObjectURL(new Blob([u8])); const l = document.createElement('a'); l.href = url; l.download = b.name || 'datei'; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(url); l.remove(); }, 3000); }
     if (host.runFile && a.startsWith('file:')) host.runFile(a.slice(5), b);
   }

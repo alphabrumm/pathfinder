@@ -1,6 +1,6 @@
 // Tests für core/pfsplit.js (Digitale Prüfung: Zerlegen und Bewerten). Aufruf: node tools/test-pfsplit.mjs
 import assert from 'node:assert/strict';
-import { splitExam, gradeExam, gradeFor, pointsFor, halfFloor, isAnswer } from '../core/pfsplit.js';
+import { splitExam, gradeExam, gapSwaps, gradeFor, pointsFor, halfFloor, isAnswer } from '../core/pfsplit.js';
 
 let n = 0;
 const test = (name, fn) => { fn(); n++; console.log('✓', name); };
@@ -108,6 +108,17 @@ test('Notenschlüssel wie im Abitur', () => {
 
 test('Zahlen mit Komma und Einheiten-Text', () => {
   assert.ok(isAnswer('9,81', '9.81')); assert.ok(isAnswer('1000', '1.000')); assert.ok(!isAnswer('5', '')); assert.ok(isAnswer('Newton', ' newton '));
+});
+
+test('Gleichung mit Lücken auf beiden Seiten: vertauscht ist auch richtig', () => {
+  assert.deepEqual(gapSwaps('I + II: [[3x]] = [[9]]<br>x = [[3]], y = [[1]]'), [[0, 1]]);
+  assert.deepEqual(gapSwaps('<p>[[3x]] = [[9]]</p><p>[[2]]x = [[6]]</p>'), [[0, 1]]); // 2x = 6 ↔ 6x = 2 wäre falsch
+  assert.deepEqual(gapSwaps('[[x]] = [[3]] − y'), []); assert.deepEqual(gapSwaps('[[x]]<sup>2</sup> = [[9]]'), []);
+  assert.deepEqual(gapSwaps('[[a]] = [[b]] = [[c]]'), []); assert.deepEqual(gapSwaps('[[a]]&nbsp;=&nbsp;[[b]]'), [[0, 1]]);
+  const k = { tasks: [{ id: 'e', type: 'gap', pts: 4, title: 'GS', bank: true, html: 'I + II: [[3x]] = [[9]]<br>x = [[3]], y = [[1]]', gaps: [['3x'], ['9'], ['3'], ['1']] }] };
+  assert.equal(gradeExam(k, { e: { 0: '9', 1: '3x', 2: '3', 3: '1' } }).total, 4);
+  assert.equal(gradeExam(k, { e: { 0: '9', 1: '3', 2: '3x', 3: '1' } }).total, 1);
+  assert.equal(gradeExam(k, { e: { 0: '3x', 1: '9', 2: '1', 3: '3' } }).total, 2); // x und y vertauscht bleibt falsch
 });
 
 test('Zerlegen ändert das Original nicht', () => {

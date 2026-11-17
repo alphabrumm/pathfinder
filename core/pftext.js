@@ -421,9 +421,12 @@ export const EXAM_STYLES = [
   ['gapbank', 'Lückentext mit Begriffen', 'Begriffe in Lücken ziehen', '„### Lückentext“ mit „Wortbank: ja“ und zwei bis drei Ablenkern unter „Extra:“'],
   ['gap', 'Lückentext zum Eintippen', 'Schüler tippen die Wörter selbst', '„### Lückentext“ ohne Wortbank (Schüler tippen; eindeutige Fachbegriffe, alle richtigen Schreibweisen mit | angeben)'],
   ['match', 'Zuordnen', 'Paare per Drag & Drop', '„### Zuordnen“ mit vier bis sechs Paaren'],
+  ['steps', 'Lösungsschritte mit Drag & Drop', 'z. B. Gleichungssystem: Terme in den Rechenweg ziehen', '„### Lückentext“ mit „Wortbank: ja“: ein Rechenweg (z. B. ein Gleichungssystem mit I und II) Schritt für Schritt, jeder Schritt in einer eigenen Zeile; Terme, Zahlen und Rechenzeichen sind Lücken [[…]], unter „Extra:“ zwei bis drei falsche Bausteine als Ablenker; Malpunkt · statt *, Hochzahlen als ² und ³, negative Zahlen ohne Leerzeichen nach dem Minus; möglichst nur eine Seite einer Gleichung als Lücke (z. B. „3x = [[9]]“) – stehen beide Seiten ganz als Lücken da („[[3x]] = [[9]]“), wird auch die vertauschte Reihenfolge als richtig gewertet'],
   ['short', 'Rechnen / kurze Antwort', 'Ergebnis wird automatisch bewertet', '„### Aufgabe“ mit „Antwort:“ (Zahl ohne Einheit oder ein Wort; mehrere richtige mit | trennen) – die erwartete Einheit steht im Auftrag'],
   ['essay', 'Freitext', 'mit Erwartungshorizont, du bewertest', '„### Freitext“ mit Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“'],
 ];
+/** vorausgewählte Aufgabenstile (Lösungsschritte nur, wenn das Thema Rechenwege hat) */
+export const EXAM_STYLES_DEFAULT = ['quiz', 'gapbank', 'gap', 'match', 'short', 'essay'];
 
 /* ---------- Anleitung für die KI ---------- */
 export function formatHelp(env) {
