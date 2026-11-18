@@ -1,0 +1,118 @@
+# English Toolbox: Simple Past
+Untertitel: Alle Bausteine von PathFinder in Mini-Beispielen
+Art: Lernpfad
+Kopfzeile: Englisch · Jahrgangsstufe 6 · Beispiel
+Farbe: Meer
+Schrift: schlicht
+Ziele:
+- alle Bausteine und Aufgabentypen von PathFinder kennenlernen
+- das simple past erkennen und bilden
+Zertifikat: ja
+
+## Station: Lesen und Verstehen | Text, Bild, Infokästen, Tabelle
+{tippen} Last Saturday Emma **visited** London with her family. They **took** the train and **saw** Big Ben.
+
+![Emma's trip to London | klein](anhang:london)
+
+[Merke] The simple past is for finished actions in the past: *yesterday, last week, two days ago*.
+
+[Regel] Regular verbs: verb + **-ed** (play → played). Irregular verbs: learn them by heart (go → went).
+
+[Tipp] Signal words help you: *yesterday, last …, … ago, in 2020*.
+
+[Achtung] After **did** or **didn't** the verb stays in the base form: *Did you go?* – not *Did you went?*
+
+[Begriff: irregular verb] A verb that does not form the past with -ed, e.g. *see → saw*.
+
+[Figur: Aha] Wow, Emma was really busy in London!
+
+| base form | simple past |
+| --- | --- |
+| go | went |
+| see | saw |
+| take | took |
+
+### Aufdecken: Did you know?
+Big Ben is the name of the big bell – not of the tower.
+
+## Station: Wörter und Formen | Markieren, Sortieren, Zuordnen
+### Markieren: Mark all verbs in the simple past.
+Yesterday Emma {{woke}} up early. She {{had}} breakfast and {{walked}} to the station. Today she is tired and wants to sleep.
+
+### Sortieren: Sort the verbs.
+regular verbs: played, visited, walked
+irregular verbs: went, saw, took
+
+### Zuordnen: Match the base form and the simple past.
+go -> went
+see -> saw
+buy -> bought
+eat -> ate
+
+## Station: Sätze bauen | Lückentext, Satzpuzzle, Reihenfolge
+### Lückentext: Fill in the simple past.
+Yesterday I [[watched]] (watch) a film. Then we [[went]] (go) for a pizza.
+
+### Lückentext: Choose the right word.
+Emma [[visited]] London last year. She [[didn't]] see the King.
+Wortbank: ja
+Extra: visits, don't
+
+### Satzpuzzle: Put the words in the right order.
+did / you / visit / London / last summer
+Auch richtig: last summer / did / you / visit / London
+
+### Reihenfolge: Put Emma's day in the right order.
+- In the morning Emma took the train to London.
+- At noon she saw Big Ben.
+- In the afternoon she visited a museum.
+- In the evening she went back home.
+
+## Station: Zeig, was du kannst | Quiz, Aufgabe, Sperre
+### Quiz
+? Which sentence is correct?
+[x] She went home. // Right: go → went.
+[ ] She goed home. // Careful: go is an irregular verb.
+[ ] She go home yesterday. // You need the past form here.
+? What is the simple past of *buy*?
+[ ] buyed // buy is irregular.
+[x] bought // Yes!
+[ ] brought // That is the past of *bring*.
+
+### Aufgabe: Your turn
+Write the simple past of **take**.
+Antwort: took
+Tipp: It rhymes with *book*.
+Lösung: take → took
+
+--- Sperre ---
+
+[Abschluss] Great job – you know all task types now! In a digital test (Art: Prüfung) there is one more type: **Freitext**, an open answer that your teacher marks.
+
+## Station: Für andere Fächer | Code und UML
+Diese Bausteine braucht man eher in Informatik – hier nur zum Anschauen.
+
+```python
+print("Hello, London!")
+```
+
+### UML: Tourist
+- name: String
+- city: String
++ visit(place: String)
++ takePhoto()
+
+## Anhang
+london: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160">
+  <rect width="240" height="160" rx="12" fill="#e7f1fb"/>
+  <circle cx="200" cy="34" r="16" fill="#ffd45e"/>
+  <rect x="0" y="128" width="240" height="32" fill="#7cc38a"/>
+  <rect x="98" y="40" width="44" height="98" fill="#c99a5b" stroke="#7a5630" stroke-width="2"/>
+  <polygon points="96,40 120,12 144,40" fill="#6b4b2a"/>
+  <circle cx="120" cy="62" r="13" fill="#fff8e6" stroke="#7a5630" stroke-width="2"/>
+  <line x1="120" y1="62" x2="120" y2="53" stroke="#333" stroke-width="2"/>
+  <line x1="120" y1="62" x2="127" y2="62" stroke="#333" stroke-width="2"><animateTransform attributeName="transform" type="rotate" from="0 120 62" to="360 120 62" dur="6s" repeatCount="indefinite"/></line>
+  <g fill="#7a5630"><rect x="106" y="86" width="8" height="12"/><rect x="126" y="86" width="8" height="12"/><rect x="106" y="108" width="8" height="12"/><rect x="126" y="108" width="8" height="12"/></g>
+  <rect x="30" y="100" width="36" height="28" rx="4" fill="#d9483b"/><rect x="34" y="104" width="10" height="8" fill="#bfe3ff"/><rect x="52" y="104" width="10" height="8" fill="#bfe3ff"/>
+  <text x="120" y="152" font-family="sans-serif" font-size="11" text-anchor="middle" fill="#234">London</text>
+</svg>

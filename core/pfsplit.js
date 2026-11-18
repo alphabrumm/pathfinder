@@ -11,7 +11,7 @@
 //   task  Text (kurze Antwort, wenn die Aufgabe ein Ergebnis hat, sonst Freitext)
 //   essay Text
 
-export const EXAM_TYPES = new Set(['task', 'quiz', 'gap', 'match', 'essay']);
+export const EXAM_TYPES = new Set(['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order']);
 /** Bausteine ohne Lösungen, die unverändert in die Schülerfassung dürfen */
 const SAFE_TYPES = new Set(['text', 'info', 'image', 'table', 'reveal', 'file', 'code', 'uml', 'html']);
 /** Standard-Notenschlüssel (wie im Abitur): ab 20 % Note 5, ab 40 % Note 4, ab 55 % Note 3, ab 70 % Note 2, ab 85 % Note 1 */
@@ -60,6 +60,26 @@ export function isAnswer(expected, v) {
   const num = x => { const t = String(x).trim().replace(/\s|€|%/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'); return /^[-+]?\d*\.?\d+$/.test(t) ? parseFloat(t) : NaN; };
   return String(expected || '').split('|').some(e => { const a = num(e), b = num(v); if (!isNaN(a) && !isNaN(b)) return Math.abs(a - b) <= Math.max(1e-9, Math.abs(a) * 1e-9, 0.005); return normAns(e) === normAns(v); });
 }
+/** Markieren: Wörter des Textes (wie markParse in pathfinder.js) und die Indizes der Zielwörter in {{…}} */
+export function markWords(html) {
+  const words = [], targets = []; let on = false;
+  for (const part of String(html || '').split(/(<[^>]*>)/)) {
+    if (part.startsWith('<')) continue;
+    for (const m of part.matchAll(/&[#\w]+;|\{\{|\}\}|[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu)) {
+      if (m[0] === '{{') on = true; else if (m[0] === '}}') on = false; else if (m[0][0] !== '&') { if (on) targets.push(words.length); words.push(m[0]); }
+    }
+  }
+  return { words, targets };
+}
+const ordNorm = t => strip(t).replace(/\s+/g, ' ').trim().toLowerCase();
+/** längste gemeinsame Teilfolge: welche Stellen der Lösung sol stehen in der Eingabe g in richtiger Reihenfolge? */
+function lcsHits(sol, g) {
+  const n = sol.length, m = g.length, D = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) D[i][j] = sol[i] === g[j] ? D[i + 1][j + 1] + 1 : Math.max(D[i + 1][j], D[i][j + 1]);
+  const hit = new Array(n).fill(false); let i = 0, j = 0;
+  while (i < n && j < m) { if (sol[i] === g[j]) { hit[i] = true; i++; j++; } else if (D[i + 1][j] >= D[i][j + 1]) i++; else j++; }
+  return hit;
+}
 /** Teilpunkte: auf halbe Punkte abrunden */
 export const halfFloor = x => Math.floor(x * 2 + 1e-9) / 2;
 
@@ -76,6 +96,9 @@ export function taskTitle(b) {
   if (b.type === 'gap') return 'Lückentext';
   if (b.type === 'match') return 'Zuordnen';
   if (b.type === 'essay') return 'Freitext';
+  if (b.type === 'mark') return 'Markieren';
+  if (b.type === 'sort') return 'Sortieren';
+  if (b.type === 'order') return b.words ? 'Satzpuzzle' : 'Reihenfolge';
   return strip(b.html).slice(0, 60) || 'Aufgabe';
 }
 
@@ -118,6 +141,22 @@ export function splitExam(doc) {
         const P = b.pairs || [];
         out.blocks.push({ id: b.id, type: 'match', pts, title: b.title || '', left: shuffle(P.map(p => ({ k: p.ka, t: p.a || '' }))), right: shuffle(P.map(p => ({ k: p.kb, t: p.b || '' }))) });
         tasks.push({ id: b.id, type: 'match', pts, title, pairs: P.map(p => ({ a: p.a || '', b: p.b || '', ka: p.ka, kb: p.kb })) });
+      } else if (b.type === 'mark') {
+        const { words, targets } = markWords(b.html);
+        out.blocks.push({ id: b.id, type: 'mark', pts, title: b.title || '', html: String(b.html || '').replace(/\{\{|\}\}/g, '') });
+        tasks.push({ id: b.id, type: 'mark', pts, title, words, targets });
+        if (!targets.length) warnings.push(`Markieren „${title}“ hat kein Zielwort {{…}}.`);
+      } else if (b.type === 'sort') {
+        const items = []; (b.groups || []).forEach((g, gi) => (g.items || []).forEach(t => { if (String(t).trim()) items.push({ k: rid(), t: String(t), g: gi }); }));
+        const groups = (b.groups || []).map(g => g.name || '');
+        out.blocks.push({ id: b.id, type: 'sort', pts, title: b.title || '', gnames: groups, sitems: shuffle(items.map(x => ({ k: x.k, t: x.t }))) });
+        tasks.push({ id: b.id, type: 'sort', pts, title, groups, items });
+        if (groups.length < 2 || !items.length) warnings.push(`Sortieren „${title}“ braucht mindestens zwei Gruppen mit Begriffen.`);
+      } else if (b.type === 'order') {
+        const pool = (b.items || []).map(t => ({ k: rid(), t: String(t) }));
+        out.blocks.push({ id: b.id, type: 'order', pts, title: b.title || '', words: !!b.words, opool: shuffle(pool) });
+        tasks.push({ id: b.id, type: 'order', pts, title, words: !!b.words, pool, items: (b.items || []).map(String), alts: (b.alts || []).map(a => a.map(String)) });
+        if (pool.length < 2) warnings.push(`${b.words ? 'Satzpuzzle' : 'Reihenfolge'} „${title}“ braucht mindestens zwei Teile.`);
       } else if (b.type === 'task') {
         const short = !!b.answer;
         out.blocks.push({ id: b.id, type: 'task', pts, title: b.title || '', html: b.html || '', img: b.img || '', ...(short ? { short: true, answerPh: b.answerPh || '' } : {}) });
@@ -164,6 +203,18 @@ export function gradeExam(key, answers = {}, opt = {}) {
         const g = a?.[p.kb], got = t.pairs.find(x => x.ka === g);
         it.parts.push({ label: strip(p.b), given: got ? strip(got.a) : '', ok: g === p.ka, expected: strip(p.a) });
       });
+    } else if (t.type === 'mark') {
+      const sel = new Set(Object.keys(a || {}).filter(k => a[k]).map(Number)), tg = new Set(t.targets);
+      t.targets.forEach(i => it.parts.push({ label: t.words[i], given: sel.has(i) ? 'markiert' : 'nicht markiert', ok: sel.has(i), expected: 'markieren' }));
+      [...sel].filter(i => !tg.has(i)).sort((x, y) => x - y).forEach(i => it.parts.push({ label: t.words[i] ?? `Wort ${i + 1}`, given: 'markiert', ok: false, expected: 'nicht markieren' }));
+    } else if (t.type === 'sort') {
+      t.items.forEach(x => { const g = a?.[x.k]; it.parts.push({ label: strip(x.t), given: g != null ? strip(t.groups[g] ?? '') : '', ok: g === x.g, expected: strip(t.groups[x.g]) }); });
+    } else if (t.type === 'order') {
+      const byK = Object.fromEntries(t.pool.map(x => [x.k, x.t])), seq = (Array.isArray(a) ? a : []).map(k => byK[k]).filter(x => x != null), g = seq.map(ordNorm);
+      let best = null;
+      for (const s of [t.items, ...(t.alts || [])]) { const hit = lcsHits(s.map(ordNorm), g), n = hit.filter(Boolean).length; if (!best || n > best.n) best = { s, hit, n }; }
+      best.s.forEach((x, i) => { const p = g.indexOf(ordNorm(x)); it.parts.push({ label: strip(x), given: p < 0 ? '' : `an Stelle ${p + 1}`, ok: best.hit[i], expected: `an Stelle ${i + 1}` }); });
+      it.answer = seq.map(strip).join(t.words ? ' ' : ' | ').replace(/^./, c => t.words ? c.toUpperCase() : c);
     } else if (t.type === 'task' && t.short) {
       const g = typeof a === 'string' ? a : '';
       it.parts.push({ label: 'Antwort', given: g, ok: isAnswer([t.answer].concat(acc[0] || []).join('|'), g), expected: String(t.answer).split('|').join(' oder ') });
