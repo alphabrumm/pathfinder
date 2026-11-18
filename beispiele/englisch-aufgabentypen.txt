@@ -1,5 +1,5 @@
-# English Toolbox: Simple Past
-Untertitel: Alle Bausteine von PathFinder in Mini-Beispielen
+# Demo 1: Lernpfad Englisch
+Untertitel: English Toolbox: Simple Past – alle Bausteine von PathFinder in Mini-Beispielen
 Art: Lernpfad
 Kopfzeile: Englisch · Jahrgangsstufe 6 · Beispiel
 Farbe: Meer

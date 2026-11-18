@@ -1,3 +1,4 @@
 [
-  { "file": "englisch-aufgabentypen.json", "title": "English Toolbox: Simple Past", "note": "Englisch 6 – alle Bausteine und Aufgabentypen in Mini-Beispielen, auch Markieren, Sortieren, Satzpuzzle und Reihenfolge" }
+  { "file": "englisch-aufgabentypen.json", "id": "demo1-englisch", "pin": true, "form": "lernpfad", "title": "Demo 1: Lernpfad Englisch", "note": "Englisch 6 · alle Bausteine und Aufgabentypen in Mini-Beispielen" },
+  { "file": "mathe-pruefung.json", "id": "demo2-mathe", "pin": true, "form": "pruefung", "title": "Demo 2: Prüfung Mathe", "note": "Mathematik 8 · Gleichungen umstellen, Gleichungssysteme und typische Prüfungsaufgaben" }
 ]
