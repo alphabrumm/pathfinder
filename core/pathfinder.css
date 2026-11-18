@@ -725,3 +725,9 @@ label.lp-btn { display: inline-flex; align-items: center; justify-content: cente
 .pf-ro .editing [contenteditable], .pf-ro .editing [contenteditable]:hover, .pf-ro .editing [contenteditable]:focus { cursor: default; outline: none; box-shadow: none; background: none; }
 .pf-ro .editing [contenteditable]:empty::before { content: none; }
 .ed-ro { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 99px; background: var(--ed-mid); color: var(--ed-ink); font-size: 13px; font-weight: 600; white-space: nowrap; }
+/* Arbeitsmaterial im KI-Dialog */
+.ki-mat ul { list-style: none; padding: 0; margin: 6px 0 0; }
+.ki-mat li { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.ki-mat li .help { flex: 1; }
+.ki-mat li.bad { color: #b3261e; }
+.ki-mat .chk { margin-top: 4px; }

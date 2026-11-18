@@ -97,3 +97,59 @@ export function extractXml(t) {
   const m = t.match(/<\?xml[\s\S]*<\/quiz>/i) || t.match(/<quiz[\s\S]*<\/quiz>/i);
   return m ? m[0] : t;
 }
+
+/* ---------- Arbeitsmaterial (Arbeitsblätter usw.) als Inhalt für Claude ---------- */
+const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const IMG = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' };
+const xmlText = x => x.replace(/<w:tab\/>/g, '\t').replace(/<\/w:p>|<w:br\/>|<\/a:p>/g, '\n').replace(/<[^>]+>/g, '')
+  .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').replace(/\n{3,}/g, '\n\n').trim();
+/** Bild verkleinern (lange Seite höchstens max Pixel) und als JPEG – auch für Formate, die Claude nicht direkt nimmt (z. B. HEIC vom iPad) */
+async function shrink(file, max = 1600) {
+  const url = URL.createObjectURL(file);
+  try {
+    const im = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
+    const r = Math.min(1, max / Math.max(im.naturalWidth, im.naturalHeight)), w = Math.round(im.naturalWidth * r), h = Math.round(im.naturalHeight * r);
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(im, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', 0.85).split(',')[1];
+  } finally { URL.revokeObjectURL(url); }
+}
+/**
+ * Dateien → Inhaltsblöcke für die Messages-API.
+ * PDF als Dokument, Bilder als Bild (verkleinert), Word/PowerPoint/Text als Text.
+ * Ergebnis: [{ name, size, ok, note, blocks }]
+ */
+export async function materialOf(files, unzip) {
+  const out = [];
+  for (const f of files) {
+    const ext = (f.name.split('.').pop() || '').toLowerCase(), item = { name: f.name, size: f.size, ok: false, note: '', blocks: [] };
+    try {
+      if (ext === 'pdf') {
+        if (f.size > 25e6) throw new Error('zu groß (höchstens 25 MB)');
+        item.blocks.push({ type: 'document', title: f.name, source: { type: 'base64', media_type: 'application/pdf', data: b64(new Uint8Array(await f.arrayBuffer())) } });
+        item.note = 'PDF';
+      } else if (IMG[ext] || /^image\//.test(f.type) || ['heic', 'heif'].includes(ext)) {
+        const data = await shrink(f).catch(() => null);
+        if (!data) throw new Error('Bild ließ sich nicht lesen');
+        item.blocks.push({ type: 'text', text: `Bild „${f.name}“:` }, { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data } });
+        item.note = 'Bild';
+      } else if (ext === 'docx' || ext === 'pptx' || ext === 'odt' || ext === 'odp') {
+        const parts = await unzip(await f.arrayBuffer()), td = new TextDecoder();
+        let text = '';
+        if (ext === 'docx') text = xmlText(td.decode(parts.find(p => p.name === 'word/document.xml')?.data || new Uint8Array()));
+        else if (ext === 'pptx') text = parts.filter(p => /^ppt\/slides\/slide\d+\.xml$/.test(p.name)).sort((a, b) => +a.name.match(/\d+/)[0] - +b.name.match(/\d+/)[0])
+          .map((p, i) => `Folie ${i + 1}:\n` + xmlText(td.decode(p.data).replace(/<\/a:t>/g, '</a:t> '))).join('\n\n');
+        else text = xmlText(td.decode(parts.find(p => p.name === 'content.xml')?.data || new Uint8Array()).replace(/<\/text:(p|h)>/g, '\n'));
+        if (!text.trim()) throw new Error('kein Text gefunden');
+        item.blocks.push({ type: 'text', text: `Datei „${f.name}“ (Text, Bilder darin nicht enthalten):\n<<<\n${text.slice(0, 200000)}\n>>>` });
+        item.note = 'Text aus ' + ext.toUpperCase();
+      } else if (['txt', 'md', 'csv', 'tex', 'html', 'htm'].includes(ext)) {
+        const text = new TextDecoder().decode(new Uint8Array(await f.arrayBuffer()));
+        item.blocks.push({ type: 'text', text: `Datei „${f.name}“:\n<<<\n${text.slice(0, 200000)}\n>>>` });
+        item.note = 'Text';
+      } else throw new Error('Dateityp wird nicht unterstützt – bitte als PDF, Bild, Word, PowerPoint oder Text');
+      item.ok = true;
+    } catch (e) { item.note = e.message || 'ließ sich nicht lesen'; }
+    out.push(item);
+  }
+  return out;
+}

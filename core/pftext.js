@@ -546,12 +546,28 @@ ${!info.types?.length || info.types.includes('gap') ? `- Lückentexte ohne Wortb
 - Jede Station: kurzer Einstieg, dann Erklärung des Neuen (mit Beispiel, gern einem Schaubild), dann mindestens eine Übung (Aufgabe, Quiz, Lückentext oder Zuordnen), die das Neue sofort festigt.
 - Von einfach zu schwer; jede Station baut auf der vorigen auf. Eine abschließende Station wiederholt das Wichtigste.
 `;
-  return `${intro}
+  // Arbeitsmaterial der Lehrkraft (Arbeitsblätter, Hefteinträge …): direkt angehängt (API) oder für eine externe KI angekündigt
+  const mat = info.material || {}, was = ex ? 'die Prüfung' : ch ? 'die Challenge' : 'der Lernpfad';
+  const matTop = mat.extern ? `ZUERST – ARBEITSMATERIAL DER LEHRKRAFT
+Die Lehrkraft gibt dir zusätzlich eigenes Arbeitsmaterial mit (z. B. Arbeitsblätter, Hefteinträge, Folien, Fotos von Tafelbildern) – als angehängte Dateien, Bilder oder eingefügten Text. ${was[0].toUpperCase() + was.slice(1)} soll auf diesem Material aufbauen.
+- Prüfe, BEVOR du irgendetwas erstellst, ob dieses Material in der Nachricht enthalten ist.
+- Fehlt es: Erstelle NOCH NICHTS. Antworte nur mit einer kurzen Bitte, das Arbeitsmaterial hochzuladen oder einzufügen, und warte auf die Antwort der Lehrkraft. (Diese Rückfrage ist die einzige Ausnahme von der Regel, nur mit einem Codeblock zu antworten.)
+- Liegt es vor: Lies es vollständig und lege es zugrunde (siehe ARBEITSMATERIAL weiter unten). Dann erstellst du ${was} wie beschrieben.
+
+` : '';
+  const matRule = ex ? 'Prüfe genau die Inhalte, Fachbegriffe, Darstellungen, Beispiele und das Niveau dieses Materials. Formuliere neue Aufgaben, statt Aufgaben aus dem Material wörtlich zu übernehmen (außer die Lehrkraft wünscht es ausdrücklich), und prüfe nichts, was weder im Material noch im Lehrplanbezug vorkommt.'
+    : ch ? 'Übe genau die Inhalte, Fachbegriffe und Verfahren aus diesem Material, im Niveau passend dazu; Aufgaben aus dem Material nicht wörtlich kopieren, sondern abwandeln und erweitern.'
+    : 'Baue auf Inhalt, Fachbegriffen, Beispielen und Darstellungen dieses Materials auf, damit Lernpfad und Unterricht zusammenpassen; übernimm Merksätze sinngemäß.';
+  const matBody = mat.files?.length ? `ARBEITSMATERIAL DER LEHRKRAFT: ${mat.files.length === 1 ? 'Die angehängte Datei' : `Die ${mat.files.length} angehängten Dateien`} (${mat.files.map(n => `„${n}“`).join(', ')}) ${mat.files.length === 1 ? 'ist' : 'sind'} die Grundlage. ${matRule}
+`
+    : mat.extern ? `ARBEITSMATERIAL DER LEHRKRAFT: das mitgeschickte Material (siehe ganz oben) ist die Grundlage. ${matRule}
+` : '';
+  return `${matTop}${intro}
 
 THEMA: ${f('thema', info.basisTitle ? `Inhalte des Lernpfads „${info.basisTitle}“` : '[bitte Thema eintragen]')}
 ${info.fach?.trim() ? 'FACH: ' + info.fach.trim() + '\n' : ''}ZIELGRUPPE: ${f('klasse', '[Jahrgangsstufe / Schulart]')}
 UMFANG: ${f('umfang', 'etwa 4 Stationen, ca. 45 Minuten')}
-${info.lehrplan ? 'LEHRPLANBEZUG: ' + info.lehrplan + '\n' : ''}${info.inhalte?.length ? 'ZU BEHANDELNDE LEHRPLANINHALTE: ' + info.inhalte.join('; ') + '\n' : info.lehrplan && info.alleInhalte?.length ? 'INHALTE DES LERNBEREICHS (sinnvoll auswählen, passend zum Umfang): ' + info.alleInhalte.join('; ') + '\n' : ''}${info.basis ? 'GRUNDLAGE – der Lernpfad, mit dem die Schüler gelernt haben. Prüfe genau diese Inhalte und Fachbegriffe, aber formuliere neue Aufgaben, statt die Übungen des Lernpfads zu kopieren:\n<<<\n' + info.basis.trim() + '\n>>>\n' : ''}${info.extra?.trim() ? 'WEITERE WÜNSCHE DER LEHRKRAFT (bitte genau umsetzen): ' + info.extra.trim() + '\n' : ''}
+${info.lehrplan ? 'LEHRPLANBEZUG: ' + info.lehrplan + '\n' : ''}${info.inhalte?.length ? 'ZU BEHANDELNDE LEHRPLANINHALTE: ' + info.inhalte.join('; ') + '\n' : info.lehrplan && info.alleInhalte?.length ? 'INHALTE DES LERNBEREICHS (sinnvoll auswählen, passend zum Umfang): ' + info.alleInhalte.join('; ') + '\n' : ''}${info.basis ? 'GRUNDLAGE – der Lernpfad, mit dem die Schüler gelernt haben. Prüfe genau diese Inhalte und Fachbegriffe, aber formuliere neue Aufgaben, statt die Übungen des Lernpfads zu kopieren:\n<<<\n' + info.basis.trim() + '\n>>>\n' : ''}${matBody}${info.extra?.trim() ? 'WEITERE WÜNSCHE DER LEHRKRAFT (bitte genau umsetzen): ' + info.extra.trim() + '\n' : ''}
 REGELN
 - WICHTIG – alles in EINEN kopierbaren Textblock: Der komplette Lernpfad samt Anhang mit allen Grafiken steht in einem einzigen Codeblock, damit die Lehrkraft nur einmal kopieren und einfügen muss. Beginne den Block mit vier Backticks und „text“ (\`\`\`\`text) und beende ihn mit vier Backticks (\`\`\`\`), damit Code-Beispiele darin den Block nicht vorzeitig schließen. Kein Text davor oder danach, nichts auf mehrere Blöcke oder Nachrichten verteilen.
 - Halte dich exakt an das unten beschriebene PathFinder-Textformat, damit der Lernpfad ohne Nacharbeit eingelesen werden kann.
