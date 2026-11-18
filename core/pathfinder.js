@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-18b';
+const PF_BUILD = '2026-11-18c';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -699,7 +699,7 @@ export function startPathFinder(opts = {}) {
         return wrap(b, h + '</div>');
       }
       case 'gap': {
-        const head = b.heft ? `<div class="heft-title">${ce('title', b.title, 'Titel des Hefteintrags', { tag: 'span' })}</div><div class="heft-sub">${ce('sub', b.sub, 'Unterzeile', { tag: 'span' })}</div>` : `<b class="lp-ctitle">Lückentext</b>`;
+        const head = b.heft ? `<div class="heft-title">${ce('title', b.title, 'Titel des Hefteintrags', { tag: 'span' })}</div><div class="heft-sub">${ce('sub', b.sub, 'Unterzeile', { tag: 'span' })}</div>` : `<b class="lp-ctitle">${b.title ? esc(plain(b.title)) : 'Lückentext'}</b>`;
         if (E()) return wrap(b, `<div class="lp-card lp-gap${b.heft ? ' heft' : ''}">${head}${xpTag(b)}${ce('html', b.html, 'Text mit [[Lücke]] …', { rich: true })}<div class="ed-hint">Lücken als <b>[[Antwort]]</b>, mehrere richtige mit | trennen: [[mal|*]]${b.bank ? ` · Begriffe zum Ziehen${b.extra.length ? ` + ${b.extra.length} Ablenker` : ''}` : ''} · ⚙ für Begriffe und Hefteintrag</div></div>`);
         const got = prog.quiz[b.id] || {}; let n = 0;
         if (b.bank) {
@@ -840,7 +840,7 @@ export function startPathFinder(opts = {}) {
       return wrap(b, h + '</div>');
     }
     if (b.type === 'gap') {
-      const head = b.heft ? `<div class="heft-title">${esc(b.title)}</div><div class="heft-sub">${esc(b.sub)}</div>` : `<b class="lp-ctitle">Lückentext</b>`;
+      const head = b.heft ? `<div class="heft-title">${esc(b.title)}</div><div class="heft-sub">${esc(b.sub)}</div>` : `<b class="lp-ctitle">${b.title ? esc(plain(b.title)) : 'Lückentext'}</b>`;
       let n = 0;
       if (b.bank) {
         const words = bankWords(b), used = Object.values(a || {}), seen = {};
@@ -1246,7 +1246,7 @@ export function startPathFinder(opts = {}) {
     html: [{ k: 'html', l: 'HTML', t: 'code', help: 'Wird für Schüler so angezeigt. Skripte laufen erst im exportierten Lernpfad.' }],
     task: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'answer', l: 'Ergebnis zur Selbstkontrolle (optional)', t: 'text', help: 'Leer = Schüler hakt „Erledigt“ ab. Sonst tippen sie das Ergebnis ein; mehrere richtige mit | trennen. Zahlen werden mit Komma oder Punkt erkannt.', show: () => !doc.skin && !EXAMF() }, { k: 'answer', l: 'Ergebnis (wird automatisch bewertet)', t: 'text', help: 'Leer = Schüler schreiben eine freie Antwort, die du bewertest. Mehrere richtige mit | trennen; Zahlen werden mit Komma oder Punkt erkannt.', show: () => EXAMF() }, { k: 'tips', l: 'Tipps (werden nacheinander aufgedeckt)', t: 'list', ph: 'Tipp', vis: 'tipsHide', show: () => !EXAMF() }, { k: 'solution', l: 'Lösung zum Aufdecken (leer = keine)', t: 'text', show: () => !EXAMF() }, { k: 'solution', l: 'Musterlösung (nur für dich bei der Korrektur)', t: 'text', show: () => EXAMF() }, { k: 'solHide', l: 'Lösung für Schüler sichtbar', t: 'shown', show: b => !!b.solution && !EXAMF() }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }, XP],
     quiz: [{ k: 'qs', l: 'Fragen', t: 'qs' }, XP],
-    gap: [{ k: 'bank', l: 'Begriffe zum Ziehen anbieten (statt Tippen)', t: 'check' }, { k: 'extra', l: 'Zusätzliche falsche Begriffe (Ablenker)', t: 'list', ph: 'Begriff', show: b => b.bank }, { k: 'heft', l: 'Als Hefteintrag gestalten (mit Titel)', t: 'check' }, XP],
+    gap: [{ k: 'title', l: 'Überschrift / Arbeitsauftrag (optional)', t: 'text' }, { k: 'bank', l: 'Begriffe zum Ziehen anbieten (statt Tippen)', t: 'check' }, { k: 'extra', l: 'Zusätzliche falsche Begriffe (Ablenker)', t: 'list', ph: 'Begriff', show: b => b.bank }, { k: 'heft', l: 'Als Hefteintrag gestalten (mit Titel)', t: 'check' }, XP],
     match: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'pairs', l: 'Paare', t: 'pairs' }, XP],
     mark: [{ k: 'title', l: 'Arbeitsauftrag', t: 'text' }, XP],
     sort: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'groups', l: 'Gruppen und Begriffe', t: 'lines', rows: 6, help: 'Je Zeile eine Gruppe: „Gruppe: Begriff, Begriff, Begriff“',
@@ -2518,15 +2518,21 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     document.body.appendChild(pop); placePop(anchor);
     let ex = []; if (opts.examples) { try { ex = await (await fetch(opts.examples, { cache: 'no-cache' })).json(); } catch (e) { } }
     const base = opts.examples ? opts.examples.replace(/[^/]*$/, '') : '';
-    const mine = docList();
+    // Demos (pin: true in beispiele/index.json) und „Willkommen“ stehen fest oben in „Meine Dokumente“
+    const pins = ex.filter(e => e.pin && e.id), pinIds = new Set([...pins.map(e => e.id), ...(opts.sample ? ['willkommen'] : [])]);
+    const icon = f => f === 'challenge' ? '⚡' : f === 'pruefung' ? '📝' : '📘';
+    const mine = docList().filter(d => !pinIds.has(d.id));
     let h = '<div class="grp">Meine Dokumente (in diesem Browser)</div>';
-    h += mine.map(d => `<button data-open="${esc(d.id)}" class="${d.id === doc.id ? 'hi' : ''}"><b>${d.form === 'challenge' ? '⚡' : d.form === 'pruefung' ? '📝' : '📘'} ${esc(d.title)}</b><span>zuletzt ${new Date(d.t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</span></button>`).join('') || '<div class="grp" style="text-transform:none;letter-spacing:0">noch keine</div>';
+    h += pins.map(e => `<button data-ex="${esc(e.file)}" data-exid="${esc(e.id)}" class="pin${e.id === doc.id ? ' hi' : ''}"><b>${icon(e.form)} ${esc(e.title)}</b><span>${esc(e.note || '')}</span></button>`).join('');
+    if (opts.sample) h += `<button data-welcome="1" class="pin${doc.id === 'willkommen' ? ' hi' : ''}"><b>📘 Willkommen bei ${esc(appName)}</b><span>kurze Einführung zum Ausprobieren</span></button>`;
+    h += mine.map(d => `<button data-open="${esc(d.id)}" class="${d.id === doc.id ? 'hi' : ''}"><b>${d.form === 'challenge' ? '⚡' : d.form === 'pruefung' ? '📝' : '📘'} ${esc(d.title)}</b><span>zuletzt ${new Date(d.t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</span></button>`).join('') || (pins.length || opts.sample ? '' : '<div class="grp" style="text-transform:none;letter-spacing:0">noch keine</div>');
     h += '<div class="grp">Neu</div>'
       + (formOk('lernpfad') ? '<button data-new="lernpfad"><b>＋ Neuer Lernpfad</b><span>leer beginnen</span></button>' : '')
       + (formOk('challenge') ? '<button data-new="challenge"><b>＋ Neue Challenge</b><span>leer beginnen</span></button>' : '')
       + (formOk('pruefung') ? '<button data-exstart="1"><b>＋ Neue digitale Prüfung</b><span>leer, aus einem Lernpfad oder mit KI – für Probe</span></button>' : '')
       + '<div class="grp">Datei</div><button data-imp="1"><b>⤒ Datei öffnen</b><span>HTML-Lernpfad, SCORM-Paket (.zip) oder Prüfungsdatei (.json) aus PathFinder · fremde Lernpfad-Seiten behalten ihr Design</span></button>';
-    if (ex.length) h += `<div class="grp">${esc(opts.examplesTitle || 'Beispiele')}</div>` + ex.map(e => `<button data-ex="${esc(e.file)}"><b>${esc(e.title)}</b><span>${esc(e.note || '')}</span></button>`).join('');
+    const more = ex.filter(e => !(e.pin && e.id));
+    if (more.length) h += `<div class="grp">${esc(opts.examplesTitle || 'Beispiele')}</div>` + more.map(e => `<button data-ex="${esc(e.file)}"><b>${esc(e.title)}</b><span>${esc(e.note || '')}</span></button>`).join('');
     $('#openList', pop).innerHTML = h; placePop(anchor);
     pop.onclick = async ev => {
       const b = ev.target.closest('button'); if (!b) return;
@@ -2537,6 +2543,8 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         closePop(); const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.html,.htm,text/html,.zip,application/zip,.json,application/json';
         inp.onchange = async () => { const f = inp.files[0]; if (f) openFile(f); }; inp.click();
       }
+      if (b.dataset.welcome) { closePop(); openDoc(loadDoc('willkommen') || migrate(sample())); return; }
+      if (b.dataset.exid && loadDoc(b.dataset.exid)) { closePop(); openDoc(loadDoc(b.dataset.exid)); return; } // eigene Fassung der Demo (evtl. verändert)
       if (b.dataset.ex) {
         closePop(); toast('lädt …');
         try {

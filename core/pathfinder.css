@@ -755,3 +755,4 @@ label.lp-btn { display: inline-flex; align-items: center; justify-content: cente
 .lp-order.paras .oarea, .lp-order.paras .obank { flex-direction: column; align-items: stretch; }
 .lp-order .gchip.para { font-weight: 400; text-align: left; line-height: 1.45; padding: 8px 12px; }
 .lp-order .gchip.para i { font-style: normal; font-weight: 700; margin-right: 8px; color: var(--a1); }
+.ed-pal button.pin { border-left: 4px solid #8a72e0; }

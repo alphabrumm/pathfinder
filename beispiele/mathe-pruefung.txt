@@ -1,0 +1,113 @@
+# Demo 2: Prüfung Mathe
+Untertitel: Gleichungen und Gleichungssysteme – typische Aufgaben einer digitalen Prüfung
+Art: Prüfung
+Kopfzeile: Mathematik · Jahrgangsstufe 8 · Beispiel
+
+## Station: Teil A | Gleichungen umstellen
+### Lückentext: Löse die Gleichung Schritt für Schritt.
+3x + 5 = 20     ⎮ − 5
+3x = [[15]]     ⎮ : 3
+x = [[5]]
+Wortbank: ja
+Extra: 25, 3, −5
+Punkte: 2
+
+### Lückentext: Stelle die Formel nach h um.
+Für den Flächeninhalt eines Dreiecks gilt A = ½ · g · h.
+h = [[2A/g|2·A/g|2A:g|(2A)/g|2*A/g|2·A:g]]
+Punkte: 1
+
+### Aufgabe: Rechne.
+Löse die Gleichung 4(x − 2) = 2x + 6. Gib x an.
+Antwort: 7
+Punkte: 2
+
+### Quiz
+? Welche Zahl löst die Gleichung 2x − 7 = 3?
+[ ] x = −2
+[x] x = 5
+[ ] x = 2
+[ ] x = 10
+? Wie viele Lösungen hat das Gleichungssystem y = 2x + 1 und y = 2x − 3?
+[x] keine
+[ ] genau eine
+[ ] unendlich viele
+Punkte: 2
+
+## Station: Teil B | Gleichungssysteme
+![Zwei Geraden im Koordinatensystem | klein](anhang:geraden)
+
+### Aufgabe: Lies den Schnittpunkt ab.
+Die Geraden y = x + 1 und y = −x + 5 sind oben gezeichnet. Gib die x-Koordinate ihres Schnittpunkts an.
+Antwort: 2
+Punkte: 1
+
+### Lückentext: Löse das Gleichungssystem mit dem Additionsverfahren.
+I: 2x + y = 7
+II: x − y = 2
+I + II: [[3x]] = [[9]]
+x = [[3]]
+x in II einsetzen: 3 − y = 2, also y = [[1]]
+Wortbank: ja
+Extra: 2x, 5, −1
+Punkte: 4
+
+### Reihenfolge: Bring die Schritte des Einsetzungsverfahrens in die richtige Reihenfolge.
+- Eine Gleichung nach einer Variablen auflösen.
+- Diesen Term in die andere Gleichung einsetzen.
+- Die entstandene Gleichung mit einer Variablen lösen.
+- Das Ergebnis einsetzen und die zweite Variable berechnen.
+- Die Probe in beiden Gleichungen machen.
+Punkte: 2
+
+### Zuordnen: Ordne jedem Gleichungssystem die Anzahl seiner Lösungen zu.
+y = 2x + 1 und y = −x + 4 -> genau eine Lösung
+y = 3x − 2 und y = 3x + 5 -> keine Lösung
+y = x + 2 und 2y = 2x + 4 -> unendlich viele Lösungen
+Punkte: 3
+
+## Station: Teil C | Anwenden und begründen
+| Tarif | Grundgebühr | Preis je GB |
+| --- | --- | --- |
+| A | 5 € | 2 € |
+| B | 11 € | 1 € |
+
+### Markieren: Markiere alle Zahlen, die du zum Aufstellen der Gleichungen brauchst.
+Lena vergleicht zwei Handytarife. Tarif A kostet {{5}} € Grundgebühr und {{2}} € je Gigabyte. Tarif B kostet {{11}} € Grundgebühr und {{1}} € je Gigabyte. Lena ist 14 Jahre alt und hat 3 Geschwister.
+Punkte: 2
+
+### Sortieren: Sortiere die Gleichungen.
+lineare Gleichung: 3x + 2 = 11; y = 4x − 1; 2(x + 1) = 8
+keine lineare Gleichung: x² = 16; y = 1/x; 2ˣ = 8
+Punkte: 3
+
+### Aufgabe: Ab wie vielen Gigabyte ist Tarif B günstiger?
+Stelle für beide Tarife einen Term für die Kosten bei x Gigabyte auf. Ab welcher ganzen Zahl von Gigabyte ist Tarif B günstiger als Tarif A?
+Antwort: 7
+Punkte: 3
+
+### Freitext: Nimm Stellung.
+Tim sagt: „Das Gleichungssystem y = 2x + 3 und y = 2x − 1 hat genau eine Lösung, weil beide Geraden steigen.“ Hat Tim recht? Begründe.
+Erwartung: Beide Geraden haben dieselbe Steigung 2, sie sind parallel (1)
+Erwartung: Sie haben verschiedene y-Achsenabschnitte (3 und −1), also keinen Schnittpunkt (1)
+Erwartung: Das Gleichungssystem hat keine Lösung – Tim hat nicht recht (1)
+Zeilen: 5
+
+## Anhang
+geraden: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220">
+  <rect width="220" height="220" fill="#fff"/>
+  <g stroke="#e3e7ef" stroke-width="1">
+    <line x1="30" y1="10" x2="30" y2="190"/><line x1="60" y1="10" x2="60" y2="190"/><line x1="90" y1="10" x2="90" y2="190"/><line x1="120" y1="10" x2="120" y2="190"/><line x1="150" y1="10" x2="150" y2="190"/><line x1="180" y1="10" x2="180" y2="190"/>
+    <line x1="10" y1="160" x2="210" y2="160"/><line x1="10" y1="130" x2="210" y2="130"/><line x1="10" y1="100" x2="210" y2="100"/><line x1="10" y1="70" x2="210" y2="70"/><line x1="10" y1="40" x2="210" y2="40"/>
+  </g>
+  <g stroke="#333" stroke-width="1.5"><line x1="10" y1="190" x2="210" y2="190"/><line x1="30" y1="210" x2="30" y2="10"/></g>
+  <g font-family="sans-serif" font-size="10" fill="#555" text-anchor="middle">
+    <text x="60" y="203">1</text><text x="90" y="203">2</text><text x="120" y="203">3</text><text x="150" y="203">4</text><text x="180" y="203">5</text>
+    <text x="22" y="164">1</text><text x="22" y="134">2</text><text x="22" y="104">3</text><text x="22" y="74">4</text><text x="22" y="44">5</text>
+    <text x="206" y="184">x</text><text x="38" y="16">y</text>
+  </g>
+  <line x1="30" y1="160" x2="180" y2="10" stroke="#3b63c4" stroke-width="2.5"/>
+  <line x1="30" y1="40" x2="210" y2="220" stroke="#c2477f" stroke-width="2.5"/>
+  <text x="160" y="40" font-family="sans-serif" font-size="11" fill="#3b63c4">y = x + 1</text>
+  <text x="150" y="170" font-family="sans-serif" font-size="11" fill="#c2477f">y = −x + 5</text>
+</svg>
