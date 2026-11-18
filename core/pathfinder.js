@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-18c';
+const PF_BUILD = '2026-11-18d';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -2452,7 +2452,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const draw = () => {
       if (view === 'start') { el.innerHTML = `<header><b>📝 Neue Prüfung</b><button data-x="1">Abbrechen</button></header><div class="ed-form"><span class="help">Womit möchtest du beginnen? Danach kannst du alles bearbeiten, Aufgaben ergänzen und Punkte anpassen.</span>
         <div class="ex-choices">
-          <button data-v="lp"><span class="ic">📘</span><span class="tx"><b>Aus einem Lernpfad</b><span>Aufgaben eines Lernpfads übernehmen, mit dem deine Klasse gelernt hat – oder die KI neue Prüfungsaufgaben zu seinem Inhalt schreiben lassen.</span></span></button>
+          ${opts.examFromLernpfad === false ? '' : `<button data-v="lp"><span class="ic">📘</span><span class="tx"><b>Aus einem Lernpfad</b><span>Aufgaben eines Lernpfads übernehmen, mit dem deine Klasse gelernt hat – oder die KI neue Prüfungsaufgaben zu seinem Inhalt schreiben lassen.</span></span></button>`}
           <button data-v="ki"><span class="ic">${KI_ICON}</span><span class="tx"><b>Mit KI erstellen</b><span>Jahrgangsstufe, Fach und Lernbereich wählen – die KI schreibt die ganze Prüfung.</span></span></button>
           <button data-v="new"><span class="ic">＋</span><span class="tx"><b>Leere Prüfung</b><span>Aufgaben selbst zusammenstellen.</span></span></button>
         </div></div>`; return; }
