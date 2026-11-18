@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-18a';
+const PF_BUILD = '2026-11-18b';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -95,10 +95,29 @@ const CORE = {
   quiz: { n: 'Quiz', ic: '?', g: 'Aufgaben', h: 'eine oder mehrere Fragen mit Rückmeldung', make: () => ({ qs: [{ q: '', opts: [{ t: '', ok: true, fb: '' }, { t: '', ok: false, fb: '' }, { t: '', ok: false, fb: '' }] }], xp: 10 }) },
   gap: { n: 'Lückentext', ic: '▭', g: 'Aufgaben', h: 'Lücken als [[Antwort]], auch mit Begriffen zum Ziehen', make: () => ({ html: 'Das Wort in der Lücke ist [[richtig]].', bank: false, extra: [], heft: false, title: '', sub: '', xp: 10 }) },
   match: { n: 'Zuordnen', ic: '⇄', g: 'Aufgaben', h: 'Paare per Drag & Drop', make: () => ({ title: 'Ordne zu', pairs: [{ a: '', b: '' }, { a: '', b: '' }], xp: 10 }) },
+  mark: { n: 'Markieren', ic: '🖍', g: 'Aufgaben', h: 'passende Wörter im Text antippen', make: () => ({ title: 'Markiere alle Verben im simple past', html: 'Yesterday I {{went}} to the park and {{played}} football.', xp: 10 }) },
+  sort: { n: 'Sortieren', ic: '▥', g: 'Aufgaben', h: 'Begriffe in Gruppen ordnen', make: () => ({ title: 'Sortiere in die Gruppen', groups: [{ name: 'Gruppe 1', items: ['Begriff', 'Begriff'] }, { name: 'Gruppe 2', items: ['Begriff', 'Begriff'] }], xp: 10 }) },
+  puzzle: { n: 'Satzpuzzle', ic: '⇢', g: 'Aufgaben', h: 'Wörter in die richtige Reihenfolge bringen', alias: 'order', make: () => ({ words: true, title: 'Bring die Wörter in die richtige Reihenfolge', items: ['I', 'have', 'never', 'been', 'to London'], alts: [], xp: 10 }) },
+  order: { n: 'Reihenfolge', ic: '↕', g: 'Aufgaben', h: 'Abschnitte ordnen (Textpuzzle)', make: () => ({ words: false, title: 'Bring die Abschnitte in die richtige Reihenfolge', items: ['Erster Abschnitt', 'Zweiter Abschnitt', 'Dritter Abschnitt'], alts: [], xp: 10 }) },
   essay: { n: 'Freitext', ic: '✍', g: 'Aufgaben', h: 'offene Antwort mit Erwartungshorizont – nur in Prüfungen', exam: true, make: () => ({ title: '', html: '', img: '', lines: 6, rubric: [], pts: 4 }) },
   lock: { n: 'Sperre', ic: '🔒', g: 'Ablauf', h: 'Ab hier erst frei, wenn … gelöst', make: () => ({ after: '' }) },
 };
-const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match', 'essay']);
+const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order']);
+/** Markieren: Text in antippbare Wörter zerlegen (wie markWords in pfsplit.js). tpl enthält Platzhalter \u0002n\u0003 für Wort n; targets = Wörter in {{…}} */
+export function markParse(html) {
+  const words = [], targets = new Set(); let on = false, tpl = '';
+  for (const part of String(html || '').split(/(<[^>]*>)/)) {
+    if (part.startsWith('<')) { tpl += part; continue; }
+    const re = /&[#\w]+;|\{\{|\}\}|[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu; let m, last = 0;
+    while ((m = re.exec(part))) {
+      tpl += part.slice(last, m.index); last = re.lastIndex;
+      if (m[0] === '{{') on = true; else if (m[0] === '}}') on = false; else if (m[0][0] === '&') tpl += m[0];
+      else { const k = words.length; words.push(m[0]); if (on) targets.add(k); tpl += `\u0002${k}\u0003`; }
+    }
+    tpl += part.slice(last);
+  }
+  return { tpl, words, targets };
+}
 
 
 
@@ -699,6 +718,12 @@ export function startPathFinder(opts = {}) {
           + b.pairs.map((p, i) => { const ci = order[i], g = got[i]; return `<div class="chip${used.has(ci) ? ' used' : ''}" data-chip="${ci}">${esc(b.pairs[ci].a)}</div><div class="slot${g != null ? (g === i ? ' ok' : ' no') : ''}" data-slot="${i}"><span>${esc(p.b)}</span>${g != null ? `<span class="got">${esc(b.pairs[g].a)}</span>` : ''}</div>`; }).join('')
           + `</div><div class="lp-state" style="margin-top:6px">${ok ? '✓ alles richtig zugeordnet' : 'Karte antippen, dann das Passende – oder ziehen.'}</div></div>`);
       }
+      case 'mark': if (E()) return wrap(b, `<div class="lp-card lp-mark">${ce('title', b.title, 'Arbeitsauftrag, z. B. Markiere alle Verben', { tag: 'b', cls: 'lp-ctitle' })}${xpTag(b)}${ce('html', b.html, 'Text mit {{Zielwort}} …', { rich: true })}<div class="ed-hint">Richtige Wörter in <b>{{…}}</b> setzen, z. B. Yesterday I {{went}} home. Mehrere Wörter: {{has been}}. Schüler sehen die Klammern nicht.</div></div>`);
+        return wrap(b, markCard(b, false));
+      case 'sort': if (E()) return wrap(b, `<div class="lp-card lp-sort">${ce('title', b.title, 'Sortiere in die Gruppen', { tag: 'b', cls: 'lp-ctitle' })}${xpTag(b)}<div class="scols">${(b.groups || []).map(g => `<div class="scol"><div class="sh">${esc(g.name)}</div>${(g.items || []).map(t => `<span class="gchip">${esc(t)}</span>`).join('')}</div>`).join('')}</div><div class="ed-hint">Gruppen und Begriffe über ⚙ – Schüler sehen alle Begriffe gemischt.</div></div>`);
+        return wrap(b, sortCard(b, false));
+      case 'order': if (E()) return wrap(b, `<div class="lp-card lp-order ${b.words ? 'words' : 'paras'}">${ce('title', b.title, b.words ? 'Satzpuzzle' : 'Reihenfolge', { tag: 'b', cls: 'lp-ctitle' })}${xpTag(b)}<div class="oarea">${(b.items || []).map((t, i) => `<span class="gchip ochip${b.words ? '' : ' para'}">${b.words ? esc(t) : `<i>${i + 1}</i>${t}`}</span>`).join('')}</div><div class="ed-hint">Richtige Reihenfolge – Schüler sehen die Teile gemischt.${(b.alts || []).length ? ` ${b.alts.length} weitere richtige Reihenfolge${b.alts.length > 1 ? 'n' : ''}.` : ''} Teile über ⚙.</div></div>`);
+        return wrap(b, orderCard(b, false));
       case 'lock': { const ref = findBlock(b.after); return wrap(b, `<div class="lp-card" style="border-style:dashed;text-align:center;color:var(--ink-2)">🔒 <b>Sperre</b> – alles darunter in dieser Station wird erst frei, wenn <b>${ref ? esc(blockLabel(ref.b)) : '<i>(noch keine Aufgabe gewählt – ⚙)</i>'}</b> gelöst ist.</div>`); }
       case 'code': return wrap(b, `<div class="lp-card lp-code"><b class="lp-ctitle">${esc(b.file || 'Code')}</b> ${b.file ? '' : `<span style="color:var(--ink-2);font-size:.85em">${esc(b.lang)}</span>`}${E() ? `<pre contenteditable="true" data-f="code" data-ph="Code …" spellcheck="false">${esc(b.code)}</pre>` : `<pre class="hl">${highlightCode(b.code || '', b.lang)}</pre>`}${b.nocopy ? (E() ? '<div class="ed-hint">ohne Knopf – nur zum Anschauen (⚙)</div>' : '') : `<button class="lp-btn alt" data-run="copy">⧉ ${esc(host.copyLabel || 'Kopieren')}</button>`}</div>`);
       case 'uml': return wrap(b, `<div class="lp-uml">${ce('name', b.name, 'Klassenname', { tag: 'div', cls: 'un' })}<div class="us">${(b.attrs || []).map(a => `<div>${esc(a)}</div>`).join('') || '<div>&nbsp;</div>'}</div><div class="us">${(b.methods || []).map(a => `<div>${esc(a)}</div>`).join('') || '<div>&nbsp;</div>'}</div></div>${E() ? '<div class="ed-hint">Attribute und Methoden über ⚙</div>' : ''}`);
@@ -725,12 +750,77 @@ export function startPathFinder(opts = {}) {
     for (const p of b.pairs || []) { p.ka = p.ka || keyOf(); p.kb = p.kb || keyOf(); }
     return { L: shuffled((b.pairs || []).map(p => ({ k: p.ka, t: p.a })), b.id), R: (b.pairs || []).map(p => ({ k: p.kb, t: p.b })) };
   }
+  /** Sortieren: Begriffe (gemischt, mit Schlüssel) und Gruppennamen; in der Schülerfassung schon vorgegeben */
+  function sortSides(b) {
+    if (b.sitems) return { I: b.sitems, G: b.gnames || [] };
+    const I = []; (b.groups || []).forEach((g, gi) => (g.items || []).forEach(t => { if (String(t).trim()) I.push({ k: 'i' + I.length, t, g: gi }); }));
+    return { I: shuffled(I, b.id), G: (b.groups || []).map(g => g.name) };
+  }
+  /** Reihenfolge: Teile (gemischt, mit Schlüssel); in der Schülerfassung schon vorgegeben */
+  const orderPool = b => b.opool || shuffled((b.items || []).map((t, i) => ({ k: 'o' + i, t })), b.id);
+  const ordText = t => plain(t).replace(/\s+/g, ' ').trim().toLowerCase();
+  /** Lösung, die zur Eingabe am besten passt (meiste Teile am richtigen Platz) – als Liste der Texte */
+  function orderBest(b, seqT) {
+    let best = null, bs = -1;
+    for (const s of [b.items || [], ...(b.alts || [])].map(x => x.map(ordText))) { const sc = s.reduce((n, x, i) => n + (seqT[i] === x ? 1 : 0), 0); if (sc > bs) { bs = sc; best = s; } }
+    return best || [];
+  }
+  const stOf = (b, exam) => (exam ? prog.ans?.[b.id] : prog.quiz[b.id]) || {};
+  const seqOf = (b, exam) => { const a = exam ? prog.ans?.[b.id] : prog.quiz[b.id]; return Array.isArray(a) ? a : []; };
+  const cardHead = (b, exam, name) => `<div class="hd"><b class="lp-ctitle">${esc(plain(b.title)) || name}</b>${exam ? examState(b) : xpTag(b)}</div>`;
+  const cardFoot = (b, exam, run, hint, okText) => exam ? `<div class="lp-state" style="margin-top:6px">${hint}</div>`
+    : `<div><button class="lp-btn" data-run="${run}">Prüfen</button><span class="lp-state" style="margin-left:8px">${prog.solved[b.id] ? okText : hint}</span></div>`;
+  /** Im Text markieren (Lernpfad: mit Prüfen; Prüfung: nur erfassen) */
+  function markCard(b, exam) {
+    const P = markParse(b.html), got = stOf(b, exam), chk = !exam && prog.quiz[b.id + ':chk'];
+    const html = P.tpl.replace(/\u0002(\d+)\u0003/g, (_, k) => { const on = !!got[k]; return `<span class="mw${on ? ' on' : ''}${chk && on ? (P.targets.has(+k) ? ' ok' : ' no') : ''}" data-mw="${k}" role="button" tabindex="0" aria-pressed="${on}">${esc(P.words[k])}</span>`; });
+    return `<div class="lp-card lp-mark${exam ? ' lp-exam' : ''}${!exam && prog.solved[b.id] ? ' ok' : ''}">${cardHead(b, exam, 'Markieren')}<div class="mtext">${html}</div>${cardFoot(b, exam, 'markcheck', 'Wörter antippen zum Markieren – nochmal antippen hebt die Markierung auf.', '✓ alles richtig markiert')}</div>`;
+  }
+  /** In Gruppen sortieren */
+  function sortCard(b, exam) {
+    const { I, G } = sortSides(b), got = stOf(b, exam), chk = !exam && prog.quiz[b.id + ':chk'];
+    const chip = (x, placed) => `<span class="gchip schip${placed && chk ? (x.g === got[x.k] ? ' ok' : ' no') : ''}" ${placed ? `data-sput="${esc(x.k)}"` : `data-schip="${esc(x.k)}"`} role="button" tabindex="0">${esc(x.t)}</span>`;
+    const pool = I.filter(x => got[x.k] == null);
+    return `<div class="lp-card lp-sort${exam ? ' lp-exam' : ''}${!exam && prog.solved[b.id] ? ' ok' : ''}">${cardHead(b, exam, 'Sortieren')}`
+      + `<div class="bank sbank">${pool.length ? pool.map(x => chip(x)).join('') : '<span class="bl">Alle Begriffe sind einsortiert.</span>'}</div>`
+      + `<div class="scols">${G.map((g, gi) => `<div class="scol" data-scol="${gi}"><div class="sh">${esc(g)}</div>${I.filter(x => got[x.k] === gi).map(x => chip(x, true)).join('')}</div>`).join('')}</div>`
+      + cardFoot(b, exam, 'sortcheck', 'Begriff antippen, dann die Gruppe – oder ziehen. Einsortierten Begriff antippen legt ihn zurück.', '✓ alles richtig sortiert') + '</div>';
+  }
+  /** Satzpuzzle (Wörter nebeneinander) und Reihenfolge (Abschnitte untereinander) */
+  function orderCard(b, exam) {
+    const pool = orderPool(b), seq = seqOf(b, exam), byK = Object.fromEntries(pool.map(x => [x.k, x])), chk = !exam && prog.quiz[b.id + ':chk'];
+    const best = chk ? orderBest(b, seq.map(k => ordText(byK[k]?.t))) : null, show = (x, first) => b.words ? esc(first ? x.t.charAt(0).toUpperCase() + x.t.slice(1) : x.t) : x.t; // Satzanfang groß
+    const cls = `gchip ochip${b.words ? '' : ' para'}`;
+    const placed = seq.map((k, i) => { const x = byK[k]; if (!x) return ''; return `<span class="${cls}${best ? (ordText(x.t) === best[i] ? ' ok' : ' no') : ''}" data-oput="${esc(k)}" role="button" tabindex="0">${b.words ? '' : `<i>${i + 1}</i>`}${show(x, i === 0)}</span>`; }).join('');
+    return `<div class="lp-card lp-order ${b.words ? 'words' : 'paras'}${exam ? ' lp-exam' : ''}${!exam && prog.solved[b.id] ? ' ok' : ''}">${cardHead(b, exam, b.words ? 'Satzpuzzle' : 'Reihenfolge')}`
+      + `<div class="oarea" data-oarea="1">${placed || `<span class="bl">${b.words ? 'Wörter der Reihe nach antippen – sie erscheinen hier.' : 'Abschnitte der Reihe nach antippen – sie erscheinen hier.'}</span>`}</div>`
+      + `<div class="bank obank">${pool.filter(x => !seq.includes(x.k)).map(x => `<span class="${cls}" data-ochip="${esc(x.k)}" role="button" tabindex="0">${show(x)}</span>`).join('')}</div>`
+      + cardFoot(b, exam, 'ordercheck', 'Antippen fügt hinten an, oben antippen legt zurück – oder an die richtige Stelle ziehen.', '✓ richtig') + '</div>';
+  }
+  function placeSort(id, k, gi) {
+    const st = EXAM() ? ansOf(id) : (prog.quiz[id] = prog.quiz[id] || {});
+    if (gi == null) delete st[k]; else st[k] = gi;
+    if (EXAM()) { render(); examChanged(id); return; }
+    delete prog.quiz[id + ':chk']; render();
+  }
+  /** at: null = zurücklegen, 'end' = hinten anfügen, sonst Schlüssel des Teils, vor dem eingefügt wird */
+  function placeOrder(id, k, at) {
+    const A = EXAM() ? (prog.ans || (prog.ans = {})) : prog.quiz;
+    const seq = (Array.isArray(A[id]) ? A[id] : []).filter(x => x !== k);
+    if (at === 'end') seq.push(k); else if (at != null) { const j = seq.indexOf(at); seq.splice(j < 0 ? seq.length : j, 0, k); }
+    A[id] = seq;
+    if (EXAM()) { render(); examChanged(id); return; }
+    delete prog.quiz[id + ':chk']; render();
+  }
   /** Ist die Aufgabe vollständig beantwortet? (nur für die Anzeige „beantwortet“) */
   function answered(b) {
     const a = prog.ans?.[b.id];
     if (b.type === 'quiz') return !!a && (b.qs || []).every((q, qi) => a[qi] != null);
     if (b.type === 'gap') { const n = gapCount(b); return !!a && n > 0 && Array.from({ length: n }, (_, i) => String(a[i] ?? '').trim()).every(Boolean); }
     if (b.type === 'match') return !!a && matchSides(b).R.every(r => a[r.k] != null);
+    if (b.type === 'mark') return !!a && Object.values(a).some(Boolean);
+    if (b.type === 'sort') return !!a && sortSides(b).I.every(x => a[x.k] != null);
+    if (b.type === 'order') return Array.isArray(a) && a.length > 0 && a.length === orderPool(b).length;
     return typeof a === 'string' && a.trim() !== '';
   }
   const examState = b => `<span class="lp-state" data-xstate>${answered(b) ? '✓ beantwortet' : ''}</span>`;
@@ -760,6 +850,9 @@ export function startPathFinder(opts = {}) {
       const html = String(b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const i = n++; return `<input data-xgap="${i}" value="${esc(a?.[i] ?? '')}" ${NOCORR} aria-label="Lücke ${i + 1}">`; });
       return wrap(b, `<div class="lp-card lp-gap lp-exam${b.heft ? ' heft' : ''}">${head}<div>${html}</div>${examState(b)}</div>`);
     }
+    if (b.type === 'mark') return wrap(b, markCard(b, true));
+    if (b.type === 'sort') return wrap(b, sortCard(b, true));
+    if (b.type === 'order') return wrap(b, orderCard(b, true));
     if (b.type === 'match') {
       const { L, R } = matchSides(b), placed = new Set(Object.values(a || {}));
       return wrap(b, `<div class="lp-card lp-match lp-exam"><b class="lp-ctitle">${esc(b.title)}</b><div class="grid">`
@@ -888,7 +981,15 @@ export function startPathFinder(opts = {}) {
     if (EXAM_DONE() && t.closest('.lp-exam')) return;
     if (opt && EXAM()) { const id = opt.closest('.blk').dataset.id, r = findBlock(id), [qi, i] = opt.dataset.opt.split('.').map(Number), k = r.b.qs[qi].opts[i].k, a = ansOf(id); if (a[qi] === k) delete a[qi]; else a[qi] = k; render(); examChanged(id); return; }
     if (opt) { const id = opt.closest('.blk').dataset.id, r = findBlock(id), [qi, i] = opt.dataset.opt.split('.').map(Number); const st = prog.quiz[id] || (prog.quiz[id] = {}); st[qi] = i; if (r.b.qs.every((q, k) => q.opts[st[k]]?.ok)) solve(id); else render(); return; }
-    const chip = t.closest('[data-chip], [data-gchip]');
+    if (Date.now() - dragEnd < 400 && t.closest('[data-chip], [data-gchip], [data-schip], [data-sput], [data-ochip], [data-oput]')) return;
+    const mw = t.closest('[data-mw]');
+    if (mw) { const id = mw.closest('.blk').dataset.id, k = mw.dataset.mw, st = EXAM() ? ansOf(id) : (prog.quiz[id] = prog.quiz[id] || {}); if (st[k]) delete st[k]; else st[k] = 1; if (EXAM()) { render(); examChanged(id); } else { delete prog.quiz[id + ':chk']; render(); } return; }
+    const sput = t.closest('[data-sput]');
+    if (sput) { const blk = sput.closest('.blk'), pick = $('[data-schip].picked', blk); if (pick) placeSort(blk.dataset.id, pick.dataset.schip, +sput.closest('[data-scol]').dataset.scol); else placeSort(blk.dataset.id, sput.dataset.sput, null); return; } // mit gewähltem Begriff: in diese Gruppe, sonst zurücklegen
+    const scol = t.closest('[data-scol]'); if (scol) { const pick = $('[data-schip].picked', scol.closest('.blk')); if (pick) placeSort(scol.closest('.blk').dataset.id, pick.dataset.schip, +scol.dataset.scol); return; }
+    const och = t.closest('[data-ochip]'); if (och) { placeOrder(och.closest('.blk').dataset.id, och.dataset.ochip, 'end'); return; }
+    const oput = t.closest('[data-oput]'); if (oput) { placeOrder(oput.closest('.blk').dataset.id, oput.dataset.oput, null); return; }
+    const chip = t.closest('[data-chip], [data-gchip], [data-schip]');
     if (chip && !chip.classList.contains('used')) { $$('.picked', lp).forEach(c => c !== chip && c.classList.remove('picked')); chip.classList.toggle('picked'); return; }
     const slot = t.closest('[data-slot]');
     if (slot && EXAM() && !$('.chip.picked', slot.closest('.blk'))) { const id = slot.closest('.blk').dataset.id, r = findBlock(id), k = matchSides(r.b).R[+slot.dataset.slot]?.k, a = ansOf(id); if (k && a[k] != null) { delete a[k]; render(); examChanged(id); } return; }
@@ -1041,7 +1142,7 @@ export function startPathFinder(opts = {}) {
   }
 
   /* ---------- Ziehen: Bausteine, Stationen, Karten ---------- */
-  let drag = null, scrollTimer = null, scrollDy = 0;
+  let drag = null, scrollTimer = null, scrollDy = 0, dragEnd = 0; // dragEnd: nach dem Ziehen kein zusätzlicher „Klick“
   lp.addEventListener('pointerdown', e => {
     if (!E()) { chipDown(e); return; }
     const g = e.target.closest('.grip');
@@ -1091,9 +1192,11 @@ export function startPathFinder(opts = {}) {
     if (scrollDy && !scrollTimer) scrollTimer = setInterval(() => { if (!scrollDy) { clearInterval(scrollTimer); scrollTimer = null; } scroller.scrollTop += scrollDy; }, 16);
   }
   function chipDown(e) {
-    const c = e.target.closest('[data-chip], [data-gchip]'); if (!c || c.classList.contains('used')) return;
+    const c = e.target.closest('[data-chip], [data-gchip], [data-schip], [data-sput], [data-ochip], [data-oput]'); if (!c || c.classList.contains('used')) return;
+    if (EXAM_DONE() && c.closest('.lp-exam')) return;
     if (e.pointerType === 'mouse') e.preventDefault(); // Maus: kein Markieren von Text beim Ziehen
-    drag = { kind: 'chip', el: c, x: e.clientX, y: e.clientY, moved: false, pid: e.pointerId, gap: !!c.dataset.gchip };
+    const d = c.dataset, target = d.gchip != null ? '[data-gslot]' : d.schip != null || d.sput != null ? '[data-scol]' : d.ochip != null || d.oput != null ? '[data-oput], [data-oarea]' : '[data-slot]';
+    drag = { kind: 'chip', el: c, x: e.clientX, y: e.clientY, moved: false, pid: e.pointerId, gap: d.gchip != null, target };
   }
   // Während gezogen wird, darf der Browser (v. a. Safari am Mac) keinen Text markieren
   document.addEventListener('selectstart', e => { if (drag) e.preventDefault(); });
@@ -1102,15 +1205,17 @@ export function startPathFinder(opts = {}) {
     if (!drag.moved) { drag.moved = true; document.body.classList.add('pf-dragging'); getSelection()?.removeAllRanges(); try { drag.el.setPointerCapture(drag.pid); } catch (er) { } drag.ghost = drag.el.cloneNode(true); Object.assign(drag.ghost.style, { position: 'fixed', zIndex: 300, pointerEvents: 'none', width: drag.el.offsetWidth + 'px', opacity: .9, boxShadow: '0 8px 20px rgba(0,0,0,.25)' }); document.body.appendChild(drag.ghost); }
     drag.ghost.style.left = (e.clientX - drag.el.offsetWidth / 2) + 'px'; drag.ghost.style.top = (e.clientY - 20) + 'px';
     $$('.hover', lp).forEach(s => s.classList.remove('hover'));
-    document.elementsFromPoint(e.clientX, e.clientY).find(x => x.matches?.(drag.gap ? '[data-gslot]' : '[data-slot]'))?.classList.add('hover');
+    document.elementsFromPoint(e.clientX, e.clientY).find(x => x !== drag.el && x !== drag.ghost && x.matches?.(drag.target))?.classList.add('hover');
   }
   function chipUp(e) {
-    const d = drag; drag = null; document.body.classList.remove('pf-dragging'); if (!d.moved) return;
+    const d = drag; drag = null; document.body.classList.remove('pf-dragging'); if (!d.moved) return; dragEnd = Date.now();
     d.ghost?.remove(); $$('.hover', lp).forEach(s => s.classList.remove('hover'));
-    const s = document.elementsFromPoint(e.clientX, e.clientY).find(x => x.matches?.(d.gap ? '[data-gslot]' : '[data-slot]'));
+    const s = document.elementsFromPoint(e.clientX, e.clientY).find(x => x !== d.el && x !== d.ghost && x.matches?.(d.target));
     if (!s || s.closest('.blk') !== d.el.closest('.blk')) return;
-    const id = s.closest('.blk').dataset.id;
-    if (d.gap) placeGap(id, +s.dataset.gslot, d.el.dataset.gchip); else placeChip(id, +d.el.dataset.chip, +s.dataset.slot);
+    const id = s.closest('.blk').dataset.id, D = d.el.dataset;
+    if (D.schip != null || D.sput != null) placeSort(id, D.schip ?? D.sput, +s.dataset.scol);
+    else if (D.ochip != null || D.oput != null) placeOrder(id, D.ochip ?? D.oput, s.dataset.oput ?? 'end');
+    else if (d.gap) placeGap(id, +s.dataset.gslot, D.gchip); else placeChip(id, +D.chip, +s.dataset.slot);
   }
 
   /* ---------- Stationen: springen, aktuelle merken ---------- */
@@ -1143,6 +1248,16 @@ export function startPathFinder(opts = {}) {
     quiz: [{ k: 'qs', l: 'Fragen', t: 'qs' }, XP],
     gap: [{ k: 'bank', l: 'Begriffe zum Ziehen anbieten (statt Tippen)', t: 'check' }, { k: 'extra', l: 'Zusätzliche falsche Begriffe (Ablenker)', t: 'list', ph: 'Begriff', show: b => b.bank }, { k: 'heft', l: 'Als Hefteintrag gestalten (mit Titel)', t: 'check' }, XP],
     match: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'pairs', l: 'Paare', t: 'pairs' }, XP],
+    mark: [{ k: 'title', l: 'Arbeitsauftrag', t: 'text' }, XP],
+    sort: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'groups', l: 'Gruppen und Begriffe', t: 'lines', rows: 6, help: 'Je Zeile eine Gruppe: „Gruppe: Begriff, Begriff, Begriff“',
+      get: b => (b.groups || []).map(g => `${g.name}: ${(g.items || []).join(', ')}`).join('\n'),
+      set: (b, v) => { b.groups = v.split('\n').map(l => l.match(/^([^:]{1,60}):\s*(.*)$/)).filter(Boolean).map(m => ({ name: m[1].trim(), items: m[2].split(/\s*[,;]\s*/).map(x => x.trim()).filter(Boolean) })); } }, XP],
+    order: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'words', l: 'Satzpuzzle: Wörter nebeneinander (sonst Abschnitte untereinander)', t: 'check' },
+      { k: 'items', l: 'Richtige Reihenfolge', t: 'lines', rows: 6, help: 'Satzpuzzle: Teile mit „ / “ trennen, z. B. I / have / never / been / to London. Abschnitte: je Zeile einer.',
+        get: b => b.words ? (b.items || []).join(' / ') : (b.items || []).map(x => plain(x)).join('\n'),
+        set: (b, v) => { b.items = b.words ? v.split(/\s*\/\s*|\n/).map(x => x.trim()).filter(Boolean) : v.split('\n').map(x => esc(x.trim())).filter(Boolean); } },
+      { k: 'alts', l: 'Weitere richtige Reihenfolgen (optional)', t: 'lines', rows: 3, show: b => b.words, help: 'Je Zeile eine, mit denselben Teilen, z. B. Never / have / I / been / to London',
+        get: b => (b.alts || []).map(a => a.join(' / ')).join('\n'), set: (b, v) => { b.alts = v.split('\n').map(l => l.split(/\s*\/\s*/).map(x => x.trim()).filter(Boolean)).filter(a => a.length > 1); } }, XP],
     essay: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'lines', l: 'Höhe des Antwortfelds in Zeilen', t: 'number' }, { k: 'rubric', l: 'Erwartungshorizont', t: 'rubric' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }],
     lock: [{ k: 'after', l: 'Frei, sobald gelöst ist:', t: 'target' }],
     code: [{ k: 'lang', l: 'Sprache', t: 'select', o: [['java', 'Java'], ['python', 'Python'], ['sql', 'SQL'], ['text', 'Text']] }, { k: 'file', l: 'Dateiname über dem Code (optional)', t: 'text' }, { k: 'mark', l: 'Zeilen hervorheben (z. B. 3-5)', t: 'text', show: () => !!doc.skin }, { k: 'nocopy', l: 'ohne Knopf (nur zum Anschauen, z. B. wenn der Code schon im Projekt steht oder eine Aufgabe verraten würde)', t: 'check' }],
@@ -1200,6 +1315,7 @@ export function startPathFinder(opts = {}) {
         else if (f.t === 'shown') h += `<label class="chk"><input type="checkbox" data-k="${f.k}"${v ? '' : ' checked'}>${esc(f.l)}</label>`;
         else if (f.t === 'select') h += `<label>${esc(f.l)}<select data-k="${f.k}">${f.o.map(([k, n]) => `<option value="${k}"${k === (v ?? '') ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>${help}</label>`;
         else if (f.t === 'code') h += `<label>${esc(f.l)}<textarea class="mono" data-k="${f.k}" style="min-height:220px" spellcheck="false">${esc(v)}</textarea>${help}</label>`;
+        else if (f.t === 'lines') h += `<label>${esc(f.l)}<textarea data-lines="${f.k}" rows="${f.rows || 5}" spellcheck="false" autocapitalize="off">${esc(f.get(b))}</textarea>${help}</label>`;
         else if (f.t === 'cell') h += `<div class="row"><label>${esc(f.l)}<input type="text" class="mono" data-k="${f.k}" value="${esc(v)}" placeholder="D2" autocapitalize="characters"></label>${takeBtn('cell', f.k)}</div>`;
         else if (f.t === 'formula') h += `<div class="row"><label>${esc(f.l)}<input type="text" class="mono" data-k="${f.k}" value="${esc(v)}" placeholder="=B2*C2" autocapitalize="off" autocorrect="off" spellcheck="false">${help}</label>${takeBtn('formula', f.k)}</div>`;
         else if (f.t === 'list') h += `<label>${esc(f.l)}</label>${f.vis ? '<span class="help">👁 = für Schüler sichtbar · antippen zum Verbergen</span>' : ''}<div class="list">${(v || []).map((t, i) => `<div class="it">${f.vis ? (hid => `<button class="pf-eye${hid ? ' off' : ''}" data-lvis="${f.vis}" data-i="${i}" aria-pressed="${!hid}" title="${hid ? 'verborgen – antippen zum Zeigen' : 'sichtbar – antippen zum Verbergen'}">${hid ? '🙈' : '👁'}</button>`)(!!(b[f.vis] || [])[i]) : ''}<input type="text" data-li="${f.k}" data-i="${i}" value="${esc(plain(t))}" placeholder="${esc(f.ph)} ${i + 1}"><button data-ldel="${f.k}" data-i="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-ladd="${f.k}">＋ ${esc(f.ph)}</button></div>`;
@@ -1226,6 +1342,7 @@ export function startPathFinder(opts = {}) {
       if (d.qok2) { const [qi, i] = d.qok2.split('.').map(Number); b.qs[qi].opts.forEach((o, k) => o.ok = k === i); }
       if (d.rt != null) b.rubric[+d.rt].t = t.value;
       if (d.rp != null) { b.rubric[+d.rp].p = Math.max(0, +t.value || 0); const s = b.rubric.reduce((a, r) => a + (+r.p || 0), 0); if (s > 0) b.pts = s; }
+      if (d.lines) fields.find(x => x.k === d.lines)?.set(b, t.value);
       if (d.pa != null) b.pairs[+d.pa].a = t.value;
       if (d.pb != null) b.pairs[+d.pb].b = t.value;
       changed();
@@ -1537,7 +1654,7 @@ ${d.theme === 'grid' ? `<span class="help">„Hack“: immer dunkel, Raster-Kopf
   const opt2 = (v, t, cur) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${t}</option>`;
   const aiStOpts = () => opt2('', '–', aiSt) + opt2('*', 'Ganzer Lernpfad (teuer!)', aiSt)
     + doc.stations.map((st, i) => opt2(st.id, `Station ${i + 1}: ${esc(plain(st.title).slice(0, 40))}`, aiSt)).join('');
-  const blkLabel = b => { const t = plain(b.type === 'quiz' ? b.qs?.[0]?.q || '' : b.type === 'match' || b.type === 'task' || b.type === 'gap' && b.title ? b.title || '' : b.html || b.caption || b.summary || '').replace(/\s+/g, ' ').trim(); return blkName(b) + (t && !blkName(b).includes(t.slice(0, 10)) ? ': ' + t.slice(0, 34) + (t.length > 34 ? '…' : '') : ''); };
+  const blkLabel = b => { const t = plain(b.type === 'quiz' ? b.qs?.[0]?.q || '' : ['match', 'task', 'mark', 'sort', 'order'].includes(b.type) || b.type === 'gap' && b.title ? b.title || '' : b.html || b.caption || b.summary || '').replace(/\s+/g, ' ').trim(); return blkName(b) + (t && !blkName(b).includes(t.slice(0, 10)) ? ': ' + t.slice(0, 34) + (t.length > 34 ? '…' : '') : ''); };
   const aiBkOpts = () => { const st = doc.stations.find(x => x.id === aiSt); return opt2('', '–', aiBk) + opt2('*', 'Ganze Station', aiBk) + (st ? st.blocks.filter(b => b.type !== 'lock').map((b, i) => opt2(b.id, `${i + 1}. ${esc(blkLabel(b))}`, aiBk)).join('') : ''); };
   /** Auswahl prüfen und Fenster auffrischen (nach Änderungen am Lernpfad) */
   function aiSync() {
@@ -1878,7 +1995,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       inhalte: lb ? (info.inh || []).filter(k => lb.k.includes(k)) : [],
       alleInhalte: lb ? lb.k : [],
       extra: info.extra || '',
-      ...(info.art === 'pruefung' ? { types: Array.isArray(info.types) ? info.types : ['quiz', 'gapbank', 'gap', 'match', 'short', 'essay'] } : {}),
+      ...(info.art === 'pruefung' || info.art === 'challenge' ? { types: (Array.isArray(info.types) ? info.types : ['quiz', 'gapbank', 'gap', 'match', 'short', 'essay']).filter(k => info.art === 'pruefung' || k !== 'essay') } : {}),
       ...(basisOf() ? { basis: basisOf().text, basisTitle: basisOf().title } : {})
     };
   }
@@ -1920,7 +2037,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
           <div class="ex-tri"><div class="ex-bar" id="kiBar"></div><input type="range" id="kiP1" min="0" max="100" step="5" value="${info.p1 ?? 40}" aria-label="Grenze Grundlagen / Fortgeschritten"><input type="range" id="kiP2" min="0" max="100" step="5" value="${info.p2 ?? 80}" aria-label="Grenze Fortgeschritten / Experte"></div>
           <div class="ex-lv" id="kiLv"></div>
         </div>
-        <div id="kiTypes" hidden><label>Aufgabenstile</label><div class="ex-types">${T.EXAM_STYLES.map(([k, n, h]) => `<label class="chk"><input type="checkbox" data-kty="${k}"${(info.types || T.EXAM_STYLES_DEFAULT).includes(k) ? ' checked' : ''}>${esc(n)} <span class="help">– ${esc(h)}</span></label>`).join('')}</div><span class="help">Die KI nimmt jede angekreuzte Art mindestens einmal auf – und keine anderen.</span></div>
+        <div id="kiTypes" hidden><label>Aufgabenstile</label><div class="ex-types">${T.EXAM_STYLES.map(([k, n, h]) => `<label class="chk"${k === 'essay' ? ' data-exonly="1"' : ''}><input type="checkbox" data-kty="${k}"${(info.types || T.EXAM_STYLES_DEFAULT).includes(k) ? ' checked' : ''}>${esc(n)} <span class="help">– ${esc(h)}</span></label>`).join('')}</div><span class="help">Die KI nimmt jede angekreuzte Art mindestens einmal auf – und keine anderen.</span></div>
         <div class="row"><label>Jahrgangsstufe<select data-k="jg">${opt('', '– wählen –', info.jg || '')}${[5, 6, 7, 8, 9, 10, 11, 12, 13].map(j => opt(j, j + '. Jahrgangsstufe', info.jg)).join('')}</select></label>
           <label>Fach<select data-k="fsel">${opt('', '– wählen –', info.fsel || '')}${L.FAECHER.map(f => opt(f, f, info.fsel)).join('')}${opt('*', 'anderes Fach …', info.fsel)}</select></label></div>
         <label id="kiFrei" hidden>Fach<input type="text" data-k="ffrei" value="${esc(info.ffrei || '')}" placeholder="z. B. Chemie"></label>
@@ -1994,7 +2111,8 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const drawBasis = () => { $('#kiBasis', el).innerHTML = kiBasis ? `<div class="ed-hint">📘 Grundlage: Lernpfad „${esc(kiBasis.title)}“ – die KI schreibt neue Prüfungsaufgaben zu genau diesen Inhalten. <button class="lp-btn alt" data-nobasis="1">✕ ohne Grundlage</button></div>` : ''; };
     drawBasis();
     const drawMix = () => {
-      $('#kiTypes', el).hidden = info.art !== 'pruefung';
+      $('#kiTypes', el).hidden = info.art !== 'pruefung' && info.art !== 'challenge';
+      $$('[data-exonly]', el).forEach(x => { x.hidden = info.art !== 'pruefung'; }); // Freitext gibt es nur in Prüfungen
       const ch = info.art === 'challenge' || info.art === 'pruefung'; $('#kiMix', el).hidden = !ch; if (!ch) return;
       const p1 = info.p1 ?? 40, p2 = info.p2 ?? 80, N = info.art === 'pruefung' ? ['AFB I – Reproduktion', 'AFB II – Transfer', 'AFB III – Problemlösen'] : ['Grundlagen', 'Fortgeschritten', 'Experte'];
       $('#kiBar', el).style.background = `linear-gradient(90deg, #8fd19e 0 ${p1}%, #f6bf3a ${p1}% ${p2}%, #ef8a7a ${p2}% 100%)`;
@@ -2207,7 +2325,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   const fmtPts = x => String(Math.round(x * 100) / 100).replace('.', ',');
   function examTitle(b) {
     const t = plain(b.title || '').trim(); if (t) return t;
-    return { quiz: 'Quiz', gap: 'Lückentext', match: 'Zuordnen', essay: 'Freitext' }[b.type] || 'Aufgabe';
+    return { quiz: 'Quiz', gap: 'Lückentext', match: 'Zuordnen', essay: 'Freitext', mark: 'Markieren', sort: 'Sortieren', order: b.words ? 'Satzpuzzle' : 'Reihenfolge' }[b.type] || 'Aufgabe';
   }
   /** Antworten einer Aufgabe als Textzeilen – für Protokoll und Vorschau */
   function answerLines(b) {
@@ -2215,6 +2333,9 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     if (b.type === 'quiz') return b.qs.flatMap((q, qi) => { const o = q.opts.find(x => x.k != null && x.k === a?.[qi]); return [`${b.qs.length > 1 ? qi + 1 + '. ' : ''}${plain(q.q)}`, `Antwort: ${o ? plain(o.t) : none}`]; });
     if (b.type === 'gap') { let i = 0; const t = plain(String(b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const v = a?.[i++]; return ` [${v != null && String(v).trim() ? esc(v) : '___'}] `; })).replace(/\s+/g, ' ').replace(/\s+([.,;:!?])/g, '$1').trim(); return [t, ...(gapCount(b) && !answered(b) ? ['(nicht alle Lücken ausgefüllt)'] : [])]; }
     if (b.type === 'match') { const { L, R } = matchSides(b); return R.map(r => { const g = L.find(x => x.k === a?.[r.k]); return `${plain(r.t)}: ${g ? plain(g.t) : none}`; }); }
+    if (b.type === 'mark') { const P = markParse(b.html), sel = Object.keys(a || {}).filter(k => a[k]).map(Number).sort((x, y) => x - y); return [sel.length ? 'Markiert: ' + sel.map(k => P.words[k]).join(', ') : none]; }
+    if (b.type === 'sort') { const { I, G } = sortSides(b); return G.map((g, gi) => `${plain(g)}: ${I.filter(x => a?.[x.k] === gi).map(x => plain(x.t)).join(', ') || '–'}`); }
+    if (b.type === 'order') { const byK = Object.fromEntries(orderPool(b).map(x => [x.k, x])), s = Array.isArray(a) ? a : []; return s.length ? (b.words ? [s.map(k => plain(byK[k]?.t)).join(' ').replace(/^./, c => c.toUpperCase())] : s.map((k, i) => `${i + 1}. ${plain(byK[k]?.t)}`)) : [none]; }
     return typeof a === 'string' && a.trim() ? a.split(/\n/) : [none];
   }
   /** Prüfcode über Name und Antworten: zeigt, ob ein Protokoll nachträglich verändert wurde */
@@ -2312,7 +2433,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       s.blocks = s.blocks.filter(b => { if (b.type === 'lock') return false; if (!CORE[b.type]) { removed++; return false; } return true; });
       for (const b of s.blocks) {
         if (b.type === 'task') { delete b.tips; delete b.tipsHide; delete b.solHide; }
-        if (CORE_CHECK.has(b.type)) { tasks++; if (b.pts == null) b.pts = b.type === 'quiz' ? (b.qs || []).length || 1 : b.type === 'gap' ? Math.max(1, gapCount(b)) : b.type === 'match' ? Math.max(1, (b.pairs || []).length) : b.type === 'essay' ? 4 : b.answer ? 1 : 2; }
+        if (CORE_CHECK.has(b.type)) { tasks++; if (b.pts == null) b.pts = b.type === 'quiz' ? (b.qs || []).length || 1 : b.type === 'gap' ? Math.max(1, gapCount(b)) : b.type === 'match' ? Math.max(1, (b.pairs || []).length) : b.type === 'mark' ? Math.max(1, markParse(b.html).targets.size) : b.type === 'sort' ? Math.max(1, sortSides(b).I.length) : b.type === 'order' ? Math.max(1, Math.ceil((b.items || []).length / 2)) : b.type === 'essay' ? 4 : b.answer ? 1 : 2; }
       }
       if (!s.blocks.length) s.blocks.push({ id: uid(), type: 'text', html: '' });
     }
@@ -2371,6 +2492,20 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (okA) solve(id); else { prog.tries[id] = (prog.tries[id] || 0) + 1; render(); }
     }
     if (a === 'copy') { if (host.copyCode) host.copyCode(b); else { navigator.clipboard?.writeText(b.code || '').then(() => toast('⧉ kopiert'), () => toast('Kopieren nicht möglich')); } }
+    if (a === 'markcheck') {
+      const P = markParse(b.html), got = prog.quiz[id] || {}, sel = Object.keys(got).filter(k => got[k]).map(Number);
+      const wrong = sel.filter(k => !P.targets.has(k)).length, miss = [...P.targets].filter(k => !got[k]).length; prog.quiz[id + ':chk'] = 1;
+      if (!wrong && !miss) solve(id); else { prog.tries[id] = (prog.tries[id] || 0) + 1; render(); toast(`Noch nicht ganz: ${[wrong ? `${wrong} falsch markiert` : '', miss ? `${miss} ${miss === 1 ? 'Wort fehlt' : 'Wörter fehlen'} noch` : ''].filter(Boolean).join(', ')}.`); }
+    }
+    if (a === 'sortcheck') {
+      const { I } = sortSides(b), got = prog.quiz[id] || {}; prog.quiz[id + ':chk'] = 1;
+      if (I.every(x => got[x.k] === x.g)) solve(id); else { prog.tries[id] = (prog.tries[id] || 0) + 1; render(); toast(I.some(x => got[x.k] == null) ? 'Erst alle Begriffe einsortieren.' : 'Noch nicht alles richtig – rote Begriffe nochmal ansehen.'); }
+    }
+    if (a === 'ordercheck') {
+      const pool = orderPool(b), byK = Object.fromEntries(pool.map(x => [x.k, x])), seq = seqOf(b, false), T = seq.map(k => ordText(byK[k]?.t)).join('\u0001'); prog.quiz[id + ':chk'] = 1;
+      if (seq.length === pool.length && [b.items || [], ...(b.alts || [])].some(s => s.map(ordText).join('\u0001') === T)) solve(id);
+      else { prog.tries[id] = (prog.tries[id] || 0) + 1; render(); toast(seq.length < pool.length ? 'Erst alle Teile anordnen.' : 'Noch nicht richtig – rote Teile stehen an der falschen Stelle.'); }
+    }
     if (a === 'gapcheck') { prog.quiz[id + ':chk'] = 1; const n = [...(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].length, got = prog.quiz[id] || {}; let all = true; for (let i = 0; i < n; i++) if (got[i] == null || !isGapOk(b, i, got[i], got)) all = false; if (all) solve(id); else { render(); toast('Noch nicht alles richtig – rote Lücken nochmal ansehen.'); } }
     if (a === 'download') { if (!b.data) { toast('Noch keine Datei – ⚙'); return; } const bin = atob(b.data), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); const url = URL.createObjectURL(new Blob([u8])); const l = document.createElement('a'); l.href = url; l.download = b.name || 'datei'; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(url); l.remove(); }, 3000); }
     if (host.runFile && a.startsWith('file:')) host.runFile(a.slice(5), b);

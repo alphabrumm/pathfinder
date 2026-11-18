@@ -99,6 +99,36 @@ test('Leere Abgabe ergibt 0 Punkte', () => {
   const r = gradeExam(key, {}); assert.equal(r.total, 0); assert.equal(r.pending, 1);
 });
 
+test('Sprachaufgaben: Markieren, Sortieren, Satzpuzzle, Reihenfolge', () => {
+  const doc = { id: 'd', stations: [{ id: 's', blocks: [
+    { id: 'm', type: 'mark', pts: 3, title: 'M', html: '<p>Yesterday I {{went}} home &amp; {{has been}} there. It was fun.</p>' },
+    { id: 'so', type: 'sort', pts: 4, title: 'S', groups: [{ name: 'der', items: ['Tisch', 'Baum'] }, { name: 'die', items: ['Tür', 'Lampe'] }] },
+    { id: 'p', type: 'order', words: true, pts: 2, title: 'P', items: ['I', 'have', 'never', 'been', 'there'], alts: [['Never', 'have', 'I', 'been', 'there']] },
+    { id: 'r', type: 'order', words: false, pts: 3, title: 'R', items: ['<b>A</b> first', 'B second', 'C third'] },
+  ] }] };
+  const { student, key } = splitExam(doc), S = Object.fromEntries(student.stations[0].blocks.map(b => [b.id, b]));
+  // Schülerfassung verrät nichts
+  assert.ok(!/\{\{/.test(S.m.html)); assert.ok(!S.so.groups && !S.so.sitems.some(x => 'g' in x)); assert.ok(!S.p.items && !S.p.alts && S.p.opool.length === 5);
+  const W = key.tasks.find(t => t.id === 'm'); assert.deepEqual(W.targets.map(i => W.words[i]), ['went', 'has', 'been']); assert.ok(!W.words.includes('amp'));
+  // Markieren: 3 Ziele; went+has+been = voll; dazu „fun“ = 3 von 4
+  const mi = (sel) => gradeExam(key, { m: Object.fromEntries(sel.map(w => [W.words.indexOf(w), 1])) }).items[0];
+  assert.equal(mi(['went', 'has', 'been']).pts, 3); assert.equal(mi(['went', 'has', 'been', 'fun']).pts, 2); assert.equal(mi(['went']).pts, 1);
+  // Sortieren
+  const SO = key.tasks.find(t => t.id === 'so'), ans = Object.fromEntries(SO.items.map(x => [x.k, x.g]));
+  assert.equal(gradeExam(key, { so: ans }).items[1].pts, 4);
+  ans[SO.items[0].k] = 1 - SO.items[0].g; assert.equal(gradeExam(key, { so: ans }).items[1].pts, 3);
+  // Satzpuzzle: Lösung, Alternative (Groß/Klein egal), Teilpunkte nach längster richtiger Teilfolge
+  const P = key.tasks.find(t => t.id === 'p'), k = w => P.pool.find(x => x.t.toLowerCase() === w.toLowerCase()).k;
+  assert.equal(gradeExam(key, { p: ['I', 'have', 'never', 'been', 'there'].map(k) }).items[2].pts, 2);
+  assert.equal(gradeExam(key, { p: ['never', 'have', 'I', 'been', 'there'].map(k) }).items[2].pts, 2);
+  assert.equal(gradeExam(key, { p: ['have', 'I', 'never', 'been', 'there'].map(k) }).items[2].pts, 1.5); // 4 von 5 in Folge
+  // Reihenfolge
+  const R = key.tasks.find(t => t.id === 'r'), rk = i => R.pool[i].k;
+  assert.equal(gradeExam(key, { r: [rk(0), rk(1), rk(2)] }).items[3].pts, 3);
+  assert.equal(gradeExam(key, { r: [rk(2), rk(0), rk(1)] }).items[3].pts, 2);
+  assert.equal(gradeExam(key, {}).items[3].pts, 0);
+});
+
 test('Notenschlüssel wie im Abitur', () => {
   assert.equal(gradeFor(19.9), 6); assert.equal(gradeFor(20), 5); assert.equal(gradeFor(39.99), 5); assert.equal(gradeFor(40), 4);
   assert.equal(gradeFor(55), 3); assert.equal(gradeFor(70), 2); assert.equal(gradeFor(84.9), 2); assert.equal(gradeFor(85), 1); assert.equal(gradeFor(100), 1);

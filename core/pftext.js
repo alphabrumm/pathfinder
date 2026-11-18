@@ -194,6 +194,33 @@ const CORE_SECTIONS = {
     if (rubric.length) b.pts = rubric.reduce((a, r) => a + r.p, 0); else H.warn(S.line, `Freitext „${S.title || ''}“ ohne Erwartungshorizont – schreibe Zeilen „Erwartung: Teilaspekt (Punkte)“.`);
     return b;
   } },
+  // Im Text markieren: Zielwörter in {{…}} – Schüler tippen alle passenden Wörter an
+  markieren: { n: 'Markieren', keys: ['xp', 'punkte'], make(S, H) {
+    const html = H.md(S.body); if (!/\{\{[^}]+\}\}/.test(html)) H.err(S.line, 'Markieren ohne Zielwort – schreibe die richtigen Wörter als {{Wort}}.');
+    return { type: 'mark', title: S.title || 'Markiere die passenden Wörter', html, xp: S.num('xp', 10) };
+  } },
+  // In Gruppen sortieren: je Zeile „Gruppe: Begriff, Begriff“
+  sortieren: { n: 'Sortieren', keys: ['xp', 'punkte'], make(S, H) {
+    const groups = [];
+    for (const [l, n] of S.bodyN) { if (!l.trim()) continue; const m = l.replace(/^\s*[-•]\s*/, '').match(/^([^:]{1,60}):\s*(.+)$/); if (m) groups.push({ name: m[1].trim(), items: m[2].split(/\s*[,;]\s*/).map(x => x.trim()).filter(Boolean) }); else H.warn(n, `Sortieren: „${l.trim().slice(0, 40)}“ – jede Zeile „Gruppe: Begriff, Begriff“.`); }
+    if (groups.length < 2) H.err(S.line, 'Sortieren braucht mindestens zwei Gruppen „Gruppe: Begriff, Begriff“.');
+    return { type: 'sort', title: S.title || 'Sortiere in die Gruppen', groups, xp: S.num('xp', 10) };
+  } },
+  // Satzpuzzle: Wörter in richtiger Reihenfolge, getrennt mit „ / “; weitere richtige Reihenfolgen mit „Auch richtig:“
+  satzpuzzle: { n: 'Satzpuzzle', keys: ['auch richtig', 'xp', 'punkte'], make(S, H) {
+    const cut = l => { l = l.trim(); return (l.includes('/') ? l.split(/\s*\/\s*/) : l.split(/\s+/)).map(x => x.trim()).filter(Boolean); };
+    const first = S.body.find(l => l.trim()) || '', items = cut(first), alts = S.all('auch richtig').map(cut).filter(a => a.length);
+    if (items.length < 2) H.err(S.line, 'Satzpuzzle braucht mindestens zwei Teile, getrennt mit „ / “.');
+    const key = a => a.map(x => x.toLowerCase()).sort().join('\u0001');
+    alts.forEach(a => { if (key(a) !== key(items)) H.warn(S.line, `Satzpuzzle: „Auch richtig: ${a.join(' / ')}“ benutzt andere Teile als die Lösung – weggelassen.`); });
+    return { type: 'order', words: true, title: S.title || 'Bring die Wörter in die richtige Reihenfolge', items, alts: alts.filter(a => key(a) === key(items)), xp: S.num('xp', 10) };
+  } },
+  // Reihenfolge (Textpuzzle): je Zeile ein Abschnitt, in der richtigen Reihenfolge
+  reihenfolge: { n: 'Reihenfolge', keys: ['xp', 'punkte'], make(S, H) {
+    const items = S.body.map(l => l.replace(/^\s*([-•]|\d+[.)])\s*/, '').trim()).filter(Boolean).map(inline);
+    if (items.length < 2) H.err(S.line, 'Reihenfolge braucht mindestens zwei Zeilen.');
+    return { type: 'order', words: false, title: S.title || 'Bring die Abschnitte in die richtige Reihenfolge', items, alts: [], xp: S.num('xp', 10) };
+  } },
   aufdecken: { n: 'Aufdecken', make: (S, H) => ({ type: 'reveal', summary: S.title || 'Mehr erfahren', html: H.md(S.body) }) },
   uml: { n: 'UML', make(S) {
     const L = S.body.map(l => l.replace(/^\s*[-+#~•]\s*/, '').trim()).filter(Boolean);
@@ -201,7 +228,11 @@ const CORE_SECTIONS = {
   } },
   html: { n: 'HTML', make: S => ({ type: 'html', html: S.raw.join('\n') }) },
 };
-const SEC_ALIAS = { aufgabe: 'aufgabe', auftrag: 'aufgabe', quiz: 'quiz', test: 'quiz', lueckentext: 'lueckentext', luecken: 'lueckentext', zuordnen: 'zuordnen', zuordnung: 'zuordnen', aufdecken: 'aufdecken', aufklappen: 'aufdecken', 'mehr erfahren': 'aufdecken', uml: 'uml', 'uml-klasse': 'uml', klasse: 'uml', html: 'html', freitext: 'freitext', 'offene aufgabe': 'freitext', essay: 'freitext' };
+const SEC_ALIAS = { aufgabe: 'aufgabe', auftrag: 'aufgabe', quiz: 'quiz', test: 'quiz', lueckentext: 'lueckentext', luecken: 'lueckentext', zuordnen: 'zuordnen', zuordnung: 'zuordnen', aufdecken: 'aufdecken', aufklappen: 'aufdecken', 'mehr erfahren': 'aufdecken', uml: 'uml', 'uml-klasse': 'uml', klasse: 'uml', html: 'html', freitext: 'freitext', 'offene aufgabe': 'freitext', essay: 'freitext',
+  markieren: 'markieren', markiere: 'markieren', 'im text markieren': 'markieren', sortieren: 'sortieren', sortiere: 'sortieren', gruppen: 'sortieren', kategorisieren: 'sortieren',
+  satzpuzzle: 'satzpuzzle', wortpuzzle: 'satzpuzzle', satzbau: 'satzpuzzle', reihenfolge: 'reihenfolge', textpuzzle: 'reihenfolge', ordnen: 'reihenfolge' };
+/** Bausteine, die als Aufgabe zählen (Punkte, Fortschritt) */
+export const CHECK_TYPES = ['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order'];
 
 export function parseText(src, env) {
   const errors = [], warnings = [];
@@ -258,7 +289,7 @@ export function parseText(src, env) {
     const Sx = { title: S.title, line: S.line, body, bodyN, raw: S.lines.map(x => x[0]), table: S.table, code: S.code || [], kv, one: k => (kv[k] || [])[0], all: k => kv[k] || [], hid: k => kh[k] || [], num: (k, d) => { const v = (kv[k] || kv.punkte || [])[0]; return v != null && !isNaN(parseInt(v)) ? parseInt(v) : d; } };
     try { const b = def.make(Sx, H, env); if (b) { if (kv.punkte) b.pts = parseFloat(String(kv.punkte[0]).replace(',', '.')) || undefined; push(b, S.line); } } catch (e) { H.err(S.line, `Abschnitt „${S.head}“: ${e.message}`); }
   };
-  const lastCheckable = () => { const bl = st ? st.blocks : []; for (let k = bl.length - 1; k >= 0; k--) if (['task', 'quiz', 'gap', 'match', 'essay'].includes(bl[k].type) || (env.isCheck && env.isCheck(bl[k]))) return bl[k]; return null; };
+  const lastCheckable = () => { const bl = st ? st.blocks : []; for (let k = bl.length - 1; k >= 0; k--) if (CHECK_TYPES.includes(bl[k].type) || (env.isCheck && env.isCheck(bl[k]))) return bl[k]; return null; };
 
   for (; i < lines.length; i++) {
     const raw = lines[i], n = i + 1, l = raw.trim();
@@ -346,7 +377,7 @@ export function parseText(src, env) {
   if (!doc.stations.length) H.err(1, 'Keine Station gefunden – Stationen beginnen mit „## Station: Titel“.');
   doc.stations.forEach(s => { if (!s.blocks.length) s.blocks.push({ id: uid(), type: 'text', html: '' }); });
   const all = doc.stations.flatMap(s => s.blocks);
-  const stats = { stations: doc.stations.length, blocks: all.length, tasks: all.filter(b => ['task', 'quiz', 'gap', 'match', 'essay'].includes(b.type) || (env.isCheck && env.isCheck(b))).length };
+  const stats = { stations: doc.stations.length, blocks: all.length, tasks: all.filter(b => CHECK_TYPES.includes(b.type) || (env.isCheck && env.isCheck(b))).length };
   stats.images = images.length;
   return { doc, errors, warnings, stats, images };
 }
@@ -399,12 +430,16 @@ export function docToText(doc, env, out = {}) {
         case 'quiz': L.push('### Quiz'); b.qs.forEach(q => { L.push(`? ${md(q.q)}`); q.opts.forEach(o => L.push(`[${o.ok ? 'x' : ' '}] ${md(o.t)}${o.fb ? ' // ' + md(o.fb) : ''}`)); }); break;
         case 'gap': L.push(`### Lückentext${b.title ? ': ' + md(b.title) : ''}`, md(b.html)); if (b.bank) L.push('Wortbank: ja'); if (b.extra?.length) L.push(`Extra: ${b.extra.join(', ')}`); break;
         case 'match': L.push(`### Zuordnen: ${md(b.title)}`, ...b.pairs.map(p => `${p.a} -> ${p.b}`)); break;
+        case 'mark': L.push(`### Markieren: ${md(b.title)}`, md(b.html)); break;
+        case 'sort': L.push(`### Sortieren: ${md(b.title)}`, ...(b.groups || []).map(g => `${g.name}: ${(g.items || []).join(', ')}`)); break;
+        case 'order': if (b.words) L.push(`### Satzpuzzle: ${md(b.title)}`, (b.items || []).join(' / '), ...(b.alts || []).map(a => `Auch richtig: ${a.join(' / ')}`));
+          else L.push(`### Reihenfolge: ${md(b.title)}`, ...(b.items || []).map(x => '- ' + md(x))); break;
         case 'lock': L.push('--- Sperre ---'); break;
         case 'file': L.push(`%% Datei „${b.name}“ (nur im Editor)`); break;
         default: { const t = plug[b.type]; L.push(t?.toText ? t.toText(b, { md }) : `%% Baustein „${b.type}“ – im Textformat nicht darstellbar`); }
       }
       // Punkte je Aufgabe (bei Freitext mit Erwartungshorizont ergeben sie sich aus den Teilpunkten)
-      if (doc.pointsOn && b.pts != null && ['task', 'quiz', 'gap', 'match', 'essay'].includes(b.type) && !(b.type === 'essay' && (b.rubric || []).length)) L.push(`Punkte: ${b.pts}`);
+      if (doc.pointsOn && b.pts != null && CHECK_TYPES.includes(b.type) && !(b.type === 'essay' && (b.rubric || []).length)) L.push(`Punkte: ${b.pts}`);
     }
   }
   if (att.length) {
@@ -423,6 +458,10 @@ export const EXAM_STYLES = [
   ['match', 'Zuordnen', 'Paare per Drag & Drop', '„### Zuordnen“ mit vier bis sechs Paaren'],
   ['steps', 'Lösungsschritte mit Drag & Drop', 'z. B. Gleichungssystem: Terme in den Rechenweg ziehen', '„### Lückentext“ mit „Wortbank: ja“: ein Rechenweg (z. B. ein Gleichungssystem mit I und II) Schritt für Schritt, jeder Schritt in einer eigenen Zeile; Terme, Zahlen und Rechenzeichen sind Lücken [[…]], unter „Extra:“ zwei bis drei falsche Bausteine als Ablenker; Malpunkt · statt *, Hochzahlen als ² und ³, negative Zahlen ohne Leerzeichen nach dem Minus; möglichst nur eine Seite einer Gleichung als Lücke (z. B. „3x = [[9]]“) – stehen beide Seiten ganz als Lücken da („[[3x]] = [[9]]“), wird auch die vertauschte Reihenfolge als richtig gewertet'],
   ['short', 'Rechnen / kurze Antwort', 'Ergebnis wird automatisch bewertet', '„### Aufgabe“ mit „Antwort:“ (Zahl ohne Einheit oder ein Wort; mehrere richtige mit | trennen) – die erwartete Einheit steht im Auftrag'],
+  ['mark', 'Im Text markieren', 'Wörter antippen, z. B. alle Verben im simple past', '„### Markieren: Arbeitsauftrag“ mit einem kurzen Text; die richtigen Wörter stehen in {{…}} (3–6 Zielwörter; im Text auch ähnliche Wörter, die NICHT markiert werden dürfen)'],
+  ['sort', 'In Gruppen sortieren', 'Begriffe in Spalten ziehen', '„### Sortieren“ mit 2–4 Gruppen und je 2–5 eindeutig zuzuordnenden Begriffen (je Zeile „Gruppe: Begriff, Begriff“)'],
+  ['puzzle', 'Satzpuzzle', 'Wörter in die richtige Reihenfolge bringen', '„### Satzpuzzle“ – ein Satz in einer Zeile, Teile mit „ / “ getrennt (feste Wendungen wie „to London“ als ein Teil); jede weitere korrekte Wortstellung als Zeile „Auch richtig: …“ mit denselben Teilen; das erste Wort klein schreiben (außer Namen und „I“), ohne Satzzeichen am Ende – PathFinder schreibt den Satzanfang selbst groß'],
+  ['textorder', 'Textpuzzle (Reihenfolge)', 'Abschnitte oder Dialogzeilen ordnen', '„### Reihenfolge“ – 4–6 Abschnitte, Sätze oder Dialogzeilen, je Zeile einer, in der richtigen Reihenfolge; die Reihenfolge muss eindeutig sein (Signalwörter, Handlungsablauf)'],
   ['essay', 'Freitext', 'mit Erwartungshorizont, du bewertest', '„### Freitext“ mit Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“'],
 ];
 /** vorausgewählte Aufgabenstile (Lösungsschritte nur, wenn das Thema Rechenwege hat) */
@@ -479,13 +518,32 @@ Extra: Ablenker, Ablenker   (optional: falsche Begriffe in der Wortbank)
 Begriff -> Erklärung
 Begriff -> Erklärung
 
+### Markieren: Markiere alle Verben im simple past.
+Yesterday I {{went}} to the park and {{played}} football. It is sunny today.
+                        (die richtigen Wörter in {{…}}; Schüler tippen sie im Text an – mehrere Wörter: {{has been}})
+
+### Sortieren: Sortiere die Wörter.
+regular verbs: play, watch, visit
+irregular verbs: go, see, buy
+                        (je Zeile eine Gruppe „Gruppe: Begriff, Begriff“; Schüler sehen alle Begriffe gemischt)
+
+### Satzpuzzle: Bring die Wörter in die richtige Reihenfolge.
+I / have / never / been / to London
+Auch richtig: never / have / I / been / to London   (optional: weitere korrekte Reihenfolgen mit denselben Teilen; Satzanfang klein, ohne Schlusspunkt – PathFinder schreibt ihn groß)
+
+### Reihenfolge: Bring die Geschichte in die richtige Reihenfolge.
+- Tom woke up early.
+- He had breakfast.
+- Then he went to school.
+                        (je Zeile ein Abschnitt oder eine Dialogzeile, in der richtigen Reihenfolge – Schüler sehen sie gemischt)
+
 ### Freitext: Titel       (nur in Prüfungen: offene Antwort, die die Lehrkraft bewertet)
 Aufgabenstellung.
 Erwartung: erster Teilaspekt der erwarteten Antwort (2)   (Erwartungshorizont, Zahl in Klammern = Punkte)
 Erwartung: zweiter Teilaspekt (1)
 Zeilen: 6               (optional: Höhe des Antwortfelds)
 
-Punkte: 2               (in jeder Aufgabe, jedem Quiz, Lückentext oder Zuordnen: Punkte für diese Aufgabe)
+Punkte: 2               (in jeder Aufgabe, jedem Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle oder jeder Reihenfolge: Punkte für diese Aufgabe)
 
 ### Aufdecken: Mehr erfahren
 Text, der erst nach Antippen erscheint.
@@ -525,7 +583,7 @@ export function promptFor(info, env) {
     ? `- Schreibe im Kopf die Zeile „Art: Prüfung“.
 - KEINE Erklärungen, Merkkästen, Figuren, Tipps, Lösungen zum Aufdecken oder Sperren – nur kurze Arbeitsanweisungen, Material (Texte, Tabellen, Abbildungen) und Aufgaben.
 - Gliedere die Prüfung in Stationen als Teilaufgaben oder Themenblöcke (z. B. „## Station: Teil A | Grundwissen“).
-- Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Freitext) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken.
+- Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle, Reihenfolge, Freitext) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken, Markieren und Sortieren etwa 1 Punkt je zwei Wörter bzw. Begriffe, ein Satzpuzzle 1–2 Punkte.
 ${!info.types?.length || info.types.includes('short') ? `- Rechenaufgaben mit eindeutigem Ergebnis als „### Aufgabe“ mit „Antwort:“ (Zahl, ohne Einheit, mehrere richtige mit | trennen) – sie werden automatisch bewertet. Schreibe die erwartete Einheit in den Auftrag.` : ''}
 ${!info.types?.length || info.types.includes('essay') ? `- Offene Aufgaben (erklären, begründen, beschreiben, beurteilen) als „### Freitext“ mit Erwartungshorizont: mehrere Zeilen „Erwartung: … (Punkte)“; die Summe ergibt die Punkte der Aufgabe.` : ''}
 ${info.types?.length ? `- AUFGABENSTILE – verwende AUSSCHLIESSLICH diese Aufgabenarten, und zwar JEDE mindestens einmal (sinnvoll auf die Prüfung verteilt):
@@ -541,7 +599,9 @@ ${!info.types?.length || info.types.includes('gap') ? `- Lückentexte ohne Wortb
 - Schreibe die Stufe in den Titel jeder Aufgabe (z. B. „### Aufgabe: Grundlagen – …“) und vergib XP nach Stufe: Grundlagen 10, Fortgeschritten 20, Experte 30.
 - Grundlagen = direkte Anwendung des Gelernten; Fortgeschritten = Transfer, mehrere Schritte; Experte = offene, knifflige Probleme oder neue Zusammenhänge.
 - Tipps erinnern an das nötige Vorwissen, statt es neu zu erklären.
-`
+${info.types?.length ? `- AUFGABENSTILE – verwende AUSSCHLIESSLICH diese Aufgabenarten (dazu höchstens kurze Merkkästen), und zwar JEDE mindestens einmal, sinnvoll auf die Stufen verteilt:
+${EXAM_STYLES.filter(s => s[0] !== 'essay' && info.types.includes(s[0])).map(s => `  • ${s[1]}: ${s[3]}`).join('\n')}
+` : ''}`
     : `- Schreibe im Kopf die Zeile „Art: Lernpfad“.
 - Jede Station: kurzer Einstieg, dann Erklärung des Neuen (mit Beispiel, gern einem Schaubild), dann mindestens eine Übung (Aufgabe, Quiz, Lückentext oder Zuordnen), die das Neue sofort festigt.
 - Von einfach zu schwer; jede Station baut auf der vorigen auf. Eine abschließende Station wiederholt das Wichtigste.
@@ -572,7 +632,7 @@ REGELN
 - WICHTIG – alles in EINEN kopierbaren Textblock: Der komplette Lernpfad samt Anhang mit allen Grafiken steht in einem einzigen Codeblock, damit die Lehrkraft nur einmal kopieren und einfügen muss. Beginne den Block mit vier Backticks und „text“ (\`\`\`\`text) und beende ihn mit vier Backticks (\`\`\`\`), damit Code-Beispiele darin den Block nicht vorzeitig schließen. Kein Text davor oder danach, nichts auf mehrere Blöcke oder Nachrichten verteilen.
 - Halte dich exakt an das unten beschriebene PathFinder-Textformat, damit der Lernpfad ohne Nacharbeit eingelesen werden kann.
 - Wenn du Dateien zum Herunterladen erzeugen kannst, liefere denselben Inhalt zusätzlich als eine Textdatei „lernpfad.txt“.
-- Sprache: Deutsch, Schüler werden mit „du“ angesprochen, kurze Sätze.
+- Sprache: Deutsch, Schüler werden mit „du“ angesprochen, kurze Sätze.${/englisch|französisch|franzoesisch|spanisch|italienisch|russisch|latein|griechisch/i.test(info.fach || '') ? ` Ausnahme Fremdsprache (${info.fach.trim()}): Texte, Beispiele, Sätze und Wörter der Aufgaben stehen in der Zielsprache (Latein/Griechisch: Originalsprache mit deutscher Übersetzung, wo nötig); Arbeitsanweisungen auf Deutsch, ab der Mittelstufe gern in der Zielsprache.` : ''}
 ${(info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')) ? `- Schreibe im Kopf die Zeile „Kopfzeile: ${info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')}“.` : ''}${info.lehrplan ? '- Bleib beim Lehrplanbezug: Inhalte, Fachbegriffe und Schwierigkeit passend zu dieser Jahrgangsstufe, nichts vorwegnehmen, was erst später im Lehrplan kommt.\n' : ''}${artRules}- Aufgaben mit eindeutiger Lösung bekommen eine „Antwort:“-Zeile, damit sie automatisch geprüft werden.
 ${ex ? '' : `- Tipps bauen aufeinander auf: zuerst ein kleiner Denkanstoß, zuletzt fast die Lösung.
 - Beim Quiz: 3–4 Antworten, genau eine oder mehrere mit [x], zu falschen Antworten eine kurze Rückmeldung.
