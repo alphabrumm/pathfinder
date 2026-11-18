@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-17g';
+const PF_BUILD = '2026-11-18a';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1421,10 +1421,10 @@ ${d.theme === 'grid' ? `<span class="help">„Hack“: immer dunkel, Raster-Kopf
   /** gängiges KI-Symbol (Funkelsterne) */
   const KI_ICON = '<svg class="ki-ico" viewBox="0 0 24 24" width="1.1em" height="1.1em" aria-hidden="true"><path fill="currentColor" d="M10 2.5l1.7 5.3a3 3 0 0 0 1.9 1.9L19 11.5l-5.4 1.8a3 3 0 0 0-1.9 1.9L10 20.5l-1.7-5.3a3 3 0 0 0-1.9-1.9L1 11.5l5.4-1.8a3 3 0 0 0 1.9-1.9z"/><path fill="currentColor" d="M19 1.5l.8 2.2a1.4 1.4 0 0 0 .8.8l2.2.8-2.2.8a1.4 1.4 0 0 0-.8.8l-.8 2.2-.8-2.2a1.4 1.4 0 0 0-.8-.8l-2.2-.8 2.2-.8a1.4 1.4 0 0 0 .8-.8z"/></svg>';
   /** Hinweis nach „KI-Prompt generieren“: was jetzt in der KI zu tun ist */
-  function kiCopiedPopup(what = 'mit dem Bau des Lernpfads fertig ist') {
+  function kiCopiedPopup(what = 'mit dem Bau des Lernpfads fertig ist', extra = '') {
     const w = document.createElement('div'); w.className = 'ki-pop-bd';
     w.innerHTML = `<div class="ki-pop" role="dialog" aria-modal="true"><div class="ki-pop-ico">${KI_ICON}</div>
-      <p>Der Prompt für deine KI (ByLKI, Mistral AI, Claude, …) wurde generiert und in die Zwischenablage kopiert. Gehe jetzt zu deinem KI-Chatbot und füge den Prompt per Rechtsklick oder Tastenkürzel (⌘V bzw. Strg+V) ein.</p>
+      <p>Der Prompt für deine KI (ByLKI, Mistral AI, Claude, …) wurde generiert und in die Zwischenablage kopiert. Gehe jetzt zu deinem KI-Chatbot und füge den Prompt per Rechtsklick oder Tastenkürzel (⌘V bzw. Strg+V) ein.</p>${extra ? `<p><b>${extra}</b></p>` : ''}
       <p>Warte, bis deine KI ${what}, und kopiere ihr Ergebnis hierher ins Feld „Antwort der KI“.</p>
       <button class="lp-btn" data-ok="1">Erledigt</button></div>`;
     w.addEventListener('click', e => { if (e.target.closest('[data-ok]')) { w.remove(); document.getElementById('kiIn')?.focus(); } });
@@ -1476,7 +1476,7 @@ ${d.theme === 'grid' ? `<span class="help">„Hack“: immer dunkel, Raster-Kopf
    */
   let apiBusy = null;
   const PFADI_WAIT = `<svg class="pfadi-wait" viewBox="0 0 100 100" aria-hidden="true"><ellipse class="pw-shadow" cx="46" cy="90" rx="26" ry="5" fill="#000" opacity=".1"/><g class="pw-body"><g class="pw-ant"><path d="M30 30q-4-9 2-12M60 30q4-9-2-12" fill="none" stroke="#3d2a73" stroke-width="3.5" stroke-linecap="round"/><circle cx="32" cy="18" r="3.5" fill="#FFD54A" stroke="#3d2a73" stroke-width="2.5"/><circle cx="58" cy="18" r="3.5" fill="#FFD54A" stroke="#3d2a73" stroke-width="2.5"/></g><path d="M46 26c21 0 32 15 32 33s-10 28-32 28-32-10-32-28 11-33 32-33z" fill="#9B8AFB" stroke="#3d2a73" stroke-width="3.5"/><path d="M30 70c4 9 28 9 32 0" fill="#C9C0FF" opacity=".7"/><g class="pw-eyes"><ellipse cx="36" cy="54" rx="7" ry="8" fill="#fff" stroke="#3d2a73" stroke-width="2.5"/><ellipse cx="56" cy="54" rx="7" ry="8" fill="#fff" stroke="#3d2a73" stroke-width="2.5"/><g class="pw-pupils"><circle cx="36" cy="55" r="3.2" fill="#3d2a73"/><circle cx="56" cy="55" r="3.2" fill="#3d2a73"/></g></g><path d="M41 71q5 3 10 0" fill="none" stroke="#3d2a73" stroke-width="3" stroke-linecap="round"/><ellipse cx="27" cy="66" rx="4" ry="2.5" fill="#ff8fb1" opacity=".55"/><ellipse cx="65" cy="66" rx="4" ry="2.5" fill="#ff8fb1" opacity=".55"/></g></svg>`;
-  async function runDirect({ prompt, system, target, box, maxTokens, onDone, what = 'den Lernpfad', title = 'Lernpfad wird gebaut' }) {
+  async function runDirect({ prompt, content, system, target, box, maxTokens, onDone, what = 'den Lernpfad', title = 'Lernpfad wird gebaut' }) {
     const A = await loadApi();
     if (!A.hasKey()) { apiSettings(); return null; }
     if (apiBusy) { toast('Claude arbeitet noch …'); return null; }
@@ -1487,7 +1487,8 @@ ${d.theme === 'grid' ? `<span class="help">„Hack“: immer dunkel, Raster-Kopf
     const tick = n => { const l = box.querySelector('#liveTxt'); if (l) l.textContent = `Claude schreibt ${what} … ${n.toLocaleString('de-DE')} Zeichen · ${Math.round((Date.now() - t0) / 1000)} s`; };
     box.scrollIntoView({ block: 'center', behavior: 'smooth' });
     try {
-      const r = await A.ask({ prompt, system, maxTokens, signal: ac.signal, onText: t => { target.value = t; tick(t.length); target.scrollTop = target.scrollHeight; } });
+      const messages = content?.length ? [{ role: 'user', content: [...content, { type: 'text', text: prompt }] }] : undefined; // Arbeitsmaterial vor dem Auftrag
+      const r = await A.ask({ prompt, messages, system, maxTokens, signal: ac.signal, onText: t => { target.value = t; tick(t.length); target.scrollTop = target.scrollHeight; } });
       target.value = r.text;
       box.innerHTML = `<div class="ki-done">✓ Fertig in ${Math.round((Date.now() - t0) / 1000)} s · Kosten ca. ${A.usd(r.usd)} (${(r.usage.input_tokens || 0).toLocaleString('de-DE')} Token rein, ${(r.usage.output_tokens || 0).toLocaleString('de-DE')} raus) · insgesamt bisher ca. ${A.usd(A.settings().spent)}</div>`
         + (r.stop === 'max_tokens' ? '<div class="warn">Die Antwort wurde wegen ihrer Länge abgeschnitten – wähle einen kleineren Umfang oder lass sie korrigieren.</div>' : '');
@@ -1906,7 +1907,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     if (info.min == null) { const m = String(info.umfang || '').match(/(\d+)\s*min/i); info.min = m && L.UMFANG.includes(+m[1]) ? +m[1] : 45; }
     if (!Array.isArray(info.inh)) info.inh = [];
     const save = () => { const p = kiPromptInfo(info, L); info.fach = p.fach; info.klasse = info.jg ? info.jg + '. Klasse' : ''; LS.set(KK, JSON.stringify(info)); };
-    let parsed = null, lastAtt = {}, fileAtt = {}, tok = 0;
+    let parsed = null, lastAtt = {}, fileAtt = {}, tok = 0, matFiles = []; // matFiles: Arbeitsmaterial für Claude (nur mit API-Key, nicht gespeichert)
     const opt = (v, t, sel) => `<option value="${esc(v)}"${String(sel) === String(v) ? ' selected' : ''}>${esc(t)}</option>`;
     el.innerHTML = `<header><b>${KI_ICON} Lernpfad, Challenge oder Prüfung erstellen</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
@@ -1928,6 +1929,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         <div id="kiInh" class="ki-inh"></div>
         <label>Thema <span class="help">(optional – sonst der Lernbereich)</span><input type="text" data-k="thema" value="${esc(info.thema || '')}" placeholder="z. B. Relative Zellbezüge in der Tabellenkalkulation"></label>
         <label>Weitere Bemerkungen für die KI<textarea data-k="extra" rows="3" placeholder="z. B. mit Alltagsbeispiel Pausenverkauf, eine Station als Challenge, zwischen den Stationen eine Animation, die einen Aspekt erklärt">${esc(info.extra || '')}</textarea></label>
+        <div id="kiMat" class="ki-mat"></div>
         <div class="row"><label>Umfang<select data-k="min">${L.UMFANG.map(m => opt(m, m + ' Minuten', info.min)).join('')}</select></label><span></span></div>
         <div class="ki-btns" id="kiDirRow" hidden><button class="lp-btn" data-direct="ki">⚡ Lernpfad direkt erstellen</button></div>
         <div id="kiLive" class="ki-res"></div>
@@ -1944,8 +1946,21 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const res = $('#kiRes', el), openB = $('#kiOpen', el);
     let imgCheck = Promise.resolve();
     let direct = false;
+    const matOk = () => matFiles.filter(m => m.ok);
+    /** Arbeitsmaterial: mit API-Key Dateien anhängen, sonst ankündigen, dass die Lehrkraft es der externen KI selbst mitgibt */
+    const drawMat = () => {
+      const box = $('#kiMat', el), was = info.art === 'pruefung' ? 'die Prüfung' : info.art === 'challenge' ? 'die Challenge' : 'der Lernpfad';
+      const kb = n => n > 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' kB';
+      box.innerHTML = direct ? `<label>Arbeitsmaterial <span class="help">(optional – z. B. Arbeitsblätter, Hefteinträge, Folien, Fotos vom Tafelbild)</span></label>
+        <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Dateien hinzufügen<input type="file" id="kiMatIn" multiple accept=".pdf,.docx,.pptx,.odt,.odp,.txt,.md,image/*" hidden></label><span class="help" style="align-self:center">PDF, Fotos, Word, PowerPoint oder Text – gehen mit an Claude, ${was} entsteht auf dieser Grundlage. Jede Seite kostet etwas mehr.</span></div>
+        ${matFiles.length ? `<ul>${matFiles.map((m, i) => `<li class="${m.ok ? 'good' : 'bad'}">${m.ok ? '✓' : '✗'} ${esc(m.name)} <span class="help">${esc(m.note)}${m.ok ? ' · ' + kb(m.size) : ''}</span> <button class="lp-btn alt sm" data-matdel="${i}" aria-label="entfernen">✕</button></li>`).join('')}</ul>` : ''}`
+        : `<label class="chk"><input type="checkbox" data-kmat="1"${info.matExt ? ' checked' : ''}>Zusätzliches Arbeitsmaterial ergänze ich für die externe KI</label>
+        <span class="help">Der Prompt kündigt dein Material (z. B. Arbeitsblätter) an: Die KI fragt vor dem Erstellen danach, falls du die Dateien nicht gleich mit hochlädst, und baut ${was} darauf auf.</span>`;
+    };
+    /** Prompt-Angaben mit Arbeitsmaterial: viaApi = Dateien gehen direkt mit; sonst wird das Material für die externe KI angekündigt */
+    const withMat = (p, viaApi) => ({ ...p, material: viaApi && matOk().length ? { files: matOk().map(m => m.name) } : (!direct && info.matExt) || (direct && matOk().length) ? { extern: true } : null });
     const refreshApi = () => {
-      const was = direct; direct = A.hasKey(); $('#kiApi', el).innerHTML = apiBarHtml(A);
+      const was = direct; direct = A.hasKey(); $('#kiApi', el).innerHTML = apiBarHtml(A); drawMat();
       $('#kiDirRow', el).hidden = !direct;
       const m = $('#kiManual', el); m.classList.toggle('col', direct);
       if (!direct) m.open = true; else if (!was && !$('#kiIn', el).value.trim()) m.open = false;
@@ -2010,11 +2025,16 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     };
     const ready = () => {
       const p = kiPromptInfo(info, L);
-      if (!p.thema && !p.extra.trim() && !p.basis) { toast('Bitte einen Lernbereich wählen oder ein Thema eintragen'); return null; }
+      if (!p.thema && !p.extra.trim() && !p.basis && !(direct ? matOk().length : info.matExt)) { toast('Bitte einen Lernbereich wählen oder ein Thema eintragen'); return null; }
       if (p.art === 'pruefung' && !p.types?.length) { toast('Bitte mindestens einen Aufgabenstil wählen'); return null; }
       return p;
     };
     el.addEventListener('change', async e => {
+      if (e.target.id === 'kiMatIn' && e.target.files.length) {
+        const fs = [...e.target.files]; e.target.value = '';
+        $('#kiMat', el).insertAdjacentHTML('beforeend', '<div class="help" data-matwait>Dateien werden gelesen …</div>');
+        matFiles.push(...await A.materialOf(fs, T.unzip)); drawMat(); return;
+      }
       if (e.target.id !== 'kiFiles' || !e.target.files.length) return;
       const { att, notes, text } = await T.readFiles([...e.target.files]); Object.assign(fileAtt, att); e.target.value = '';
       if (text) $('#kiIn', el).value = text;
@@ -2027,9 +2047,10 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         info[k] = t.value;
         if (k === 'jg' || k === 'fsel') { info.lb = ''; info.inh = []; drawLb(); }
         if (k === 'lb') { info.inh = []; drawInh(); }
-        if (k === 'art') drawMix();
+        if (k === 'art') { drawMix(); drawMat(); }
         save();
       }
+      if (t.dataset.kmat != null) { info.matExt = t.checked; save(); }
       if (t.dataset.kty != null) { info.types = $$('[data-kty]', el).filter(x => x.checked).map(x => x.dataset.kty); save(); }
       if (t.id === 'kiP1' || t.id === 'kiP2') {
         let p1 = +$('#kiP1', el).value, p2 = +$('#kiP2', el).value;
@@ -2046,12 +2067,13 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (t.dataset.x) { closeDlg(false); return; }
       if (t.dataset.api) { apiSettings(refreshApi); return; }
       if (t.dataset.nobasis) { kiBasis = null; drawBasis(); return; }
+      if (t.dataset.matdel != null) { matFiles.splice(+t.dataset.matdel, 1); drawMat(); return; }
       if (t.dataset.inh) { const lb = L.lernbereiche(info.fsel, +info.jg || 0).find(x => x.id === info.lb); if (!lb) return; info.inh = info.inh.length === lb.k.length ? [] : [...lb.k]; drawInh(); save(); return; }
-      if (t.dataset.copy === 'prompt') { const p = ready(); if (!p) return; if (await copyText(T.promptFor(p, env))) kiCopiedPopup(); else toast('Kopieren ging nicht'); }
+      if (t.dataset.copy === 'prompt') { const p = ready(); if (!p) return; const pm = withMat(p, false); if (await copyText(T.promptFor(pm, env))) kiCopiedPopup(undefined, pm.material ? 'Lade dort auch dein Arbeitsmaterial hoch (z. B. Arbeitsblätter als PDF oder Foto) – sonst fragt die KI zuerst danach.' : ''); else toast('Kopieren ging nicht'); }
       if (t.dataset.direct === 'ki') {
         const p = ready(); if (!p) return;
         const inp = $('#kiIn', el); inp.value = ''; check();
-        const r = await runDirect({ prompt: T.promptFor(p, env), target: inp, box: $('#kiLive', el), maxTokens: 48000, what: p.art === 'challenge' ? 'die Challenge' : p.art === 'pruefung' ? 'die Prüfung' : 'den Lernpfad', title: p.art === 'challenge' ? 'Challenge wird gebaut' : p.art === 'pruefung' ? 'Prüfung wird gebaut' : 'Lernpfad wird gebaut' });
+        const r = await runDirect({ prompt: T.promptFor(withMat(p, true), env), content: matOk().flatMap(m => m.blocks), target: inp, box: $('#kiLive', el), maxTokens: 48000, what: p.art === 'challenge' ? 'die Challenge' : p.art === 'pruefung' ? 'die Prüfung' : 'den Lernpfad', title: p.art === 'challenge' ? 'Challenge wird gebaut' : p.art === 'pruefung' ? 'Prüfung wird gebaut' : 'Lernpfad wird gebaut' });
         if (r != null) {
           check(); await imgCheck;
           if (parsed && !parsed.errors.length) { openB.click(); return; }
