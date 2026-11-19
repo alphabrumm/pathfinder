@@ -558,6 +558,7 @@ body.pf-player { background: var(--bg, #fdf8f3); }
   body:not(.pf-player) .ki-manual.col > summary { color: var(--dk-ink); }
   body:not(.pf-player) .ki-done { color: #7fd69c; }
   body:not(.pf-player) .ki-fmt { background: var(--dk-bg); color: var(--dk-ink); }
+  body:not(.pf-player) .ex-plink { color: #9fb0ff !important; }
   body:not(.pf-player) .ki-res .good { color: #7fd69c; } body:not(.pf-player) .ki-res .bad { color: #ff8f80; } body:not(.pf-player) .ki-res .warn { color: #f6c35a; }
   body:not(.pf-player) .ed-certprev { background: #fff; color: #222; } /* wie das spätere PDF: Papier */
   body:not(.pf-player) .ex-tri input[type=range]::-webkit-slider-thumb { border-color: #ece9f4; background: #252231; }
@@ -756,3 +757,8 @@ label.lp-btn { display: inline-flex; align-items: center; justify-content: cente
 .lp-order .gchip.para { font-weight: 400; text-align: left; line-height: 1.45; padding: 8px 12px; }
 .lp-order .gchip.para i { font-style: normal; font-weight: 700; margin-right: 8px; color: var(--a1); }
 .ed-pal button.pin { border-left: 4px solid #8a72e0; }
+/* Neue Prüfung: fertige Prüfung laden, Prompt für externe KI */
+.ex-choices .tx .ex-plink { display: inline-block; margin-top: 4px; opacity: 1; color: #4a5fb8; text-decoration: underline; text-underline-offset: 2px; font-size: 13px; cursor: pointer; }
+.ed-form .help .ex-plink { color: #4a5fb8; text-decoration: underline; cursor: pointer; }
+.ex-steps { margin: 4px 0 2px; padding-left: 22px; font-size: 14px; line-height: 1.5; }
+#exPrompt { max-height: 340px; }

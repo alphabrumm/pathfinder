@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-18d';
+const PF_BUILD = '2026-11-19a';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -2455,18 +2455,64 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
           ${opts.examFromLernpfad === false ? '' : `<button data-v="lp"><span class="ic">📘</span><span class="tx"><b>Aus einem Lernpfad</b><span>Aufgaben eines Lernpfads übernehmen, mit dem deine Klasse gelernt hat – oder die KI neue Prüfungsaufgaben zu seinem Inhalt schreiben lassen.</span></span></button>`}
           <button data-v="ki"><span class="ic">${KI_ICON}</span><span class="tx"><b>Mit KI erstellen</b><span>Jahrgangsstufe, Fach und Lernbereich wählen – die KI schreibt die ganze Prüfung.</span></span></button>
           <button data-v="new"><span class="ic">＋</span><span class="tx"><b>Leere Prüfung</b><span>Aufgaben selbst zusammenstellen.</span></span></button>
+          <button data-v="load"><span class="ic">⤒</span><span class="tx"><b>Fertige Prüfung laden</b><span>Eine Prüfung im PathFinder-Textformat einfügen oder als Datei öffnen – z. B. von einer anderen KI erstellt. <span class="ex-plink" data-v="prompt" role="link" tabindex="0">Prompt für externe KI anzeigen ›</span></span></span></button>
         </div></div>`; return; }
+      if (view === 'prompt') {
+        el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>Prompt für externe KI</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
+          <span class="help">Mit diesem Prompt erstellt jede KI (ByLKI, ChatGPT, Gemini, Copilot, Mistral, Claude …) eine Prüfung, die ${esc(appName)} ohne Nacharbeit einlesen kann. Die KI fragt zuerst nach Fach, Jahrgangsstufe, Thema, Zeit und Aufgabenarten.</span>
+          <ol class="ex-steps"><li><b>Prompt kopieren</b> und in den KI-Chat einfügen.</li><li>Die <b>Rückfragen der KI</b> beantworten – gern mit Arbeitsblättern als Datei.</li><li>Den <b>Textblock</b> der Antwort kopieren (oder die Datei pruefung.txt laden).</li><li>Hier unter <b>Fertige Prüfung laden</b> einfügen.</li></ol>
+          <div class="ki-btns"><button class="lp-btn" data-pcopy="1">📋 Prompt kopieren</button><button class="lp-btn alt" data-v="load">Weiter: Prüfung laden ›</button></div>
+          <pre class="ki-fmt" id="exPrompt">lädt …</pre></div>`;
+        loadText().then(T => { const p = $('#exPrompt', el); if (p) p.textContent = promptText(T); });
+        return;
+      }
+      if (view === 'load') {
+        el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>Fertige Prüfung laden</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
+          <span class="help">Füge den Text der Prüfung ein (beginnt mit „# Titel“) oder wähle eine Datei. Noch keine Prüfung? <span class="ex-plink" data-v="prompt" role="link" tabindex="0">Prompt für externe KI anzeigen ›</span></span>
+          <textarea id="exIn" rows="10" spellcheck="false" placeholder="# Titel der Prüfung&#10;Art: Prüfung&#10;&#10;## Station: Teil A | …">${esc(pasted)}</textarea>
+          <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Datei wählen<input type="file" id="exFiles" multiple accept=".txt,.md,.json,.html,.htm,.zip,.svg,.png,.gif,.jpg,.jpeg,.webp" hidden></label><span class="help" style="align-self:center">pruefung.txt einer KI (gern mit Bildern), eine Prüfungsdatei (.json) oder ein PathFinder-Export (.html, .zip)</span></div>
+          <div id="exRes" class="ki-res"></div>
+          <div class="ki-btns"><button class="lp-btn" id="exOpen" disabled>＋ Als neue Prüfung öffnen</button></div></div>`;
+        exCheck(); return;
+      }
       const L = list();
       el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>Aus einem Lernpfad</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
         <span class="help">Wähle den Lernpfad, mit dem deine Klasse gelernt hat. Er selbst bleibt unverändert.</span>
         <div class="ex-lplist">${L.length ? L.map(d => `<div class="ex-lp${sel === d.id ? ' on' : ''}"><button data-pick="${esc(d.id)}"><b>${d.form === 'challenge' ? '⚡' : '📘'} ${esc(d.title)}</b><span>zuletzt ${new Date(d.t).toLocaleDateString('de-DE')}</span></button>${sel === d.id ? `<div class="ex-lpact"><button class="lp-btn" data-take="${esc(d.id)}">Aufgaben übernehmen</button><button class="lp-btn alt" data-kib="${esc(d.id)}">${KI_ICON} Neue Aufgaben mit KI</button></div><span class="help"><b>Übernehmen:</b> Quiz, Lückentexte, Zuordnungen und Aufgaben werden Prüfungsaufgaben mit Punkten; Tipps, Sperren und Zertifikat fallen weg. <b>Neue Aufgaben mit KI:</b> Die KI schreibt eine neue Prüfung zu genau diesen Inhalten.</span>` : ''}</div>`).join('') : '<span class="help">In diesem Browser sind keine Lernpfade gespeichert.</span>'}</div>
         <button class="lp-btn alt" data-file="1">⤒ Lernpfad-Datei wählen</button><span class="help">Eine aus PathFinder exportierte HTML-Datei oder ein SCORM-Paket (.zip). Ihre Aufgaben werden übernommen.</span></div>`;
     };
+    // „Fertige Prüfung laden“: eingefügter Text oder Datei im PathFinder-Textformat
+    let pasted = '', files = {}, parsed = null;
+    const promptText = T => T.promptFor({ art: 'pruefung', ask: true }, textEnv());
+    const exCheck = async () => {
+      const res = $('#exRes', el), ob = $('#exOpen', el); if (!res) return;
+      if (!pasted.trim()) { parsed = null; ob.disabled = true; res.innerHTML = Object.keys(files).length ? `<div class="good">✓ ${Object.keys(files).length} Bild${Object.keys(files).length === 1 ? '' : 'er'} geladen – jetzt den Text der Prüfung einfügen.</div>` : ''; return; }
+      const T = await loadText(); parsed = T.parseText(pasted, { ...textEnv(), attachments: {}, files });
+      const { errors, warnings, stats } = parsed;
+      res.innerHTML = errors.length
+        ? `<div class="bad">✗ ${errors.length} Fehler – bitte korrigieren oder die KI bitten, genau diese Stellen zu korrigieren:</div><ul>${errors.map(x => `<li>Zeile ${x.n}: ${esc(x.m)}</li>`).join('')}</ul>`
+        : `<div class="good">✓ Erkannt: „${esc(plain(parsed.doc.title))}“ · ${stats.stations} Station${stats.stations === 1 ? '' : 'en'} · ${stats.tasks} Aufgabe${stats.tasks === 1 ? '' : 'n'}${parsed.doc.form !== 'pruefung' ? ' · wird zur Prüfung umgewandelt' : ''}</div>`
+          + (warnings.length ? `<div class="warn">Hinweise:</div><ul>${warnings.map(x => `<li>Zeile ${x.n}: ${esc(x.m)}</li>`).join('')}</ul>` : '');
+      ob.disabled = !!errors.length;
+    };
     draw();
+    el.addEventListener('input', e => { if (e.target.id === 'exIn') { pasted = e.target.value; exCheck(); } });
+    el.addEventListener('change', async e => {
+      if (e.target.id !== 'exFiles' || !e.target.files.length) return;
+      const fs = [...e.target.files]; e.target.value = '';
+      const whole = fs.find(f => /\.(json|html?|zip)$/i.test(f.name)); // gespeicherte Prüfung oder PathFinder-Export: direkt öffnen
+      if (whole) { closeDlg(false); convertNext = true; try { await openFile(whole); } finally { convertNext = false; } return; }
+      const T = await loadText(), r = await T.readFiles(fs); Object.assign(files, r.att);
+      if (r.text) { pasted = r.text; $('#exIn', el).value = r.text; }
+      await exCheck(); if (r.notes.some(n => !n.startsWith('✓'))) $('#exRes', el).insertAdjacentHTML('beforeend', `<ul>${r.notes.filter(n => !n.startsWith('✓')).map(n => `<li>${esc(n)}</li>`).join('')}</ul>`);
+    });
+    el.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList?.contains('ex-plink')) { e.preventDefault(); e.stopPropagation(); view = 'prompt'; draw(); } });
     el.addEventListener('click', async e => {
-      const t = e.target.closest('button'); if (!t) return;
+      const t = e.target.closest('.ex-plink, button'); if (!t) return;
       if (t.dataset.x) { closeDlg(false); return; }
-      if (t.dataset.v === 'start' || t.dataset.v === 'lp') { view = t.dataset.v; sel = null; draw(); return; }
+      if (t.dataset.v === 'start' || t.dataset.v === 'lp' || t.dataset.v === 'load' || t.dataset.v === 'prompt') { view = t.dataset.v; sel = null; draw(); return; }
+      if (t.dataset.pcopy) { const T = await loadText(); toast(await copyText(promptText(T)) ? '📋 Prompt kopiert – jetzt im KI-Chat einfügen' : 'Kopieren ging nicht'); return; }
+      if (t.id === 'exOpen' && parsed && !parsed.errors.length) { const d = parsed.doc; if (!plain(d.kicker || '').trim() && opts.ki?.kopf) d.kicker = esc(opts.ki.kopf); closeDlg(false); if (d.form !== 'pruefung') convertNext = true; openDoc(d); toast(`„${esc(plain(d.title))}“ geladen – prüfe Aufgaben und Punkte im Editor.`); return; }
       if (t.dataset.v === 'new') { closeDlg(false); const d = emptyDoc('pruefung'); if (opts.ki?.kopf) d.kicker = opts.ki.kopf; openDoc(d); toast('Leere Prüfung angelegt – Titel antippen, Aufgaben über ＋ einfügen'); return; }
       if (t.dataset.v === 'ki') { closeDlg(false); openKI({ art: 'pruefung' }); return; }
       if (t.dataset.pick) { sel = sel === t.dataset.pick ? null : t.dataset.pick; draw(); return; }

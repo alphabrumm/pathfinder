@@ -586,9 +586,11 @@ export function promptFor(info, env) {
 - Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle, Reihenfolge, Freitext) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken, Markieren und Sortieren etwa 1 Punkt je zwei Wörter bzw. Begriffe, ein Satzpuzzle 1–2 Punkte.
 ${!info.types?.length || info.types.includes('short') ? `- Rechenaufgaben mit eindeutigem Ergebnis als „### Aufgabe“ mit „Antwort:“ (Zahl, ohne Einheit, mehrere richtige mit | trennen) – sie werden automatisch bewertet. Schreibe die erwartete Einheit in den Auftrag.` : ''}
 ${!info.types?.length || info.types.includes('essay') ? `- Offene Aufgaben (erklären, begründen, beschreiben, beurteilen) als „### Freitext“ mit Erwartungshorizont: mehrere Zeilen „Erwartung: … (Punkte)“; die Summe ergibt die Punkte der Aufgabe.` : ''}
-${info.types?.length ? `- AUFGABENSTILE – verwende AUSSCHLIESSLICH diese Aufgabenarten, und zwar JEDE mindestens einmal (sinnvoll auf die Prüfung verteilt):
+${info.ask ? `- AUFGABENARTEN – verwende die Arten, die die Lehrkraft gewählt hat, und zwar JEDE mindestens einmal; ohne Vorgabe eine abwechslungsreiche, zum Thema passende Auswahl (Lösungsschritte nur bei Rechenwegen):
+${EXAM_STYLES.map(s => `  • ${s[1]}: ${s[3]}`).join('\n')}
+` : ''}${info.types?.length ? `- AUFGABENSTILE – verwende AUSSCHLIESSLICH diese Aufgabenarten, und zwar JEDE mindestens einmal (sinnvoll auf die Prüfung verteilt):
 ${EXAM_STYLES.filter(s => info.types.includes(s[0])).map(s => `  • ${s[1]}: ${s[3]}`).join('\n')}
-` : ''}- Anforderungsbereiche: etwa ${mix[0]} % der Punkte Reproduktion (AFB I), ${mix[1]} % Anwendung und Transfer (AFB II), ${mix[2]} % Problemlösen und Beurteilen (AFB III); von leicht nach schwer.
+` : ''}- Anforderungsbereiche: ${info.ask ? 'wie von der Lehrkraft angegeben, sonst ' : ''}etwa ${mix[0]} % der Punkte Reproduktion (AFB I), ${mix[1]} % Anwendung und Transfer (AFB II), ${mix[2]} % Problemlösen und Beurteilen (AFB III); von leicht nach schwer.
 ${!info.types?.length || info.types.includes('quiz') ? `- Quizfragen mit genau einer richtigen Antwort und plausiblen falschen Antworten; Rückmeldungen nach // sind nicht nötig.` : ''}
 ${!info.types?.length || info.types.includes('gap') ? `- Lückentexte ohne Wortbank werden tolerant bewertet (Groß/Klein egal); mehrdeutige Lücken vermeiden oder alle richtigen Antworten mit | angeben.` : ''}
 `
@@ -622,18 +624,29 @@ Die Lehrkraft gibt dir zusätzlich eigenes Arbeitsmaterial mit (z. B. Arbeitsbl�
 `
     : mat.extern ? `ARBEITSMATERIAL DER LEHRKRAFT: das mitgeschickte Material (siehe ganz oben) ist die Grundlage. ${matRule}
 ` : '';
-  return `${matTop}${intro}
+  const askTop = info.ask ? `ZUERST – RÜCKFRAGE AN DIE LEHRKRAFT
+Erstelle NOCH NICHTS. Frage die Lehrkraft zuerst in EINER kurzen, übersichtlichen Nachricht nach allem, was sie nicht schon geschrieben hat:
+1. Fach, Jahrgangsstufe und Schulart
+2. Thema bzw. Lernbereich (gern mit Lehrplanbezug) und welche Inhalte geprüft werden sollen
+3. Bearbeitungszeit in Minuten
+4. gewünschte Aufgabenarten – biete die Liste unter AUFGABENARTEN (weiter unten) zur Auswahl an – und den Anteil der Anforderungsbereiche (Vorschlag: 40 % AFB I, 40 % AFB II, 20 % AFB III)
+5. ob sie Arbeitsmaterial mitgibt (Arbeitsblätter, Hefteinträge, Fotos vom Tafelbild) – dann soll sie es jetzt hochladen oder einfügen
+Warte auf die Antwort. Diese Rückfrage ist die einzige Ausnahme von der Regel, nur mit einem Codeblock zu antworten. Danach erstellst du die Prüfung genau nach diesen Angaben; liegt Arbeitsmaterial vor, baut sie darauf auf. ${matRule}
 
-THEMA: ${f('thema', info.basisTitle ? `Inhalte des Lernpfads „${info.basisTitle}“` : '[bitte Thema eintragen]')}
+` : '';
+  return `${askTop}${matTop}${intro}
+
+${info.ask ? `THEMA, FACH, ZIELGRUPPE, UMFANG: laut Antwort der Lehrkraft auf deine Rückfrage
+` : `THEMA: ${f('thema', info.basisTitle ? `Inhalte des Lernpfads „${info.basisTitle}“` : '[bitte Thema eintragen]')}
 ${info.fach?.trim() ? 'FACH: ' + info.fach.trim() + '\n' : ''}ZIELGRUPPE: ${f('klasse', '[Jahrgangsstufe / Schulart]')}
 UMFANG: ${f('umfang', 'etwa 4 Stationen, ca. 45 Minuten')}
-${info.lehrplan ? 'LEHRPLANBEZUG: ' + info.lehrplan + '\n' : ''}${info.inhalte?.length ? 'ZU BEHANDELNDE LEHRPLANINHALTE: ' + info.inhalte.join('; ') + '\n' : info.lehrplan && info.alleInhalte?.length ? 'INHALTE DES LERNBEREICHS (sinnvoll auswählen, passend zum Umfang): ' + info.alleInhalte.join('; ') + '\n' : ''}${info.basis ? 'GRUNDLAGE – der Lernpfad, mit dem die Schüler gelernt haben. Prüfe genau diese Inhalte und Fachbegriffe, aber formuliere neue Aufgaben, statt die Übungen des Lernpfads zu kopieren:\n<<<\n' + info.basis.trim() + '\n>>>\n' : ''}${matBody}${info.extra?.trim() ? 'WEITERE WÜNSCHE DER LEHRKRAFT (bitte genau umsetzen): ' + info.extra.trim() + '\n' : ''}
+`}${info.lehrplan ? 'LEHRPLANBEZUG: ' + info.lehrplan + '\n' : ''}${info.inhalte?.length ? 'ZU BEHANDELNDE LEHRPLANINHALTE: ' + info.inhalte.join('; ') + '\n' : info.lehrplan && info.alleInhalte?.length ? 'INHALTE DES LERNBEREICHS (sinnvoll auswählen, passend zum Umfang): ' + info.alleInhalte.join('; ') + '\n' : ''}${info.basis ? 'GRUNDLAGE – der Lernpfad, mit dem die Schüler gelernt haben. Prüfe genau diese Inhalte und Fachbegriffe, aber formuliere neue Aufgaben, statt die Übungen des Lernpfads zu kopieren:\n<<<\n' + info.basis.trim() + '\n>>>\n' : ''}${matBody}${info.extra?.trim() ? 'WEITERE WÜNSCHE DER LEHRKRAFT (bitte genau umsetzen): ' + info.extra.trim() + '\n' : ''}
 REGELN
 - WICHTIG – alles in EINEN kopierbaren Textblock: Der komplette Lernpfad samt Anhang mit allen Grafiken steht in einem einzigen Codeblock, damit die Lehrkraft nur einmal kopieren und einfügen muss. Beginne den Block mit vier Backticks und „text“ (\`\`\`\`text) und beende ihn mit vier Backticks (\`\`\`\`), damit Code-Beispiele darin den Block nicht vorzeitig schließen. Kein Text davor oder danach, nichts auf mehrere Blöcke oder Nachrichten verteilen.
 - Halte dich exakt an das unten beschriebene PathFinder-Textformat, damit der Lernpfad ohne Nacharbeit eingelesen werden kann.
-- Wenn du Dateien zum Herunterladen erzeugen kannst, liefere denselben Inhalt zusätzlich als eine Textdatei „lernpfad.txt“.
+- Wenn du Dateien zum Herunterladen erzeugen kannst, liefere denselben Inhalt zusätzlich als eine Textdatei „${ex ? 'pruefung' : ch ? 'challenge' : 'lernpfad'}.txt“.
 - Sprache: Deutsch, Schüler werden mit „du“ angesprochen, kurze Sätze.${/englisch|französisch|franzoesisch|spanisch|italienisch|russisch|latein|griechisch/i.test(info.fach || '') ? ` Ausnahme Fremdsprache (${info.fach.trim()}): Texte, Beispiele, Sätze und Wörter der Aufgaben stehen in der Zielsprache (Latein/Griechisch: Originalsprache mit deutscher Übersetzung, wo nötig); Arbeitsanweisungen auf Deutsch, ab der Mittelstufe gern in der Zielsprache.` : ''}
-${(info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')) ? `- Schreibe im Kopf die Zeile „Kopfzeile: ${info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')}“.` : ''}${info.lehrplan ? '- Bleib beim Lehrplanbezug: Inhalte, Fachbegriffe und Schwierigkeit passend zu dieser Jahrgangsstufe, nichts vorwegnehmen, was erst später im Lehrplan kommt.\n' : ''}${artRules}- Aufgaben mit eindeutiger Lösung bekommen eine „Antwort:“-Zeile, damit sie automatisch geprüft werden.
+${info.ask ? '- Schreibe im Kopf die Zeile „Kopfzeile: <Fach> · <Jahrgangsstufe>“ (mit den Angaben der Lehrkraft).\n' : ''}${(info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')) ? `- Schreibe im Kopf die Zeile „Kopfzeile: ${info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')}“.` : ''}${info.lehrplan ? '- Bleib beim Lehrplanbezug: Inhalte, Fachbegriffe und Schwierigkeit passend zu dieser Jahrgangsstufe, nichts vorwegnehmen, was erst später im Lehrplan kommt.\n' : ''}${artRules}- Aufgaben mit eindeutiger Lösung bekommen eine „Antwort:“-Zeile, damit sie automatisch geprüft werden.
 ${ex ? '' : `- Tipps bauen aufeinander auf: zuerst ein kleiner Denkanstoß, zuletzt fast die Lösung.
 - Beim Quiz: 3–4 Antworten, genau eine oder mehrere mit [x], zu falschen Antworten eine kurze Rückmeldung.
 `}- Bilder und Animationen: Zeichne passende Abbildungen selbst als SVG – im Abschnitt ## Anhang am Ende als „name: <svg …> … </svg>“, oben mit anhang:name einbinden. SVG darf animiert sein (<animate>, <animateTransform>, <animateMotion> oder CSS-@keyframes in <style> innerhalb des SVG). Immer viewBox angeben, gut lesbare Schrift (font-family="sans-serif"), keine Skripte, keine externen Links, Schriften oder Bilder. Lieber wenige, aussagekräftige Grafiken (z. B. Schaubild, Ablauf, Beispiel-Tabelle) als Deko.

@@ -17,7 +17,10 @@ Neben „Lernpfad“ und „Challenge“ gibt es das Format **Digitale Prüfung*
 oder ⚙ Einstellungen → Art). Es ist die Grundlage für die Prüfungsplattform **Probe**:
 
 * Eine neue Prüfung beginnt mit der Wahl: **aus einem Lernpfad** (Aufgaben übernehmen oder von der KI neue Aufgaben zu seinem Inhalt
-  schreiben lassen), **mit KI** oder **leer**. Der Lernpfad selbst bleibt unverändert.
+  schreiben lassen), **mit KI**, **leer** oder als **fertige Prüfung laden** (Text im PathFinder-Format einfügen oder Datei wählen,
+  z. B. von einer externen KI). Der Lernpfad selbst bleibt unverändert. Dort gibt es auch einen allgemeinen **Prompt für externe KI**:
+  Die KI fragt zuerst nach Fach, Jahrgangsstufe, Thema, Zeit, Aufgabenarten und Material und liefert dann eine einlesbare Prüfung
+  (`promptFor({ art: 'pruefung', ask: true }, env)`).
 * `index.html?nur=pruefung` zeigt PathFinder so, wie er in Probe eingebettet ist: nur Prüfungen, Lernpfade werden beim Öffnen zur Prüfung.
 * Vorgaben für den KI-Dialog: `?fach=Physik&jg=8&min=45` (statt `jg` auch `klasse=8b`, dazu `kopf=…` für die Kopfzeile) bzw.
   `startPathFinder({ ki: { fach, jg, min, kopf } })` – Fach, Jahrgangsstufe und Umfang sind dann schon ausgefüllt.
