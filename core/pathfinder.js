@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-19b';
+const PF_BUILD = '2026-11-19c';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -2026,7 +2026,9 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const save = () => { const p = kiPromptInfo(info, L); info.fach = p.fach; info.klasse = info.jg ? info.jg + '. Klasse' : ''; LS.set(KK, JSON.stringify(info)); };
     let parsed = null, lastAtt = {}, fileAtt = {}, tok = 0, matFiles = []; // matFiles: Arbeitsmaterial für Claude (nur mit API-Key, nicht gespeichert)
     const opt = (v, t, sel) => `<option value="${esc(v)}"${String(sel) === String(v) ? ' selected' : ''}>${esc(t)}</option>`;
-    el.innerHTML = `<header><b>${KI_ICON} Lernpfad, Challenge oder Prüfung erstellen</b><button class="ok" data-x="1">Schließen</button></header>
+    const EX1 = FORMS_OK.length === 1 && FORMS_OK[0] === 'pruefung'; // nur Prüfungen (eingebettet in Probe): Beschriftungen sprechen von der Prüfung
+    const W = EX1 ? { a: 'Prüfung', den: 'die Prüfung', neu: 'neue Prüfung', head: 'Prüfung erstellen', file: 'pruefung.txt' } : { a: 'Lernpfad', den: 'den Lernpfad', neu: 'neuen Lernpfad', head: 'Lernpfad, Challenge oder Prüfung erstellen', file: 'lernpfad.txt' };
+    el.innerHTML = `<header><b>${KI_ICON} ${W.head}</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
         <div class="ki-api" id="kiApi"></div>
         <div class="ki-step"><span class="n">1</span><b>Beschreibung</b></div>
@@ -2048,16 +2050,16 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         <label>Weitere Bemerkungen für die KI<textarea data-k="extra" rows="3" placeholder="z. B. mit Alltagsbeispiel Pausenverkauf, eine Station als Challenge, zwischen den Stationen eine Animation, die einen Aspekt erklärt">${esc(info.extra || '')}</textarea></label>
         <div id="kiMat" class="ki-mat"></div>
         <div class="row"><label>Umfang<select data-k="min">${L.UMFANG.map(m => opt(m, m + ' Minuten', info.min)).join('')}</select></label><span></span></div>
-        <div class="ki-btns" id="kiDirRow" hidden><button class="lp-btn" data-direct="ki">⚡ Lernpfad direkt erstellen</button></div>
+        <div class="ki-btns" id="kiDirRow" hidden><button class="lp-btn" data-direct="ki">⚡ ${W.a} direkt erstellen</button></div>
         <div id="kiLive" class="ki-res"></div>
         <details class="ki-manual" id="kiManual" open><summary>Mit Prompt und Fremd-KI arbeiten</summary>
-        <div class="ki-btns"><button class="lp-btn" data-copy="prompt">${KI_ICON} KI-Prompt generieren</button><button class="lp-btn alt" data-copy="doc" title="Den geöffneten Lernpfad als Text – z. B. um ihn von der KI überarbeiten zu lassen">📋 Aktuellen Lernpfad als Text</button><button class="lp-btn alt" data-copy="show">Format ansehen</button></div>
+        <div class="ki-btns"><button class="lp-btn" data-copy="prompt">${KI_ICON} KI-Prompt generieren</button><button class="lp-btn alt" data-copy="doc" title="${EX1 ? 'Die geöffnete Prüfung' : 'Den geöffneten Lernpfad'} als Text – z. B. um ${EX1 ? 'sie' : 'ihn'} von der KI überarbeiten zu lassen">📋 ${EX1 ? 'Aktuelle Prüfung' : 'Aktuellen Lernpfad'} als Text</button><button class="lp-btn alt" data-copy="show">Format ansehen</button></div>
         <div class="ki-step"><span class="n">2</span><b>Antwort der KI hier einfügen</b></div>
-        <textarea id="kiIn" rows="10" spellcheck="false" placeholder="# Titel des Lernpfads&#10;&#10;## Station: …"></textarea>
-        <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Datei der KI laden<input type="file" id="kiFiles" multiple accept=".txt,.md,.svg,.png,.gif,.jpg,.jpeg,.webp,.zip" hidden></label><span class="help" style="align-self:center">statt Einfügen: lernpfad.txt – auch zusätzliche Bilder (.svg, .png, .gif, ZIP)</span></div>
+        <textarea id="kiIn" rows="10" spellcheck="false" placeholder="# Titel ${EX1 ? 'der Prüfung' : 'des Lernpfads'}&#10;&#10;## Station: …"></textarea>
+        <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Datei der KI laden<input type="file" id="kiFiles" multiple accept=".txt,.md,.svg,.png,.gif,.jpg,.jpeg,.webp,.zip" hidden></label><span class="help" style="align-self:center">statt Einfügen: ${W.file} – auch zusätzliche Bilder (.svg, .png, .gif, ZIP)</span></div>
         <div id="kiFileList" class="ki-res"></div>
         <div id="kiRes" class="ki-res"></div>
-        <div class="ki-btns"><button class="lp-btn" id="kiOpen" disabled>＋ Als neuen Lernpfad öffnen</button></div>
+        <div class="ki-btns"><button class="lp-btn" id="kiOpen" disabled>＋ Als ${W.neu} öffnen</button></div>
         </details>
       </div>`;
     const res = $('#kiRes', el), openB = $('#kiOpen', el);
@@ -2124,7 +2126,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (!src.trim()) { res.innerHTML = ''; openB.disabled = true; parsed = null; return; }
       if (!/^\s*(```[\w-]*\s*)?#\s/.test(src) && /```\s*svg/i.test(src) && !/^##\s/m.test(src.replace(/^##\s+(anhang|bilder)\s*$/gim, ''))) {
         // nur ein Anhang eingefügt? Dann wie eine Anhang-Datei behandeln
-        Object.assign(fileAtt, T.readAttachments(src)); $('#kiIn', el).value = ''; res.innerHTML = `<div class="good">✓ ${Object.keys(fileAtt).length} Bild${Object.keys(fileAtt).length === 1 ? '' : 'er'} als Anhang übernommen – jetzt den Lernpfad-Text einfügen.</div>`; return;
+        Object.assign(fileAtt, T.readAttachments(src)); $('#kiIn', el).value = ''; res.innerHTML = `<div class="good">✓ ${Object.keys(fileAtt).length} Bild${Object.keys(fileAtt).length === 1 ? '' : 'er'} als Anhang übernommen – jetzt den Text ${EX1 ? 'der Prüfung' : 'des Lernpfads'} einfügen.</div>`; return;
       }
       parsed = T.parseText(src, { ...env, attachments: lastAtt, files: fileAtt });
       const { errors, warnings, stats } = parsed;
@@ -2187,7 +2189,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (t.dataset.nobasis) { kiBasis = null; drawBasis(); return; }
       if (t.dataset.matdel != null) { matFiles.splice(+t.dataset.matdel, 1); drawMat(); return; }
       if (t.dataset.inh) { const lb = L.lernbereiche(info.fsel, +info.jg || 0).find(x => x.id === info.lb); if (!lb) return; info.inh = info.inh.length === lb.k.length ? [] : [...lb.k]; drawInh(); save(); return; }
-      if (t.dataset.copy === 'prompt') { const p = ready(); if (!p) return; const pm = withMat(p, false); if (await copyText(T.promptFor(pm, env))) kiCopiedPopup(undefined, pm.material ? 'Lade dort auch dein Arbeitsmaterial hoch (z. B. Arbeitsblätter als PDF oder Foto) – sonst fragt die KI zuerst danach.' : ''); else toast('Kopieren ging nicht'); }
+      if (t.dataset.copy === 'prompt') { const p = ready(); if (!p) return; const pm = withMat(p, false); if (await copyText(T.promptFor(pm, env))) kiCopiedPopup(EX1 ? 'mit der Prüfung fertig ist' : undefined, pm.material ? 'Lade dort auch dein Arbeitsmaterial hoch (z. B. Arbeitsblätter als PDF oder Foto) – sonst fragt die KI zuerst danach.' : ''); else toast('Kopieren ging nicht'); }
       if (t.dataset.direct === 'ki') {
         const p = ready(); if (!p) return;
         const inp = $('#kiIn', el); inp.value = ''; check();
@@ -2204,12 +2206,12 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
           + parsed.errors.map(x => `- Zeile ${x.n}: ${x.m}`).join('\n')
           + '\n\nKorrigiere genau diese Stellen und lass alles andere unverändert. Antworte nur mit dem vollständigen Lernpfad in einem Codeblock (vier Backticks, „text“).\n\n'
           + T.formatHelp(env) + '\nLERNPFAD:\n' + src;
-        const r = await runDirect({ prompt, target: inp, box: $('#kiLive', el), maxTokens: 48000, what: 'die Korrektur', title: 'Lernpfad wird repariert' });
+        const r = await runDirect({ prompt, target: inp, box: $('#kiLive', el), maxTokens: 48000, what: 'die Korrektur', title: `${W.a} wird repariert` });
         if (r == null) inp.value = src; check();
         if (r != null) { await imgCheck; if (parsed && !parsed.errors.length) { openB.click(); return; } }
       }
       if (t.dataset.copy === 'doc') { const o = {}; const txt = T.docToText(doc, env, o); lastAtt = Object.fromEntries(Object.entries(o.attachments).map(([k, v]) => [k.toLowerCase(), v])); }
-      if (t.dataset.copy === 'doc') toast(await copyText('Überarbeite diesen Lernpfad. Behalte das Format genau bei und antworte nur mit dem vollständigen Lernpfad in einem Codeblock. Verweise wie anhang:bild1 ohne Eintrag im Anhang einfach stehen lassen.\n\n' + T.formatHelp(env) + '\nLERNPFAD:\n' + T.docToText(doc, env)) ? '📋 Lernpfad als Text kopiert (mit Formatbeschreibung)' : 'Kopieren ging nicht');
+      if (t.dataset.copy === 'doc') toast(await copyText('Überarbeite diesen Lernpfad. Behalte das Format genau bei und antworte nur mit dem vollständigen Lernpfad in einem Codeblock. Verweise wie anhang:bild1 ohne Eintrag im Anhang einfach stehen lassen.\n\n' + T.formatHelp(env) + '\nLERNPFAD:\n' + T.docToText(doc, env)) ? `📋 ${W.a} als Text kopiert (mit Formatbeschreibung)` : 'Kopieren ging nicht');
       if (t.dataset.copy === 'show') { const pre = document.createElement('pre'); pre.className = 'ki-fmt'; pre.textContent = T.formatHelp(env); t.closest('.ki-btns').after(pre); t.remove(); }
       if (t.id === 'kiOpen' && parsed && !parsed.errors.length) {
         const d = parsed.doc; if (!plain(d.kicker || '').trim()) d.kicker = esc(kiPromptInfo(info, L).kopf); closeDlg(false); openDoc(d); toast(`„${esc(d.title)}“ angelegt – jetzt kannst du alles im Editor anpassen.`);
