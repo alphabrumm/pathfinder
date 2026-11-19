@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-19a';
+const PF_BUILD = '2026-11-19b';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -2470,7 +2470,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>Fertige Prüfung laden</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
           <span class="help">Füge den Text der Prüfung ein (beginnt mit „# Titel“) oder wähle eine Datei. Noch keine Prüfung? <span class="ex-plink" data-v="prompt" role="link" tabindex="0">Prompt für externe KI anzeigen ›</span></span>
           <textarea id="exIn" rows="10" spellcheck="false" placeholder="# Titel der Prüfung&#10;Art: Prüfung&#10;&#10;## Station: Teil A | …">${esc(pasted)}</textarea>
-          <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Datei wählen<input type="file" id="exFiles" multiple accept=".txt,.md,.json,.html,.htm,.zip,.svg,.png,.gif,.jpg,.jpeg,.webp" hidden></label><span class="help" style="align-self:center">pruefung.txt einer KI (gern mit Bildern), eine Prüfungsdatei (.json) oder ein PathFinder-Export (.html, .zip)</span></div>
+          <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Datei wählen<input type="file" id="exFiles" multiple accept=".txt,.md,.json,.html,.htm,.zip,.svg,.png,.gif,.jpg,.jpeg,.webp" hidden></label><span class="help" style="align-self:center">pruefung.txt einer KI (gern mit Bildern), eine gesicherte Prüfung (.probe.json) oder ein PathFinder-Export (.html, .zip)</span></div>
           <div id="exRes" class="ki-res"></div>
           <div class="ki-btns"><button class="lp-btn" id="exOpen" disabled>＋ Als neue Prüfung öffnen</button></div></div>`;
         exCheck(); return;
@@ -2500,7 +2500,13 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     el.addEventListener('change', async e => {
       if (e.target.id !== 'exFiles' || !e.target.files.length) return;
       const fs = [...e.target.files]; e.target.value = '';
-      const whole = fs.find(f => /\.(json|html?|zip)$/i.test(f.name)); // gespeicherte Prüfung oder PathFinder-Export: direkt öffnen
+      const js = fs.find(f => /\.json$/i.test(f.name)); // gesicherte Prüfung: als neue Prüfung (eigene ID, nicht abgegeben) öffnen
+      if (js) {
+        let d; try { d = JSON.parse(await js.text()); if (!Array.isArray(d?.stations)) throw new Error('keine Prüfungsdatei'); } catch (er) { toast('Datei ließ sich nicht öffnen: ' + esc(er.message), 4000); return; }
+        d.id = uid(); delete d.exam; if (opts.ki?.kopf) d.kicker = esc(opts.ki.kopf);
+        closeDlg(false); if (d.form !== 'pruefung') convertNext = true; openDoc(d); toast(`„${esc(plain(d.title || 'ohne Titel'))}“ geladen – passe Titel, Aufgaben und Punkte für die neue Prüfung an.`, 5000); return;
+      }
+      const whole = fs.find(f => /\.(html?|zip)$/i.test(f.name)); // PathFinder-Export: direkt öffnen
       if (whole) { closeDlg(false); convertNext = true; try { await openFile(whole); } finally { convertNext = false; } return; }
       const T = await loadText(), r = await T.readFiles(fs); Object.assign(files, r.att);
       if (r.text) { pasted = r.text; $('#exIn', el).value = r.text; }
@@ -2703,6 +2709,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   $('#bMore').onclick = e => {
     closePop(); pop = document.createElement('div'); pop.className = 'ed-pop';
     pop.innerHTML = `<h3>Mehr</h3><div class="ed-pal">
+      ${EXAMF() ? `<button data-m="keep"><b>💾 Diese Prüfung sichern</b><span>als Datei – später unter „Neue Prüfung → Fertige Prüfung laden“ als Grundlage, z. B. für eine Nachschrift</span></button>` : ''}
       <button data-m="reset"><b>↺ Vorschau-Fortschritt zurücksetzen</b><span>Haken, Quiz, Sperren wieder leer</span></button>
       <button data-m="json"><b>{ } Dokument ansehen</b><span>so wird der Lernpfad gespeichert</span></button>
       <button data-m="ki"><b>${KI_ICON} Vorlage für KI</b><span>Lernpfad von einer KI schreiben lassen und einfügen</span></button>
@@ -2716,6 +2723,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     pop.onclick = ev => {
       const m = ev.target.closest('[data-m]')?.dataset.m; if (!m) return; closePop();
       if (m === 'export') { openExport(); return; }
+      if (m === 'keep') { if (pending) commit(); const d = clone(doc); delete d.exam; download(new Blob([JSON.stringify(d, null, 1)], { type: 'application/json' }), fileName('.probe.json')); toast('💾 Prüfung als Datei gesichert – mit den Lösungen, also nicht an Schüler weitergeben. Wieder öffnen: Neue Prüfung → Fertige Prüfung laden.', 6000); return; }
       if (m === 'reset') { prog = freshProg(); host.reset?.(); render(); toast('Fortschritt zurückgesetzt'); }
       if (m === 'del') { if (!confirm('„' + (doc.title || 'ohne Titel') + '“ in diesem Browser löschen?')) return; LS.del(DOCKEY(doc.id)); saveDocList(docList().filter(x => x.id !== doc.id)); const next = docList()[0]; openDoc(next ? loadDoc(next.id) : sample()); }
       if (m === 'json') infoDlg('{ } Dokument', `<pre style="margin:0;padding:12px;font:12px/1.4 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all">${esc(JSON.stringify(doc, (k, v) => typeof v === 'string' && v.length > 200 && /^(data:|[A-Za-z0-9+/=]{200})/.test(v) ? v.slice(0, 40) + '…' : v, 2))}</pre>`);
