@@ -2709,7 +2709,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   $('#bMore').onclick = e => {
     closePop(); pop = document.createElement('div'); pop.className = 'ed-pop';
     pop.innerHTML = `<h3>Mehr</h3><div class="ed-pal">
-      ${EXAMF() ? `<button data-m="keep"><b>💾 Diese Prüfung sichern</b><span>als Datei – später unter „Neue Prüfung → Fertige Prüfung laden“ als Grundlage, z. B. für eine Nachschrift</span></button>` : ''}
+      ${EXAMF() ? `<button data-m="keep"><b>💾 Diese Prüfung sichern</b><span>als Datei – Grundlage z. B. für eine Nachschrift</span></button>` : ''}
       <button data-m="reset"><b>↺ Vorschau-Fortschritt zurücksetzen</b><span>Haken, Quiz, Sperren wieder leer</span></button>
       <button data-m="json"><b>{ } Dokument ansehen</b><span>so wird der Lernpfad gespeichert</span></button>
       <button data-m="ki"><b>${KI_ICON} Vorlage für KI</b><span>Lernpfad von einer KI schreiben lassen und einfügen</span></button>
