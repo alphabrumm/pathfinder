@@ -43,7 +43,15 @@ Regeln für die App im Prüfungsmodus:
    `pftext.js` um die App ergänzen und `node tools/doku.mjs` ausführen (Skill „probe-pruefung“ aktualisieren).
 5. **App**: Prüfungsmodus `?pfapp` wie in JPad (`src/jpad/App.ts`, Abschnitt „Prüfungsmodus“): `ready` senden, `load` übernehmen,
    `state` nach Änderungen und Läufen, `flush`/`stop` beantworten.
-6. **Testen**: zuerst auf der Testinstanz von Probe (`git push origin <zweig>:test`), die die Test-Fassung der App öffnet
+6. **Prüfungsfassung in Probe**: In Prüfungen läuft jede App **innerhalb der Probe-Domain** in einem eigenen Unterordner
+   (JPad: `probe.pandapy.de/jpad/`, ebenso FlowPad, QPad, wEOS). Dann muss während der Prüfung nur die Probe-Domain frei sein,
+   und was Schüler in der normalen App gespeichert haben, ist dort nicht erreichbar (Browser-Speicher je Domain). Dafür:
+   - eigener Build der App als Prüfungsfassung: ohne Lernpfade, Hilfen und Beispielprojekte; startet nur mit `?pfapp`, in einem
+     Rahmen und nur, wenn die Seite drumherum von derselben Domain stammt (JPad: `src/jpad/JPadStarter.ts`, `npm run build-jpad-pruefung`);
+   - der Webspace-Workflow der App überträgt sie zusätzlich nach `PROBE_FTP_DIR` (= Probe-Ordner + `/<app>/`), aus demselben
+     getesteten Build (JPad: `jpad-pages.yml` + `jpad-webspace.yml`);
+   - in Probe `APPS_DEFAULT` in `api.php` um `'<app>' => '<app>/'` ergänzen. Probe löscht beim Ausspielen keine fremden Ordner.
+7. **Testen**: zuerst auf der Testinstanz von Probe (`git push origin <zweig>:test`), die die Test-Fassung der App öffnet
    (Adresse über die Repository-Variable bzw. `config.deploy.php`); erst danach live.
 
 Ein Ersatz-App-Skelett zum Testen ohne echte App: eine HTML-Seite, die `ready` schickt, bei `load` die Dateien in ein Textfeld
