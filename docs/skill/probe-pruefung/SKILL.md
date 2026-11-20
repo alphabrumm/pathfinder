@@ -1,0 +1,209 @@
+---
+name: probe-pruefung
+description: Digitale Prüfungen für Probe (probe.pandapy.de) im PathFinder-Textformat erstellen, prüfen oder überarbeiten und Fragen zu Probe beantworten – bei Schulaufgaben, Kurzarbeiten, Stegreifaufgaben oder Tests, die in Probe laufen sollen.
+---
+
+# Probe-Prüfungen
+
+Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-19c). Die Spezifikation unten ist dieselbe, die Probe
+als „Prompt für externe KI“ anzeigt. Weicht etwas vom aktuellen Probe-Verhalten ab, gilt der Code in alphabrumm/pathfinder
+(`core/pftext.js`, `core/pfsplit.js`).
+
+## Arbeitsweise
+
+1. **Angaben klären.** Fehlt etwas davon, frage in EINER kurzen Nachricht nach: Fach, Jahrgangsstufe und Schulart; Thema bzw.
+   Lernbereich (gern mit Lehrplanbezug) und Inhalte; Bearbeitungszeit; gewünschte Aufgabenarten (Liste unten anbieten);
+   Anteil der Anforderungsbereiche (Vorschlag 40/40/20); Arbeitsmaterial (Arbeitsblätter, Hefteinträge, Fotos). Was schon
+   genannt wurde, nicht erneut fragen. Liegt Material vor, darauf aufbauen und nichts prüfen, was weder im Material noch im
+   Lehrplanbezug vorkommt.
+2. **Prüfung schreiben** – exakt nach der Spezifikation unten.
+3. **Selbst prüfen**, bevor du sie ausgibst: jede Aufgabe hat `Punkte:`; Freitext-Erwartungen ergeben in Summe die Punkte;
+   jede gewählte Aufgabenart kommt vor; keine Lösung steht im Aufgabentext; Umfang passt zur Bearbeitungszeit
+   (grob 1 Punkt je Minute bei geschlossenen Aufgaben, mehr Zeit für Freitext); Anhang-Verweise `anhang:name` existieren.
+4. **Ausgeben:** Kannst du Dateien erzeugen, liefere `pruefung.txt` als Datei und nenne in einer Zeile Gesamtpunkte und
+   Aufgabenzahl. Sonst den kompletten Text in EINEM Codeblock (vier Backticks, `text`), ohne Text davor oder danach.
+5. **Überarbeiten:** Bekommst du eine bestehende Prüfung (Text oder `.probe.json`), ändere nur das Gewünschte und gib die
+   vollständige Prüfung wieder im Textformat aus. Bei Fehlermeldungen aus Probe („Zeile n: …“) genau diese Stellen korrigieren.
+
+## In Probe laden
+
+1. In Probe eine **neue Prüfung** anlegen (Klasse, Fach, Art, Zeit) – der Editor (PathFinder) öffnet sich.
+2. **Fertige Prüfung laden** wählen und den Text einfügen oder die Datei `pruefung.txt` wählen
+   (Bilder als zusätzliche Dateien oder im Abschnitt `## Anhang`). Probe prüft den Text sofort und zeigt Fehler mit Zeilennummer.
+3. **Als neue Prüfung öffnen**, im Editor Aufgaben und Punkte kontrollieren, fertigstellen.
+
+Weitere Wege: Im „…“-Menü des Editors sichert **Diese Prüfung sichern** eine Prüfung als `.probe.json` (mit Lösungen).
+Diese Datei lädt man ebenfalls über **Fertige Prüfung laden** – sie wird eine neue, eigenständige Prüfung (z. B. Nachschrift).
+Unter „Prompt für externe KI anzeigen“ zeigt Probe genau die Spezifikation aus diesem Dokument zum Kopieren.
+
+## Spezifikation
+
+Du erstellst eine DIGITALE PRÜFUNG (Leistungsnachweis) für die Plattform PathFinder (App: Probe). Die Schüler bearbeiten sie am iPad ohne Rückmeldung; bewertet wird erst nach der Abgabe – geschlossene Aufgaben automatisch, Freitexte von der Lehrkraft.
+
+THEMA, FACH, ZIELGRUPPE, UMFANG: laut Antwort der Lehrkraft auf deine Rückfrage
+
+REGELN
+- WICHTIG – alles in EINEN kopierbaren Textblock: Der komplette Lernpfad samt Anhang mit allen Grafiken steht in einem einzigen Codeblock, damit die Lehrkraft nur einmal kopieren und einfügen muss. Beginne den Block mit vier Backticks und „text“ (````text) und beende ihn mit vier Backticks (````), damit Code-Beispiele darin den Block nicht vorzeitig schließen. Kein Text davor oder danach, nichts auf mehrere Blöcke oder Nachrichten verteilen.
+- Halte dich exakt an das unten beschriebene PathFinder-Textformat, damit der Lernpfad ohne Nacharbeit eingelesen werden kann.
+- Wenn du Dateien zum Herunterladen erzeugen kannst, liefere denselben Inhalt zusätzlich als eine Textdatei „pruefung.txt“.
+- Sprache: Deutsch, Schüler werden mit „du“ angesprochen, kurze Sätze.
+- Schreibe im Kopf die Zeile „Kopfzeile: <Fach> · <Jahrgangsstufe>“ (mit den Angaben der Lehrkraft).
+- Schreibe im Kopf die Zeile „Art: Prüfung“.
+- KEINE Erklärungen, Merkkästen, Figuren, Tipps, Lösungen zum Aufdecken oder Sperren – nur kurze Arbeitsanweisungen, Material (Texte, Tabellen, Abbildungen) und Aufgaben.
+- Gliedere die Prüfung in Stationen als Teilaufgaben oder Themenblöcke (z. B. „## Station: Teil A | Grundwissen“).
+- Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle, Reihenfolge, Freitext) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken, Markieren und Sortieren etwa 1 Punkt je zwei Wörter bzw. Begriffe, ein Satzpuzzle 1–2 Punkte.
+- Rechenaufgaben mit eindeutigem Ergebnis als „### Aufgabe“ mit „Antwort:“ (Zahl, ohne Einheit, mehrere richtige mit | trennen) – sie werden automatisch bewertet. Schreibe die erwartete Einheit in den Auftrag.
+- Offene Aufgaben (erklären, begründen, beschreiben, beurteilen) als „### Freitext“ mit Erwartungshorizont: mehrere Zeilen „Erwartung: … (Punkte)“; die Summe ergibt die Punkte der Aufgabe.
+- AUFGABENARTEN – verwende die Arten, die die Lehrkraft gewählt hat, und zwar JEDE mindestens einmal; ohne Vorgabe eine abwechslungsreiche, zum Thema passende Auswahl (Lösungsschritte nur bei Rechenwegen):
+  • Multiple Choice: „### Quiz“ – Fragen mit genau einer richtigen Antwort und plausiblen falschen Antworten
+  • Lückentext mit Begriffen: „### Lückentext“ mit „Wortbank: ja“ und zwei bis drei Ablenkern unter „Extra:“
+  • Lückentext zum Eintippen: „### Lückentext“ ohne Wortbank (Schüler tippen; eindeutige Fachbegriffe, alle richtigen Schreibweisen mit | angeben)
+  • Zuordnen: „### Zuordnen“ mit vier bis sechs Paaren
+  • Lösungsschritte mit Drag & Drop: „### Lückentext“ mit „Wortbank: ja“: ein Rechenweg (z. B. ein Gleichungssystem mit I und II) Schritt für Schritt, jeder Schritt in einer eigenen Zeile; Terme, Zahlen und Rechenzeichen sind Lücken [[…]], unter „Extra:“ zwei bis drei falsche Bausteine als Ablenker; Malpunkt · statt *, Hochzahlen als ² und ³, negative Zahlen ohne Leerzeichen nach dem Minus; möglichst nur eine Seite einer Gleichung als Lücke (z. B. „3x = [[9]]“) – stehen beide Seiten ganz als Lücken da („[[3x]] = [[9]]“), wird auch die vertauschte Reihenfolge als richtig gewertet
+  • Rechnen / kurze Antwort: „### Aufgabe“ mit „Antwort:“ (Zahl ohne Einheit oder ein Wort; mehrere richtige mit | trennen) – die erwartete Einheit steht im Auftrag
+  • Im Text markieren: „### Markieren: Arbeitsauftrag“ mit einem kurzen Text; die richtigen Wörter stehen in {{…}} (3–6 Zielwörter; im Text auch ähnliche Wörter, die NICHT markiert werden dürfen)
+  • In Gruppen sortieren: „### Sortieren“ mit 2–4 Gruppen und je 2–5 eindeutig zuzuordnenden Begriffen (je Zeile „Gruppe: Begriff, Begriff“)
+  • Satzpuzzle: „### Satzpuzzle“ – ein Satz in einer Zeile, Teile mit „ / “ getrennt (feste Wendungen wie „to London“ als ein Teil); jede weitere korrekte Wortstellung als Zeile „Auch richtig: …“ mit denselben Teilen; das erste Wort klein schreiben (außer Namen und „I“), ohne Satzzeichen am Ende – PathFinder schreibt den Satzanfang selbst groß
+  • Textpuzzle (Reihenfolge): „### Reihenfolge“ – 4–6 Abschnitte, Sätze oder Dialogzeilen, je Zeile einer, in der richtigen Reihenfolge; die Reihenfolge muss eindeutig sein (Signalwörter, Handlungsablauf)
+  • Freitext: „### Freitext“ mit Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“
+- Anforderungsbereiche: wie von der Lehrkraft angegeben, sonst etwa 40 % der Punkte Reproduktion (AFB I), 40 % Anwendung und Transfer (AFB II), 20 % Problemlösen und Beurteilen (AFB III); von leicht nach schwer.
+- Quizfragen mit genau einer richtigen Antwort und plausiblen falschen Antworten; Rückmeldungen nach // sind nicht nötig.
+- Lückentexte ohne Wortbank werden tolerant bewertet (Groß/Klein egal); mehrdeutige Lücken vermeiden oder alle richtigen Antworten mit | angeben.
+- Aufgaben mit eindeutiger Lösung bekommen eine „Antwort:“-Zeile, damit sie automatisch geprüft werden.
+- Bilder und Animationen: Zeichne passende Abbildungen selbst als SVG – im Abschnitt ## Anhang am Ende als „name: <svg …> … </svg>“, oben mit anhang:name einbinden. SVG darf animiert sein (<animate>, <animateTransform>, <animateMotion> oder CSS-@keyframes in <style> innerhalb des SVG). Immer viewBox angeben, gut lesbare Schrift (font-family="sans-serif"), keine Skripte, keine externen Links, Schriften oder Bilder. Lieber wenige, aussagekräftige Grafiken (z. B. Schaubild, Ablauf, Beispiel-Tabelle) als Deko.
+- Rasterbilder (PNG, GIF, JPG) nur als data:image/…;base64,…, und nur wenn du die Datei wirklich erzeugt hast (z. B. mit einem Code-Werkzeug) – niemals Base64 ausdenken. Sonst ein Bild-Platzhalter: ![Beschreibung]()
+- Keine Bilder aus dem Internet.
+- Innerhalb eines ###-Abschnitts (Aufgabe, Quiz, Lückentext, Zuordnen …) keine Bild-Zeilen und keine Infokästen: Sie beenden den Abschnitt. Bilder und Kästen gehören davor oder dahinter (bei Aufgaben stattdessen „Bild: anhang:name“).
+- Im Lückentext ist JEDE [[Lücke]] eine Antwort, die Schüler einsetzen müssen – Arbeitsanweisungen ohne Lücken als normalen Text vor den Abschnitt schreiben.
+
+FORMAT (PathFinder-Text):
+# Titel des Lernpfads
+Untertitel: kurze Unterzeile
+Art: Lernpfad            (oder: Challenge, Prüfung)
+Farbe: 
+Schrift: Pixel | schlicht | elegant | Handwriting
+Ziele:
+- Lernziel 1
+- Lernziel 2
+Kopfbild: anhang:logo          (optional, Bild aus dem Anhang)
+Kopfbild-Art: klein | groß | Hintergrund
+Titel-Animation: tippen | einblenden | glitch | leuchten   (optional, ebenso Untertitel-Animation)
+
+## Station: Titel der Station | kurze Unterzeile
+Animation: einblenden          (optional, direkt nach der Stationszeile: Animation des Stationstitels)
+Normaler Text. Leerzeile = neuer Absatz. **fett**, *kursiv*, `Code`, Listen mit „- “.
+
+[Merke] Wichtiger Merksatz.          (auch: [Tipp], [Achtung], [Begriff: Wort], [Regel], [Abschluss])
+[Figur: Aha] Eine Figur sagt etwas.  (Figuren: Nachdenken, Aha, Achtung – davor optional „Smiley“ oder „Pixel“ für einen anderen Stil – und Ente)
+[Figur: anhang:roboter | Robo] Eigene Figur mit Bild aus dem Anhang und Namen.
+{tippen} Text mit Animation (vor einem Absatz oder Infokasten: {tippen}, {einblenden}, {glitch}, {leuchten})
+
+![Bildunterschrift](anhang:diagramm)        Bild aus dem Anhang (mit „| klein“ nach der Unterschrift kleiner)
+
+### Aufgabe: Titel
+Auftrag für die Schüler.
+Antwort: 12,60          (optional: genaue Antwort → wird automatisch geprüft; Zahl oder kurzes Wort)
+Tipp: erster Tipp       (beliebig viele Tipp-Zeilen, vom kleinen zum großen Tipp)
+Lösung: Musterlösung
+Bild: anhang:skizze     (optional: Bild zur Aufgabe)
+                        („Tipp (verborgen):“ bzw. „Lösung (verborgen):“ = nur für die Lehrkraft, Schüler sehen sie nicht)
+XP: 20
+
+### Quiz
+? Frage
+[x] richtige Antwort // Rückmeldung (optional)
+[ ] falsche Antwort // warum falsch
+? zweite Frage …
+
+### Lückentext: Titel
+Satz mit [[Lücke]] und [[Antwort|andere erlaubte Antwort]].
+Wortbank: ja            (optional: Begriffe zum Ziehen)
+Extra: Ablenker, Ablenker   (optional: falsche Begriffe in der Wortbank)
+
+### Zuordnen: Ordne zu
+Begriff -> Erklärung
+Begriff -> Erklärung
+
+### Markieren: Markiere alle Verben im simple past.
+Yesterday I {{went}} to the park and {{played}} football. It is sunny today.
+                        (die richtigen Wörter in {{…}}; Schüler tippen sie im Text an – mehrere Wörter: {{has been}})
+
+### Sortieren: Sortiere die Wörter.
+regular verbs: play, watch, visit
+irregular verbs: go, see, buy
+                        (je Zeile eine Gruppe „Gruppe: Begriff, Begriff“; Schüler sehen alle Begriffe gemischt)
+
+### Satzpuzzle: Bring die Wörter in die richtige Reihenfolge.
+I / have / never / been / to London
+Auch richtig: never / have / I / been / to London   (optional: weitere korrekte Reihenfolgen mit denselben Teilen; Satzanfang klein, ohne Schlusspunkt – PathFinder schreibt ihn groß)
+
+### Reihenfolge: Bring die Geschichte in die richtige Reihenfolge.
+- Tom woke up early.
+- He had breakfast.
+- Then he went to school.
+                        (je Zeile ein Abschnitt oder eine Dialogzeile, in der richtigen Reihenfolge – Schüler sehen sie gemischt)
+
+### Freitext: Titel       (nur in Prüfungen: offene Antwort, die die Lehrkraft bewertet)
+Aufgabenstellung.
+Erwartung: erster Teilaspekt der erwarteten Antwort (2)   (Erwartungshorizont, Zahl in Klammern = Punkte)
+Erwartung: zweiter Teilaspekt (1)
+Zeilen: 6               (optional: Höhe des Antwortfelds)
+
+Punkte: 2               (in jeder Aufgabe, jedem Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle oder jeder Reihenfolge: Punkte für diese Aufgabe)
+
+### Aufdecken: Mehr erfahren
+Text, der erst nach Antippen erscheint.
+
+### UML: Klassenname
+- attribut: Typ
++ methode()
+
+```java
+Programmcode (Sprache nach den drei Backticks)
+```
+(```java ohne-knopf: Code nur zum Anschauen, ohne Knopf zum Übernehmen – z. B. wenn er schon im Projekt steht oder eine Aufgabe verraten würde)
+
+| Kopf | Kopf |
+| --- | --- |
+| Zelle | Zelle |
+
+--- Sperre ---          (alles danach in der Station erst frei, wenn die Aufgabe davor gelöst ist)
+
+## Anhang               (immer ganz am Ende, im selben Textblock: Bilder, auf die oben mit anhang:name verwiesen wird)
+diagramm: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 160">
+  …  (SVG darf über mehrere Zeilen gehen, endet mit </svg>)
+</svg>
+foto: data:image/png;base64,iVBORw0KGgo…
+
+## Bewertung in Probe
+
+Probe bewertet nach der Abgabe; die Schüler bekommen während der Prüfung keine Rückmeldung.
+
+| Aufgabenart | automatisch bewertet nach |
+| --- | --- |
+| Quiz | je Frage richtig/falsch |
+| Lückentext | je Lücke; ohne Wortbank tolerant (Groß/Klein egal, Alternativen mit `\|`); bei `[[a]] = [[b]]` zählt auch die vertauschte Reihenfolge |
+| Zuordnen | je Paar |
+| Aufgabe mit `Antwort:` | richtig/falsch (Zahl oder Wort, Alternativen mit `\|`) |
+| Markieren | je Zielwort; jedes fälschlich markierte Wort zählt als zusätzlicher Fehler |
+| Sortieren | je Begriff |
+| Satzpuzzle, Reihenfolge | je Teil an richtiger Stelle (längste richtige Teilfolge), beste der erlaubten Lösungen |
+| Freitext | von der Lehrkraft, mit Erwartungshorizont |
+
+**Teilpunkte:** Punkte der Aufgabe × Anteil richtiger Teile, auf halbe Punkte abgerundet.
+Die Lehrkraft kann nachträglich weitere Antworten akzeptieren, Punkte überschreiben oder Aufgaben streichen.
+**Notenschlüssel** (Standard, anpassbar): ab 20 % Note 5, 40 % Note 4, 55 % Note 3, 70 % Note 2, 85 % Note 1.
+
+## Probe kurz erklärt
+
+- **Was:** Prüfungsplattform für iPads im Klassenzimmer (probe.pandapy.de, Repo alphabrumm/probe), PHP + SQLite auf Webspace.
+  Prüfungen entstehen im eingebetteten PathFinder (nur Format „Prüfung“). Schüler brauchen kein Konto (QR-Code + Einlass-PIN).
+- **Rollen:** Admin (Konten, Fachschaften, Schuljahresende), Fachleitung (Respizienz), Lehrkraft.
+- **Prüfungsarten:** Schulaufgabe, Kurzarbeit, AKL, Übungsprüfung.
+- **Durchführung:** Live-Liste, Zeit verlängern, automatische Abgabe, Schließen; nach dem Schließen keine Nachreichung übers Netz,
+  bei Netzausfall Notfall-Abgabe per Datei (AirDrop an die Lehrkraft).
+- **Datenschutz:** Alles wird im Browser verschlüsselt (WebCrypto, ECDH P-256 je Lehrkraft). Schüler-Geräte bekommen nur eine
+  Fassung **ohne Lösungen**; Lösungen, Antworten und Klassenliste liegen nur verschlüsselt auf dem Server.
+- **Auswertung:** Notenschlüssel per Regler, Freitext bewerten, Ergebnisseiten mit Ergebniscode, Prüfungsprotokoll (PDF).
+- **Respizienz:** Lehrkraft reicht bei der Fachleitung ein (für sie verschlüsselt) → Rückfrage ⇄ erneut eingereicht → abgezeichnet;
+  Archiv-Export verschlüsselt für Fachleitung, Admins und optional eine Passphrase.

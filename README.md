@@ -40,6 +40,10 @@ oder ⚙ Einstellungen → Art). Es ist die Grundlage für die Prüfungsplattfor
 * Textformat und KI-Prompts kennen „Art: Prüfung“, „### Freitext“ mit „Erwartung: … (Punkte)“ und „Punkte: n“ je Aufgabe.
 * HTML- und SCORM-Export sind für Prüfungen gesperrt, weil die Datei die Lösungen enthielte.
 
+**Prüfungsformat:** [docs/PRUEFUNGSFORMAT.md](docs/PRUEFUNGSFORMAT.md) beschreibt Textformat, Aufgabenarten und Bewertung.
+Dieselbe Spezifikation steckt im Claude-Skill [probe-pruefung](docs/skill/probe-pruefung/SKILL.md). Beides erzeugt
+`node tools/doku.mjs` aus `core/pftext.js` – nach jeder Formatänderung ausführen und den Skill in Claude aktualisieren.
+
 ## Kern und Erweiterungen
 
 `core/pathfinder.js` ist der Kern und kennt keine App. Apps wie **FlowPad**, **JPad** oder **QPad** binden den Kern ein
