@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-19c';
+const PF_BUILD = '2026-11-20a';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -100,9 +100,12 @@ const CORE = {
   puzzle: { n: 'Satzpuzzle', ic: '⇢', g: 'Aufgaben', h: 'Wörter in die richtige Reihenfolge bringen', alias: 'order', make: () => ({ words: true, title: 'Bring die Wörter in die richtige Reihenfolge', items: ['I', 'have', 'never', 'been', 'to London'], alts: [], xp: 10 }) },
   order: { n: 'Reihenfolge', ic: '↕', g: 'Aufgaben', h: 'Abschnitte ordnen (Textpuzzle)', make: () => ({ words: false, title: 'Bring die Abschnitte in die richtige Reihenfolge', items: ['Erster Abschnitt', 'Zweiter Abschnitt', 'Dritter Abschnitt'], alts: [], xp: 10 }) },
   essay: { n: 'Freitext', ic: '✍', g: 'Aufgaben', h: 'offene Antwort mit Erwartungshorizont – nur in Prüfungen', exam: true, make: () => ({ title: '', html: '', img: '', lines: 6, rubric: [], pts: 4 }) },
+  app: { n: 'Programmieren in JPad', ic: '☕', g: 'Aufgaben', h: 'Schüler programmieren in JPad; Ausgabe und Pflicht-Code werden geprüft – nur in Prüfungen', exam: true, make: () => ({ app: 'jpad', title: '', html: '', img: '', files: [{ name: 'Hauptprogramm', text: '' }], expect: '', compare: 'enthaelt', needs: [], rubric: [], solution: '', pts: 4 }) },
   lock: { n: 'Sperre', ic: '🔒', g: 'Ablauf', h: 'Ab hier erst frei, wenn … gelöst', make: () => ({ after: '' }) },
 };
-const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order']);
+const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order', 'app']);
+const APP_INFO = { jpad: ['JPad', '☕', 'java'], qpad: ['QPad', '🗄', 'sql'], flowpad: ['FlowPad', '🔀', 'text'] };
+const appN = a => (APP_INFO[a] || APP_INFO.jpad)[0], appIc = a => (APP_INFO[a] || APP_INFO.jpad)[1], appLang = a => (APP_INFO[a] || APP_INFO.jpad)[2];
 /** Markieren: Text in antippbare Wörter zerlegen (wie markWords in pfsplit.js). tpl enthält Platzhalter \u0002n\u0003 für Wort n; targets = Wörter in {{…}} */
 export function markParse(html) {
   const words = [], targets = new Set(); let on = false, tpl = '';
@@ -297,6 +300,7 @@ export function startPathFinder(opts = {}) {
         if (b.type === 'quiz') for (const q of b.qs || []) for (const o of q.opts || []) o.k = o.k || keyOf();
         if (b.type === 'match') for (const p of b.pairs || []) { p.ka = p.ka || keyOf(); p.kb = p.kb || keyOf(); }
         if (b.type === 'essay') { b.rubric = b.rubric || []; b.lines = b.lines || 6; }
+        if (b.type === 'app') { b.app = b.app || 'jpad'; b.files = b.files || []; b.needs = b.needs || []; b.rubric = b.rubric || []; b.compare = b.compare || 'enthaelt'; }
       }
     }
     return d;
@@ -650,6 +654,7 @@ export function startPathFinder(opts = {}) {
   function blockHtml(b) {
     if (EXAM() && CORE_CHECK.has(b.type)) return examBlockHtml(b);
     if (b.type === 'essay') return wrap(b, essayEdit(b));
+    if (b.type === 'app') return wrap(b, appEdit(b));
     if (b.type === 'task' && EXAMF() && E() && !b.answer) return wrap(b, taskCard(b, { hint: 'In der Prüfung: <b>freie Antwort</b>, die du bewertest. Für automatische Bewertung ⚙ → Ergebnis eintragen.' }));
     if (b.type === 'task' && EXAMF() && E()) return wrap(b, taskCard(b, { buttons: `<span class="lp-answer"><input disabled placeholder="${esc(b.answerPh || 'Ergebnis')}"></span>`, hint: `Wird automatisch bewertet. Richtig ist: <b>${esc(b.answer.split('|').join(' oder '))}</b>` }));
     const ok = !!prog.solved[b.id], t = def(b);
@@ -734,6 +739,18 @@ export function startPathFinder(opts = {}) {
     return wrap(b, `<div class="lp-missing"><span class="app">braucht ${esc(typeof app === 'string' ? app : 'eine App')}</span>${b.title ? `<div><b>${esc(plain(b.title))}</b></div>` : ''}${b.html ? `<div>${b.html}</div>` : ''}${b.label ? `<div>${esc(b.label)}</div>` : ''}</div>`);
   }
   /* ---------- Digitale Prüfung: Antworten erfassen, ohne zu prüfen ---------- */
+  /** App-Aufgabe im Editor (und außerhalb von Prüfungen): Auftrag, Startcode, was geprüft wird */
+  function appEdit(b) {
+    const N = appN(b.app), mode = (b.rubric || []).length ? 'rubric' : (b.expect || (b.needs || []).some(Boolean)) ? 'auto' : 'free';
+    const checks = [b.expect ? `Ausgabe ${b.compare === 'gleich' ? 'genau' : 'enthält'} <code>${esc(b.expect.length > 60 ? b.expect.slice(0, 60) + '…' : b.expect)}</code>` : '', ...(b.needs || []).filter(Boolean).map(n => `im Code: <code>${esc(n)}</code>`)].filter(Boolean);
+    const hint = mode === 'auto' ? `Wird automatisch bewertet: ${checks.join(' · ')} (Punkte × Anteil erfüllter Prüfungen).`
+      : mode === 'rubric' ? `Du bewertest mit dem Erwartungshorizont${checks.length ? '; als Hilfe prüft Probe: ' + checks.join(' · ') : ''}.` : '⚙ → erwartete Ausgabe, Pflicht-Code oder Erwartungshorizont eintragen – sonst bewertest du ganz von Hand.';
+    const files = (b.files || []).filter(f => (f.text || '').trim());
+    return `<div class="lp-card lp-task lp-app"><div class="hd">${ce('title', b.title, `${N}-Aufgabe`, { tag: 'b', cls: 'lp-ctitle' })}<span class="where">${appIc(b.app)} ${esc(N)}</span></div>${imgHtml(b.img, '', 'klein')}${ce('html', b.html, 'Arbeitsauftrag …', { rich: true })}`
+      + files.map(f => `<div class="lp-app-file"><b>${esc(f.name)}</b> <span class="help">Startcode</span><pre class="hl">${highlightCode(f.text, appLang(b.app))}</pre></div>`).join('')
+      + `<div><button class="lp-btn alt" data-appopen="1">${appIc(b.app)} ${E() ? `In ${esc(N)} ausprobieren` : `In ${esc(N)} öffnen`}</button></div>`
+      + (E() ? `<div class="ed-hint">${hint}${b.project ? `<br>🔗 Gemeinsames Projekt „${esc(b.project)}“ – Schüler arbeiten in allen Aufgaben dieses Projekts am selben Code.` : ''}${EXAMF() ? '' : '<br><b>Nur in Prüfungen:</b> Im Lernpfad nimm die Programmier-Aufgabe der App.'}</div>` : '') + '</div>';
+  }
   function essayEdit(b) {
     const R = b.rubric || [];
     return `<div class="lp-card lp-task lp-essay"><div class="hd">${ce('title', b.title, 'Freitext', { tag: 'b', cls: 'lp-ctitle' })}</div>${imgHtml(b.img, '', 'klein')}${ce('html', b.html, 'Aufgabenstellung …', { rich: true })}`
@@ -821,6 +838,7 @@ export function startPathFinder(opts = {}) {
     if (b.type === 'mark') return !!a && Object.values(a).some(Boolean);
     if (b.type === 'sort') return !!a && sortSides(b).I.every(x => a[x.k] != null);
     if (b.type === 'order') return Array.isArray(a) && a.length > 0 && a.length === orderPool(b).length;
+    if (b.type === 'app') return !!a && (!!a.run || !!a.ed);
     return typeof a === 'string' && a.trim() !== '';
   }
   const examState = b => `<span class="lp-state" data-xstate>${answered(b) ? '✓ beantwortet' : ''}</span>`;
@@ -849,6 +867,14 @@ export function startPathFinder(opts = {}) {
       }
       const html = String(b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const i = n++; return `<input data-xgap="${i}" value="${esc(a?.[i] ?? '')}" ${NOCORR} aria-label="Lücke ${i + 1}">`; });
       return wrap(b, `<div class="lp-card lp-gap lp-exam${b.heft ? ' heft' : ''}">${head}<div>${html}</div>${examState(b)}</div>`);
+    }
+    if (b.type === 'app') {
+      const N = appN(b.app), run = a?.run, done = EXAM_DONE();
+      const st = !a ? `Noch nicht begonnen.` : run ? `${run.error ? '⚠ Letzter Programmlauf mit Fehler abgebrochen' : '▶ Zuletzt ausgeführt'} um ${new Date(run.at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr${run.sig && a.sig && run.sig !== a.sig ? ' · danach noch geändert' : ''}.` : `In Arbeit – noch nicht ausgeführt.`;
+      const out = run && !run.error && String(run.output || '').trim() ? `<pre class="lp-app-out">${esc(String(run.output).trim().split('\n').slice(-6).join('\n'))}</pre>` : '';
+      return wrap(b, `<div class="lp-card lp-task lp-exam lp-app"><div class="hd"><b class="lp-ctitle">${esc(plain(b.title)) || N + '-Aufgabe'}</b><span class="where">${appIc(b.app)} ${esc(N)}</span>${examState(b)}</div>${imgHtml(b.img, '', 'klein')}<div>${b.html || ''}</div>`
+        + `<div><button class="lp-btn${a ? ' alt' : ''}" data-appopen="1">${appIc(b.app)} ${done ? `In ${esc(N)} ansehen` : a ? `In ${esc(N)} weiterarbeiten` : `In ${esc(N)} bearbeiten`}</button></div>`
+        + `${b.project ? `<div class="help lp-app-st">🔗 Projekt „${esc(b.project)}“: Alle Aufgaben dieses Projekts bearbeitest du im selben Programm. Lösche nichts – am Ende zählt dein letzter Stand.</div>` : ''}<div class="help lp-app-st">${st}</div>${out}</div>`);
     }
     if (b.type === 'mark') return wrap(b, markCard(b, true));
     if (b.type === 'sort') return wrap(b, sortCard(b, true));
@@ -976,6 +1002,7 @@ export function startPathFinder(opts = {}) {
     if (qok && E()) { const r = findBlock(qok.closest('.blk').dataset.id); const [qi, i] = qok.dataset.qok.split('.').map(Number); r.b.qs[qi].opts.forEach((o, k) => o.ok = k === i); commit(); render(); return; }
     const run = t.closest('[data-run]');
     if (run) { runAction(run.closest('.blk').dataset.id, run.dataset.run); return; }
+    const aop = t.closest('[data-appopen]'); if (aop) { openAppTask(aop.closest('.blk').dataset.id); return; }
     if (E()) { const blk = t.closest('.blk'); selId = blk ? blk.dataset.id : null; markSel(); if (blk) curSid = blk.closest('.lp-station')?.dataset.sid || curSid; if (panelOpen && blk && panelWhat !== selId) { panelWhat = selId; drawPanel(); } return; }
     const opt = t.closest('[data-opt]');
     if (EXAM_DONE() && t.closest('.lp-exam')) return;
@@ -1259,6 +1286,14 @@ export function startPathFinder(opts = {}) {
       { k: 'alts', l: 'Weitere richtige Reihenfolgen (optional)', t: 'lines', rows: 3, show: b => b.words, help: 'Je Zeile eine, mit denselben Teilen, z. B. Never / have / I / been / to London',
         get: b => (b.alts || []).map(a => a.join(' / ')).join('\n'), set: (b, v) => { b.alts = v.split('\n').map(l => l.split(/\s*\/\s*/).map(x => x.trim()).filter(Boolean)).filter(a => a.length > 1); } }, XP],
     essay: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'lines', l: 'Höhe des Antwortfelds in Zeilen', t: 'number' }, { k: 'rubric', l: 'Erwartungshorizont', t: 'rubric' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }],
+    app: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'app', l: 'App', t: 'select', o: [['jpad', '☕ JPad (Java)'], ['qpad', '🗄 QPad (SQL) – noch nicht verfügbar'], ['flowpad', '🔀 FlowPad – noch nicht verfügbar']] },
+      { k: 'project', l: 'Gemeinsames Projekt (optional)', t: 'text', help: 'Aufgaben mit demselben Namen (z. B. Rakete) bauen am selben Programm weiter: Die Schüler sehen in jeder dieser Aufgaben denselben Code; jede Aufgabe prüft den abgegebenen Stand. Startcode nur bei der ersten Aufgabe.' },
+      { k: 'files', l: 'Startcode (je Datei; leer = Schüler beginnen mit einem leeren Hauptprogramm)', t: 'appfiles' },
+      { k: 'expect', l: 'Erwartete Ausgabe (leer = Ausgabe wird nicht geprüft)', t: 'lines', rows: 3, get: b => b.expect || '', set: (b, v) => { b.expect = v; } },
+      { k: 'compare', l: 'Vergleich der Ausgabe', t: 'select', o: [['enthaelt', 'Ausgabe enthält diesen Text (Leerzeichen und Zeilenumbrüche egal)'], ['gleich', 'Ausgabe genau gleich (bis auf Leerzeichen am Zeilenende)']], show: b => !!b.expect },
+      { k: 'needs', l: 'Muss im Code vorkommen (je Zeile eins, z. B. while)', t: 'lines', rows: 3, get: b => (b.needs || []).join('\n'), set: (b, v) => { b.needs = v.split('\n').map(x => x.trim()).filter(Boolean); } },
+      { k: 'rubric', l: 'Erwartungshorizont (optional – dann bewertest du, die Prüfungen oben sind nur Hinweise)', t: 'rubric' },
+      { k: 'solution', l: 'Musterlösung (nur für dich bei der Korrektur)', t: 'code' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }],
     lock: [{ k: 'after', l: 'Frei, sobald gelöst ist:', t: 'target' }],
     code: [{ k: 'lang', l: 'Sprache', t: 'select', o: [['java', 'Java'], ['python', 'Python'], ['sql', 'SQL'], ['text', 'Text']] }, { k: 'file', l: 'Dateiname über dem Code (optional)', t: 'text' }, { k: 'mark', l: 'Zeilen hervorheben (z. B. 3-5)', t: 'text', show: () => !!doc.skin }, { k: 'nocopy', l: 'ohne Knopf (nur zum Anschauen, z. B. wenn der Code schon im Projekt steht oder eine Aufgabe verraten würde)', t: 'check' }],
     uml: [{ k: 'name', l: 'Klassenname', t: 'text' }, { k: 'attrs', l: 'Attribute', t: 'list', ph: 'Attribut' }, { k: 'methods', l: 'Methoden', t: 'list', ph: 'Methode' }],
@@ -1321,6 +1356,7 @@ export function startPathFinder(opts = {}) {
         else if (f.t === 'list') h += `<label>${esc(f.l)}</label>${f.vis ? '<span class="help">👁 = für Schüler sichtbar · antippen zum Verbergen</span>' : ''}<div class="list">${(v || []).map((t, i) => `<div class="it">${f.vis ? (hid => `<button class="pf-eye${hid ? ' off' : ''}" data-lvis="${f.vis}" data-i="${i}" aria-pressed="${!hid}" title="${hid ? 'verborgen – antippen zum Zeigen' : 'sichtbar – antippen zum Verbergen'}">${hid ? '🙈' : '👁'}</button>`)(!!(b[f.vis] || [])[i]) : ''}<input type="text" data-li="${f.k}" data-i="${i}" value="${esc(plain(t))}" placeholder="${esc(f.ph)} ${i + 1}"><button data-ldel="${f.k}" data-i="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-ladd="${f.k}">＋ ${esc(f.ph)}</button></div>`;
         else if (f.t === 'qs') h += `<label>${esc(f.l)}</label>${v.map((q, qi) => `<fieldset><legend>Frage ${qi + 1}</legend><input type="text" data-qq="${qi}" value="${esc(plain(q.q))}" placeholder="Frage"><div class="list">${q.opts.map((o, i) => `<div class="it"><input type="radio" name="ok${qi}" data-qok2="${qi}.${i}"${o.ok ? ' checked' : ''} title="richtig" style="width:24px;height:24px"><input type="text" data-qt="${qi}.${i}" value="${esc(plain(o.t))}" placeholder="Antwort ${i + 1}"><button data-qodel="${qi}.${i}" aria-label="entfernen">✕</button></div><div class="it" style="padding-left:30px"><input type="text" data-qfb="${qi}.${i}" value="${esc(plain(o.fb))}" placeholder="Rückmeldung zu dieser Antwort (optional)" style="font-size:13px"></div>`).join('')}<div class="row" style="align-items:center"><button class="add" data-qoadd="${qi}">＋ Antwort</button>${v.length > 1 ? `<button class="add" data-qdel="${qi}">Frage entfernen</button>` : ''}</div></div></fieldset>`).join('')}<button class="add" data-qadd="1">＋ Frage</button>`;
         else if (f.t === 'rubric') h += `<label>${esc(f.l)}</label><span class="help">Teilaspekte mit Punkten – nur für dich bei der Korrektur, Schüler sehen sie nicht. Die Summe sind die Punkte der Aufgabe.</span><div class="list">${(v || []).map((r, i) => `<div class="it"><input type="text" data-rt="${i}" value="${esc(r.t)}" placeholder="Teilaspekt, z. B. nennt das Trägheitsprinzip"><input type="number" min="0" step="0.5" inputmode="decimal" data-rp="${i}" value="${esc(r.p)}" style="width:4.5em;flex:none" aria-label="Punkte"><button data-rdel="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-radd="1">＋ Teilaspekt</button></div>`;
+        else if (f.t === 'appfiles') h += `<label>${esc(f.l)}</label><div class="list">${(v || []).map((x, i) => `<div class="it" style="flex-wrap:wrap"><input type="text" data-afn="${i}" value="${esc(x.name)}" placeholder="Dateiname, z. B. Rakete" style="flex:1"><button data-afdel="${i}" aria-label="Datei entfernen">✕</button><textarea class="mono" data-aft="${i}" rows="6" spellcheck="false" autocapitalize="off" style="width:100%">${esc(x.text)}</textarea></div>`).join('')}<button class="add" data-afadd="1">＋ Datei</button></div>`;
         else if (f.t === 'pairs') h += `<label>${esc(f.l)}</label><div class="list">${v.map((p, i) => `<div class="it"><input type="text" data-pa="${i}" value="${esc(p.a)}" placeholder="Karte"><span>→</span><input type="text" data-pb="${i}" value="${esc(p.b)}" placeholder="passt zu"><button data-pdel="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-padd="1">＋ Paar</button></div>`;
         else if (f.t === 'image') h += `<label>${esc(f.l)}</label><div class="imgprev">${v ? `<img src="${v}" alt="">` : ''}<label class="take" style="display:inline-flex;align-items:center;cursor:pointer">🖼 ${v ? 'Anderes Bild' : 'Bild/GIF wählen'}<input type="file" accept="image/*" data-img="${f.k}" hidden></label>${v ? `<button class="add" data-imgdel="${f.k}">entfernen</button>` : ''}</div><span class="help">Große Fotos werden verkleinert, GIFs bleiben animiert.</span>`;
         else if (f.t === 'file') h += `<label>${esc(f.l)}</label><div class="imgprev"><span class="help">${v ? `${esc(b.name)} · ${Math.round(v.length * .75 / 1024)} KB` : 'noch keine Datei'}</span><label class="take" style="display:inline-flex;align-items:center;cursor:pointer">📎 Datei wählen<input type="file" data-file="${f.k}" hidden></label></div>`;
@@ -1343,6 +1379,8 @@ export function startPathFinder(opts = {}) {
       if (d.rt != null) b.rubric[+d.rt].t = t.value;
       if (d.rp != null) { b.rubric[+d.rp].p = Math.max(0, +t.value || 0); const s = b.rubric.reduce((a, r) => a + (+r.p || 0), 0); if (s > 0) b.pts = s; }
       if (d.lines) fields.find(x => x.k === d.lines)?.set(b, t.value);
+      if (d.afn != null) b.files[+d.afn].name = t.value.replace(/\.(java|sql)$/i, '').replace(/[^\wÄÖÜäöüß-]+/g, '');
+      if (d.aft != null) b.files[+d.aft].text = t.value;
       if (d.pa != null) b.pairs[+d.pa].a = t.value;
       if (d.pb != null) b.pairs[+d.pb].b = t.value;
       changed();
@@ -1373,6 +1411,8 @@ export function startPathFinder(opts = {}) {
       if (d.qodel) { const [qi, i] = d.qodel.split('.').map(Number); b.qs[qi].opts.splice(i, 1); draw(); }
       if (d.radd) { b.rubric = b.rubric || []; b.rubric.push({ t: '', p: 1 }); b.pts = b.rubric.reduce((a, r) => a + (+r.p || 0), 0); draw(); $$('[data-rt]', el).pop()?.focus(); }
       if (d.rdel) { b.rubric.splice(+d.rdel, 1); const s = b.rubric.reduce((a, r) => a + (+r.p || 0), 0); if (s > 0) b.pts = s; draw(); }
+      if (d.afadd) { b.files = b.files || []; b.files.push({ name: '', text: '' }); draw(); $$('[data-afn]', el).pop()?.focus(); }
+      if (d.afdel) { b.files.splice(+d.afdel, 1); draw(); }
       if (d.padd) { b.pairs.push({ a: '', b: '' }); draw(); }
       if (d.pdel) { b.pairs.splice(+d.pdel, 1); draw(); }
       if (d.imgdel) { setPath(b, d.imgdel, ''); draw(); }
@@ -2039,7 +2079,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
           <div class="ex-tri"><div class="ex-bar" id="kiBar"></div><input type="range" id="kiP1" min="0" max="100" step="5" value="${info.p1 ?? 40}" aria-label="Grenze Grundlagen / Fortgeschritten"><input type="range" id="kiP2" min="0" max="100" step="5" value="${info.p2 ?? 80}" aria-label="Grenze Fortgeschritten / Experte"></div>
           <div class="ex-lv" id="kiLv"></div>
         </div>
-        <div id="kiTypes" hidden><label>Aufgabenstile</label><div class="ex-types">${T.EXAM_STYLES.map(([k, n, h]) => `<label class="chk"${k === 'essay' ? ' data-exonly="1"' : ''}><input type="checkbox" data-kty="${k}"${(info.types || T.EXAM_STYLES_DEFAULT).includes(k) ? ' checked' : ''}>${esc(n)} <span class="help">– ${esc(h)}</span></label>`).join('')}</div><span class="help">Die KI nimmt jede angekreuzte Art mindestens einmal auf – und keine anderen.</span></div>
+        <div id="kiTypes" hidden><label>Aufgabenstile</label><div class="ex-types">${T.EXAM_STYLES.map(([k, n, h]) => `<label class="chk"${k === 'essay' || k === 'jpad' ? ' data-exonly="1"' : ''}><input type="checkbox" data-kty="${k}"${(info.types || T.EXAM_STYLES_DEFAULT).includes(k) ? ' checked' : ''}>${esc(n)} <span class="help">– ${esc(h)}</span></label>`).join('')}</div><span class="help">Die KI nimmt jede angekreuzte Art mindestens einmal auf – und keine anderen.</span></div>
         <div class="row"><label>Jahrgangsstufe<select data-k="jg">${opt('', '– wählen –', info.jg || '')}${[5, 6, 7, 8, 9, 10, 11, 12, 13].map(j => opt(j, j + '. Jahrgangsstufe', info.jg)).join('')}</select></label>
           <label>Fach<select data-k="fsel">${opt('', '– wählen –', info.fsel || '')}${L.FAECHER.map(f => opt(f, f, info.fsel)).join('')}${opt('*', 'anderes Fach …', info.fsel)}</select></label></div>
         <label id="kiFrei" hidden>Fach<input type="text" data-k="ffrei" value="${esc(info.ffrei || '')}" placeholder="z. B. Chemie"></label>
@@ -2327,11 +2367,35 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   const fmtPts = x => String(Math.round(x * 100) / 100).replace('.', ',');
   function examTitle(b) {
     const t = plain(b.title || '').trim(); if (t) return t;
-    return { quiz: 'Quiz', gap: 'Lückentext', match: 'Zuordnen', essay: 'Freitext', mark: 'Markieren', sort: 'Sortieren', order: b.words ? 'Satzpuzzle' : 'Reihenfolge' }[b.type] || 'Aufgabe';
+    return { quiz: 'Quiz', gap: 'Lückentext', match: 'Zuordnen', essay: 'Freitext', mark: 'Markieren', sort: 'Sortieren', order: b.words ? 'Satzpuzzle' : 'Reihenfolge', app: appN(b.app) + '-Aufgabe' }[b.type] || 'Aufgabe';
+  }
+  /* ---------- App-Aufgaben (JPad …): Fenster mit der App, Stand als Antwort ---------- */
+  let APPM = null;
+  const loadAppMod = async () => APPM || (APPM = await import(modUrl('pfapp.js')));
+  /** Aufgaben, die sich den Stand teilen (gleiches „Projekt“ und gleiche App), sonst nur die Aufgabe selbst */
+  const appGroup = b => b.project ? doc.stations.flatMap(s => s.blocks).filter(x => x.type === 'app' && x.project === b.project && (x.app || 'jpad') === (b.app || 'jpad')) : [b];
+  async function openAppTask(id) {
+    const r = findBlock(id); if (!r) return; const b = r.b;
+    let M; try { M = await loadAppMod(); } catch (e) { toast('Die App lässt sich nicht laden.'); return; }
+    const exam = EXAM(), done = EXAM_DONE(), group = appGroup(b), ids = group.map(x => x.id);
+    const a = exam ? ids.map(i => prog.ans?.[i]).filter(Boolean).sort((x, y) => (y.at || 0) - (x.at || 0))[0] : null; // neuester Stand der Gruppe
+    const sb = group.find(x => (x.files || []).some(f => (f.text || '').trim())) || b;
+    const start = (sb.files || []).filter(f => (f.text || '').trim()).map(f => ({ name: f.name, text: f.text }));
+    const startSig = M.filesSig(start);
+    M.openApp({ app: b.app || 'jpad', url: opts.apps?.[b.app || 'jpad'], task: b.project ? 'projekt:' + b.project : id, title: (b.project ? `Projekt ${b.project} · ` : '') + (plain(b.title) || ''), files: a?.files || start, readonly: !exam || done,
+      closeLabel: !exam ? 'Schließen (Änderungen werden nicht gespeichert)' : undefined,
+      onState: st => {
+        if (!exam || EXAM_DONE()) return;
+        const old = ids.map(i => prog.ans[i]).find(Boolean);
+        const v = { files: st.files, sig: st.sig, at: st.at, ed: !!old?.ed || st.sig !== startSig, ...(st.run ? { run: st.run } : old?.run ? { run: old.run } : {}) };
+        ids.forEach(i => { prog.ans[i] = clone(v); examChanged(i); });
+      },
+      onClose: () => { if (exam) render(); } });
   }
   /** Antworten einer Aufgabe als Textzeilen – für Protokoll und Vorschau */
   function answerLines(b) {
     const a = prog.ans?.[b.id], none = '– keine Antwort –';
+    if (b.type === 'app') { if (!a?.files?.length) return [none]; const L = []; a.files.forEach(f => { L.push(`Datei ${f.name}:`, ...String(f.text).replace(/\s+$/, '').split('\n').map(l => '  ' + l)); }); L.push(a.run ? `Letzter Programmlauf${a.run.error ? ' (mit Fehler abgebrochen)' : ''}: ${String(a.run.output || '').trim().replace(/\s*\n\s*/g, ' | ').slice(0, 300) || '(keine Ausgabe)'}` : 'Programm nie ausgeführt.'); return L; }
     if (b.type === 'quiz') return b.qs.flatMap((q, qi) => { const o = q.opts.find(x => x.k != null && x.k === a?.[qi]); return [`${b.qs.length > 1 ? qi + 1 + '. ' : ''}${plain(q.q)}`, `Antwort: ${o ? plain(o.t) : none}`]; });
     if (b.type === 'gap') { let i = 0; const t = plain(String(b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const v = a?.[i++]; return ` [${v != null && String(v).trim() ? esc(v) : '___'}] `; })).replace(/\s+/g, ' ').replace(/\s+([.,;:!?])/g, '$1').trim(); return [t, ...(gapCount(b) && !answered(b) ? ['(nicht alle Lücken ausgefüllt)'] : [])]; }
     if (b.type === 'match') { const { L, R } = matchSides(b); return R.map(r => { const g = L.find(x => x.k === a?.[r.k]); return `${plain(r.t)}: ${g ? plain(g.t) : none}`; }); }
@@ -2401,6 +2465,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     if (host.submit) {
       const open = examTasks().filter(b => !answered(b)).length;
       if (!confirm(open ? `${open} Aufgabe${open > 1 ? 'n sind' : ' ist'} noch nicht vollständig beantwortet. Trotzdem abgeben?` : 'Prüfung jetzt abgeben? Danach kannst du nichts mehr ändern.')) return;
+      if (APPM) { await APPM.flushApp(); await APPM.closeApp(true); }
       await host.submit({ answers: clone(prog.ans || {}) });
       return;
     }
@@ -2949,6 +3014,8 @@ ${SC}
     examPdf: async name => examPdf(name, await examCode(name)),
     examStart: () => examStart(),
     setSubmitted: (v = true) => { doc.exam = { ...(doc.exam || {}), submitted: !!v }; render(); },
+    /** App-Fenster (JPad …): aktuellen Stand holen bzw. schließen, z. B. vor der automatischen Abgabe */
+    flushApp: async () => { if (APPM) await APPM.flushApp(); }, closeApp: async () => { if (APPM) await APPM.closeApp(true); },
     /** vorhandene HTML-Lernpfad-Seite öffnen (Originaldesign); liefert das Dokument oder null */
     importHtml: html => importPage(html), openFile: f => openFile(f),
   };

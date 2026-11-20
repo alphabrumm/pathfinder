@@ -151,6 +151,25 @@ test('Gleichung mit Lücken auf beiden Seiten: vertauscht ist auch richtig', () 
   assert.equal(gradeExam(k, { e: { 0: '3x', 1: '9', 2: '1', 3: '3' } }).total, 2); // x und y vertauscht bleibt falsch
 });
 
+test('JPad-Aufgabe: Schülerfassung ohne Lösung, automatische und manuelle Bewertung', () => {
+  const d = { v: 2, id: 'dj', form: 'pruefung', title: 'Info', design: {}, stations: [{ id: 's', title: 'A', blocks: [
+    { id: 'j1', type: 'app', app: 'jpad', pts: 4, title: 'Countdown', html: 'Zähle', files: [{ name: 'Rakete', text: 'class Rakete {}' }], expect: '3 2 1 Start', compare: 'enthaelt', needs: ['while'], rubric: [], solution: 'while (n > 0) {}' },
+    { id: 'j2', type: 'app', app: 'jpad', pts: 5, title: 'Klasse', html: 'Baue', files: [], expect: 'Hallo', needs: [], rubric: [{ t: 'Attribute', p: 2 }, { t: 'Konstruktor', p: 3 }], solution: 'x' }] }] };
+  const { student: st, key: ky } = splitExam(d), js = JSON.stringify(st);
+  assert.ok(!js.includes('3 2 1 Start') && !js.includes('while (n') && !js.includes('Konstruktor'));
+  assert.equal(st.stations[0].blocks[0].files[0].name, 'Rakete');
+  const run = (out, extra = {}) => ({ files: [{ name: 'Rakete', text: 'class Rakete { // while kommt noch\n }' }], sig: 'a', run: { output: out, error: false, sig: 'a' }, ...extra });
+  let R = gradeExam(ky, { j1: run('3\n2\n1\nStart\n') });
+  assert.equal(R.items[0].pts, 2); // Ausgabe stimmt, „while“ nur im Kommentar
+  R = gradeExam(ky, { j1: { files: [{ name: 'Rakete', text: 'while (n > 0) n--;' }], run: { output: '3 2 1 Start', error: false } } });
+  assert.equal(R.items[0].pts, 4); assert.ok(R.items[0].text.includes('Letzter Programmlauf'));
+  R = gradeExam(ky, { j1: { files: [{ name: 'Rakete', text: 'while' }], run: { output: '3 2 1 Start', error: true } } });
+  assert.equal(R.items[0].pts, 2); // abgebrochen: Ausgabe zählt nicht
+  assert.equal(R.items[1].auto, false); assert.equal(R.items[1].open, true); assert.equal(R.items[1].pts, null);
+  R = gradeExam(ky, { j2: run('Hallo') }, { manual: { j2: 4 } });
+  assert.equal(R.items[1].pts, 4); assert.equal(R.items[1].suggest, 5);
+});
+
 test('Zerlegen ändert das Original nicht', () => {
   assert.equal(doc.stations[0].blocks[1].qs[0].opts[0].k, undefined);
   assert.equal(doc.stations[0].blocks[1].qs[0].opts[0].ok, true);

@@ -10,8 +10,10 @@
 //   match { Schlüssel kb der rechten Karte: Schlüssel ka der gezogenen linken Karte }
 //   task  Text (kurze Antwort, wenn die Aufgabe ein Ergebnis hat, sonst Freitext)
 //   essay Text
+//   app   { files:[{name,text}], sig, at, run:{ output, error, at, sig } } – Stand aus der App (JPad …), siehe pfapp.js;
+//         Aufgaben mit demselben „project“ teilen sich den Stand (er steht dann bei jeder dieser Aufgaben)
 
-export const EXAM_TYPES = new Set(['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order']);
+export const EXAM_TYPES = new Set(['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order', 'app']);
 /** Bausteine ohne Lösungen, die unverändert in die Schülerfassung dürfen */
 const SAFE_TYPES = new Set(['text', 'info', 'image', 'table', 'reveal', 'file', 'code', 'uml', 'html']);
 /** Standard-Notenschlüssel (wie im Abitur): ab 20 % Note 5, ab 40 % Note 4, ab 55 % Note 3, ab 70 % Note 2, ab 85 % Note 1 */
@@ -83,10 +85,44 @@ function lcsHits(sol, g) {
 /** Teilpunkte: auf halbe Punkte abrunden */
 export const halfFloor = x => Math.floor(x * 2 + 1e-9) / 2;
 
+/* ---------- App-Aufgaben (JPad …): Ausgabe und Pflicht-Code prüfen ---------- */
+const APP_NAMES = { jpad: 'JPad', qpad: 'QPad', flowpad: 'FlowPad' };
+export const appName = a => APP_NAMES[a] || a || 'App';
+const normOut = s => String(s ?? '').replace(/\r\n?/g, '\n').split('\n').map(l => l.replace(/\s+$/, '')).join('\n').trim();
+const squash = s => normOut(s).replace(/\s+/g, ' ');
+/** Kommentare weglassen, damit „Muss: while“ nicht schon in einem Kommentar erfüllt ist */
+const noComments = (s, sql) => { s = String(s ?? '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:"'\\])\/\/[^\n]*/g, '$1'); return sql ? s.replace(/--[^\n]*/g, ' ') : s; };
+/** Teilprüfungen einer App-Aufgabe: Ausgabe (enthält / genau gleich) und Pflicht-Code */
+export function appParts(t, a) {
+  const parts = [], run = a?.run, code = noComments((a?.files || []).map(f => f.text).join('\n'), t.app === 'qpad');
+  if (t.expect) {
+    const want = t.expect, out = run?.output ?? '';
+    const ok = !!run && !run.error && (t.compare === 'gleich' ? normOut(out) === normOut(want) : squash(out).includes(squash(want)));
+    const given = !run ? 'Programm nie ausgeführt' : run.error ? 'mit Fehler abgebrochen' : (squash(out).slice(0, 80) + (squash(out).length > 80 ? '…' : '')) || '(keine Ausgabe)';
+    parts.push({ label: t.compare === 'gleich' ? 'Ausgabe (genau)' : 'Ausgabe enthält', given, ok, expected: squash(want) });
+  }
+  for (const n of (t.needs || []).filter(Boolean)) { const ok = code.includes(n); parts.push({ label: `Code enthält „${n}“`, given: ok ? 'ja' : 'nein', ok, expected: 'ja' }); }
+  return parts;
+}
+/** Stand einer App-Aufgabe als lesbarer Text (Korrektur, Protokoll, Ergebnisseite) */
+export function appText(a) {
+  const files = a?.files || [];
+  if (!files.length) return '';
+  let s = files.map(f => (files.length > 1 ? `// ── ${f.name} ──\n` : '') + String(f.text).replace(/\s+$/, '')).join('\n\n');
+  const r = a.run;
+  if (r) s += `\n\n▶ Letzter Programmlauf${r.error ? ' (mit Fehler abgebrochen)' : ''}:\n${String(r.output || '').replace(/\s+$/, '') || '(keine Ausgabe)'}`;
+  else s += '\n\n▶ Programm wurde nie ausgeführt.';
+  if (r && a.sig && r.sig && r.sig !== a.sig) s += '\n⚠ Der Code wurde nach diesem Programmlauf noch geändert.';
+  return s;
+}
+/** Wie wird eine App-Aufgabe bewertet? 'rubric' (Lehrkraft mit Erwartungshorizont), 'auto' (Ausgabe/Pflicht-Code), 'free' (Lehrkraft) */
+export const appMode = t => (t.rubric || []).length ? 'rubric' : (t.expect || (t.needs || []).some(Boolean)) ? 'auto' : 'free';
+
 /** Art der Bewertung eines Prüfungsbausteins */
 export function taskKind(b) {
   if (b.type === 'task') return b.answer || b.short ? 'short' : 'free';
   if (b.type === 'essay') return 'free';
+  if (b.type === 'app') return 'app';
   return b.type;
 }
 /** Kurzer Titel einer Aufgabe für Listen und Protokolle */
@@ -99,6 +135,7 @@ export function taskTitle(b) {
   if (b.type === 'mark') return 'Markieren';
   if (b.type === 'sort') return 'Sortieren';
   if (b.type === 'order') return b.words ? 'Satzpuzzle' : 'Reihenfolge';
+  if (b.type === 'app') return `${appName(b.app)}-Aufgabe`;
   return strip(b.html).slice(0, 60) || 'Aufgabe';
 }
 
@@ -164,6 +201,13 @@ export function splitExam(doc) {
       } else if (b.type === 'essay') {
         out.blocks.push({ id: b.id, type: 'essay', pts, title: b.title || '', html: b.html || '', img: b.img || '', lines: b.lines || 6 });
         tasks.push({ id: b.id, type: 'essay', pts, title, rubric: (b.rubric || []).map(r => ({ t: r.t || '', p: +r.p || 0 })), solution: b.solution || '' });
+      } else if (b.type === 'app') {
+        // Startcode gehört zur Aufgabe; erwartete Ausgabe, Pflicht-Code, Erwartungshorizont und Musterlösung nicht
+        const files = (b.files || []).filter(f => f && (f.text || '').trim()).map(f => ({ name: String(f.name || ''), text: String(f.text) }));
+        out.blocks.push({ id: b.id, type: 'app', pts, app: b.app || 'jpad', title: b.title || '', html: b.html || '', img: b.img || '', files, ...(b.project ? { project: String(b.project) } : {}) });
+        const t = { id: b.id, type: 'app', pts, title, app: b.app || 'jpad', expect: b.expect || '', compare: b.compare === 'gleich' ? 'gleich' : 'enthaelt', needs: (b.needs || []).filter(Boolean), rubric: (b.rubric || []).map(r => ({ t: r.t || '', p: +r.p || 0 })), solution: b.solution || '', files };
+        tasks.push(t);
+        if (appMode(t) === 'free') warnings.push(`${title}: ohne erwartete Ausgabe, Pflicht-Code oder Erwartungshorizont – du bewertest sie nach der Abgabe von Hand.`);
       } else if (SAFE_TYPES.has(b.type) || b.type === 'heading') {
         const c = clone(b); delete c.anim; out.blocks.push(c);
       } else if (b.type === 'lock') {
@@ -218,6 +262,16 @@ export function gradeExam(key, answers = {}, opt = {}) {
     } else if (t.type === 'task' && t.short) {
       const g = typeof a === 'string' ? a : '';
       it.parts.push({ label: 'Antwort', given: g, ok: isAnswer([t.answer].concat(acc[0] || []).join('|'), g), expected: String(t.answer).split('|').join(' oder ') });
+    } else if (t.type === 'app') {
+      it.text = appText(a); it.app = t.app; it.files = a?.files || [];
+      it.parts = appParts(t, a);
+      if (appMode(t) !== 'auto') {
+        it.auto = false;
+        const m = opt.manual?.[t.id];
+        if (m == null) { it.open = true; it.pts = null; } else it.pts = Math.max(0, Math.min(t.pts, +m || 0));
+        // Vorschlag aus den automatischen Prüfungen (nur Hilfe für die Lehrkraft)
+        if (it.parts.length) it.suggest = halfFloor(t.pts * it.parts.filter(p => p.ok).length / it.parts.length);
+      }
     } else { // Freitext: bewertet die Lehrkraft
       it.auto = false; it.text = typeof a === 'string' ? a : '';
       const m = opt.manual?.[t.id];

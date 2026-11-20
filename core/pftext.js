@@ -155,6 +155,33 @@ export function hideDefaults(b, S) {
   return b;
 }
 
+/* ---------- App-Aufgabe (JPad, QPad, FlowPad) ---------- */
+const APP_MAIN = { jpad: 'Hauptprogramm', qpad: 'Abfrage', flowpad: 'Programm' };
+/** Dateiname zum Startcode: angegeben („```java start Rakete“), sonst Klassenname, sonst Hauptprogramm */
+function appFileName(app, given, code, used) {
+  let n = String(given || '').trim().replace(/\.(java|sql|txt)$/i, '');
+  if (!n && app === 'jpad') n = (String(code).match(/\b(?:class|interface|enum)\s+([A-Za-z_]\w*)/) || [])[1] || '';
+  n = (n || APP_MAIN[app] || 'Datei').replace(/[^\wÄÖÜäöüß-]+/g, '');
+  let k = n, i = 2; while (used.has(k.toLowerCase())) k = n + i++;
+  used.add(k.toLowerCase()); return k;
+}
+function appSection(app, name) {
+  return { n: name, fences: true, keys: ['ausgabe', 'vergleich', 'muss', 'erwartung', 'punkte', 'bild', 'loesung', 'projekt'], make(S, H) {
+    const isSol = c => /^(loesung|losung|solution|muster|musterloesung)\b/.test(c.tag), isOut = c => /^(ausgabe|output)\b/.test(c.tag);
+    const used = new Set(), files = S.code.filter(c => !isSol(c) && !isOut(c)).map(c => ({ name: appFileName(app, (c.raw || '').replace(/^start\b\s*/i, ''), c.code, used), text: c.code }));
+    const outFence = S.code.find(isOut), sols = S.code.filter(isSol);
+    const expect = outFence ? outFence.code : (S.one('ausgabe') || '').replace(/\\n/g, '\n');
+    const rubric = S.all('erwartung').map(x => { const m = x.match(/^(.*?)\s*\((\d+(?:[.,]\d+)?)\s*(?:P\.?|Punkte?)?\)\s*$/i); return m ? { t: m[1].trim(), p: parseFloat(m[2].replace(',', '.')) } : { t: x.trim(), p: 1 }; }).filter(r => r.t);
+    const b = { type: 'app', app, title: S.title, html: H.md(S.body), img: S.one('bild') ? H.img(S.one('bild'), S.line) : '', files, expect,
+      compare: /gleich|genau/i.test(S.one('vergleich') || '') ? 'gleich' : 'enthaelt', needs: S.all('muss').map(x => x.trim()).filter(Boolean), rubric,
+      solution: sols.map(c => c.code).join('\n\n') || S.one('loesung') || '' };
+    if (S.one('projekt')) b.project = S.one('projekt').trim().slice(0, 40);
+    if (rubric.length) b.pts = rubric.reduce((a, r) => a + r.p, 0);
+    if (!expect && !b.needs.length && !rubric.length) H.warn(S.line, `${name}-Aufgabe „${S.title || ''}“: ohne „Ausgabe:“, „Muss:“ oder „Erwartung:“ wird sie nicht automatisch bewertet – du bewertest sie von Hand.`);
+    return b;
+  } };
+}
+
 /* ---------- Aufbau der Bausteine aus Abschnitten ---------- */
 const CORE_SECTIONS = {
   aufgabe: { n: 'Aufgabe', keys: ['antwort', 'tipp', 'loesung', 'xp', 'punkte', 'bild'], make(S, H) {
@@ -221,6 +248,8 @@ const CORE_SECTIONS = {
     if (items.length < 2) H.err(S.line, 'Reihenfolge braucht mindestens zwei Zeilen.');
     return { type: 'order', words: false, title: S.title || 'Bring die Abschnitte in die richtige Reihenfolge', items, alts: [], xp: S.num('xp', 10) };
   } },
+  // Programmieren in einer App (nur Prüfungen): ### JPad: Titel – Startcode ```java start Name```, Musterlösung ```java lösung```
+  jpad: appSection('jpad', 'JPad'), qpad: appSection('qpad', 'QPad'), flowpad: appSection('flowpad', 'FlowPad'),
   aufdecken: { n: 'Aufdecken', make: (S, H) => ({ type: 'reveal', summary: S.title || 'Mehr erfahren', html: H.md(S.body) }) },
   uml: { n: 'UML', make(S) {
     const L = S.body.map(l => l.replace(/^\s*[-+#~•]\s*/, '').trim()).filter(Boolean);
@@ -230,9 +259,10 @@ const CORE_SECTIONS = {
 };
 const SEC_ALIAS = { aufgabe: 'aufgabe', auftrag: 'aufgabe', quiz: 'quiz', test: 'quiz', lueckentext: 'lueckentext', luecken: 'lueckentext', zuordnen: 'zuordnen', zuordnung: 'zuordnen', aufdecken: 'aufdecken', aufklappen: 'aufdecken', 'mehr erfahren': 'aufdecken', uml: 'uml', 'uml-klasse': 'uml', klasse: 'uml', html: 'html', freitext: 'freitext', 'offene aufgabe': 'freitext', essay: 'freitext',
   markieren: 'markieren', markiere: 'markieren', 'im text markieren': 'markieren', sortieren: 'sortieren', sortiere: 'sortieren', gruppen: 'sortieren', kategorisieren: 'sortieren',
-  satzpuzzle: 'satzpuzzle', wortpuzzle: 'satzpuzzle', satzbau: 'satzpuzzle', reihenfolge: 'reihenfolge', textpuzzle: 'reihenfolge', ordnen: 'reihenfolge' };
+  satzpuzzle: 'satzpuzzle', wortpuzzle: 'satzpuzzle', satzbau: 'satzpuzzle', reihenfolge: 'reihenfolge', textpuzzle: 'reihenfolge', ordnen: 'reihenfolge',
+  jpad: 'jpad', 'jpad-aufgabe': 'jpad', qpad: 'qpad', 'qpad-aufgabe': 'qpad', flowpad: 'flowpad', 'flowpad-aufgabe': 'flowpad' };
 /** Bausteine, die als Aufgabe zählen (Punkte, Fortschritt) */
-export const CHECK_TYPES = ['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order'];
+export const CHECK_TYPES = ['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order', 'app'];
 
 export function parseText(src, env) {
   const errors = [], warnings = [];
@@ -294,13 +324,13 @@ export function parseText(src, env) {
   for (; i < lines.length; i++) {
     const raw = lines[i], n = i + 1, l = raw.trim();
     // Code-Block ```sprache
-    const fence = l.match(/^```\s*([\w+#-]*)(?:\s+[\wäöüÄÖÜß-]+)?\s*$/);
+    const fence = l.match(/^```\s*([\w+#-]*)(?:\s+[\wäöüÄÖÜß.-]+){0,3}\s*$/);
     if (fence) {
       const code = []; i++; while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) code.push(lines[i++]);
       if (i >= lines.length) H.warn(n, 'Code-Block ohne schließendes ```.');
       if (sec && sec.kind === 'html') { sec.lines.push(...code.map((c, k) => [c, n + k + 1])); continue; }
       // Abschnitte mit eigenen Codeblöcken (z. B. Startcode, Musterlösung) – Zusatz nach der Sprache: ```java start
-      if (sec && SECS[sec.kind].fences) { sec.code.push({ lang: (fence[1] || '').toLowerCase(), tag: norm(raw.trim().replace(/^`{3,}\s*[\w+#-]*\s*/, '')), code: code.join('\n') }); continue; }
+      if (sec && SECS[sec.kind].fences) { const extra = raw.trim().replace(/^`{3,}\s*[\w+#-]*\s*/, ''); sec.code.push({ lang: (fence[1] || '').toLowerCase(), tag: norm(extra), raw: extra, code: code.join('\n') }); continue; }
       closeSec(); flushPara();
       if (/^svg$/i.test(fence[1])) { const src = cleanSvg(code.join('\n')); if (src) { images.push({ n, src }); push({ type: 'image', src, alt: '', caption: '', size: 'voll' }, n); } else H.warn(n, 'SVG-Grafik ist ungültig oder zu groß – weggelassen.'); continue; }
       push({ type: 'code', lang: (fence[1] || 'text').toLowerCase(), code: code.join('\n'), ...(/\s(ohne-knopf|nocopy)\s*$/i.test(l) ? { nocopy: true } : {}) }, n); continue;
@@ -434,12 +464,26 @@ export function docToText(doc, env, out = {}) {
         case 'sort': L.push(`### Sortieren: ${md(b.title)}`, ...(b.groups || []).map(g => `${g.name}: ${(g.items || []).join(', ')}`)); break;
         case 'order': if (b.words) L.push(`### Satzpuzzle: ${md(b.title)}`, (b.items || []).join(' / '), ...(b.alts || []).map(a => `Auch richtig: ${a.join(' / ')}`));
           else L.push(`### Reihenfolge: ${md(b.title)}`, ...(b.items || []).map(x => '- ' + md(x))); break;
+        case 'app': {
+          const N = { jpad: 'JPad', qpad: 'QPad', flowpad: 'FlowPad' }[b.app] || 'JPad', lang = { jpad: 'java', qpad: 'sql' }[b.app] || 'text';
+          L.push(`### ${N}: ${md(b.title || '')}`, md(b.html || ''));
+          if (b.img) L.push(`Bild: ${ref(b.img, 'bild')}`);
+          if (b.project) L.push(`Projekt: ${b.project}`);
+          if (b.expect && !b.expect.includes('\n')) L.push(`Ausgabe: ${b.expect}`);
+          if (b.compare === 'gleich') L.push('Vergleich: gleich');
+          (b.needs || []).filter(Boolean).forEach(n => L.push(`Muss: ${n}`));
+          (b.rubric || []).forEach(r => L.push(`Erwartung: ${r.t} (${String(r.p).replace('.', ',')})`));
+          if (b.expect && b.expect.includes('\n')) L.push('```text ausgabe', b.expect, '```');
+          (b.files || []).forEach(f => L.push('```' + lang + ' start ' + f.name, f.text, '```'));
+          if (b.solution) L.push('```' + lang + ' lösung', b.solution, '```');
+          break;
+        }
         case 'lock': L.push('--- Sperre ---'); break;
         case 'file': L.push(`%% Datei „${b.name}“ (nur im Editor)`); break;
         default: { const t = plug[b.type]; L.push(t?.toText ? t.toText(b, { md }) : `%% Baustein „${b.type}“ – im Textformat nicht darstellbar`); }
       }
       // Punkte je Aufgabe (bei Freitext mit Erwartungshorizont ergeben sie sich aus den Teilpunkten)
-      if (doc.pointsOn && b.pts != null && CHECK_TYPES.includes(b.type) && !(b.type === 'essay' && (b.rubric || []).length)) L.push(`Punkte: ${b.pts}`);
+      if (doc.pointsOn && b.pts != null && CHECK_TYPES.includes(b.type) && !((b.type === 'essay' || b.type === 'app') && (b.rubric || []).length)) L.push(`Punkte: ${b.pts}`);
     }
   }
   if (att.length) {
@@ -463,6 +507,7 @@ export const EXAM_STYLES = [
   ['puzzle', 'Satzpuzzle', 'Wörter in die richtige Reihenfolge bringen', '„### Satzpuzzle“ – ein Satz in einer Zeile, Teile mit „ / “ getrennt (feste Wendungen wie „to London“ als ein Teil); jede weitere korrekte Wortstellung als Zeile „Auch richtig: …“ mit denselben Teilen; das erste Wort klein schreiben (außer Namen und „I“), ohne Satzzeichen am Ende – PathFinder schreibt den Satzanfang selbst groß'],
   ['textorder', 'Textpuzzle (Reihenfolge)', 'Abschnitte oder Dialogzeilen ordnen', '„### Reihenfolge“ – 4–6 Abschnitte, Sätze oder Dialogzeilen, je Zeile einer, in der richtigen Reihenfolge; die Reihenfolge muss eindeutig sein (Signalwörter, Handlungsablauf)'],
   ['essay', 'Freitext', 'mit Erwartungshorizont, du bewertest', '„### Freitext“ mit Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“'],
+  ['jpad', 'Programmieren in JPad', 'Java-Programm in JPad schreiben, nur für Informatik', '„### JPad: Titel“ – die Schüler programmieren in JPad (Java): kurzer Auftrag, Startcode als ```java start Klassenname … ``` (optional, je Datei ein Block), „Ausgabe:“ mit der erwarteten Programmausgabe (Teil der Ausgabe genügt) und/oder „Muss:“ für Pflicht-Code (z. B. while); Musterlösung als ```java lösung … ``` (sieht nur die Lehrkraft). Ohne „Erwartung:“-Zeilen wird automatisch nach Ausgabe und Pflicht-Code bewertet; mit „Erwartung: … (Punkte)“ bewertet die Lehrkraft. Java wie in JPad üblich: println() und print() ohne System.out, Wrapper-Typen Integer, Double, Boolean, Character statt int, double, boolean, char'],
 ];
 /** vorausgewählte Aufgabenstile (Lösungsschritte nur, wenn das Thema Rechenwege hat) */
 export const EXAM_STYLES_DEFAULT = ['quiz', 'gapbank', 'gap', 'match', 'short', 'essay'];
@@ -543,7 +588,22 @@ Erwartung: erster Teilaspekt der erwarteten Antwort (2)   (Erwartungshorizont, Z
 Erwartung: zweiter Teilaspekt (1)
 Zeilen: 6               (optional: Höhe des Antwortfelds)
 
-Punkte: 2               (in jeder Aufgabe, jedem Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle oder jeder Reihenfolge: Punkte für diese Aufgabe)
+### JPad: Titel         (nur in Prüfungen: Programmieraufgabe, die Schüler in JPad bearbeiten)
+Arbeitsauftrag.
+Ausgabe: Start in 3 2 1  (optional: was das Programm ausgeben soll; mehrzeilig als \`\`\`text ausgabe … \`\`\`)
+Vergleich: enthält | gleich   (Standard: enthält – Leerzeichen und Zeilenumbrüche zählen nicht)
+Muss: while              (optional, mehrfach: muss im Code vorkommen)
+Erwartung: Teilaspekt (2)   (optional: Erwartungshorizont – dann bewertet die Lehrkraft, die Prüfungen oben sind nur Hinweise)
+Projekt: Rakete          (optional: JPad-Aufgaben mit demselben Projekt bauen nacheinander am selben Programm; Startcode nur bei der ersten)
+\`\`\`java start Rakete
+Startcode (optional, je Datei ein Block; Name nach „start“, sonst Klassenname bzw. Hauptprogramm)
+\`\`\`
+\`\`\`java lösung
+Musterlösung (nur für die Lehrkraft)
+\`\`\`
+Punkte: 6               (ohne Erwartungshorizont: Punkte × Anteil erfüllter Prüfungen)
+
+Punkte: 2               (in jeder Aufgabe, jedem Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle, jeder Reihenfolge oder JPad-Aufgabe: Punkte für diese Aufgabe)
 
 ### Aufdecken: Mehr erfahren
 Text, der erst nach Antippen erscheint.
@@ -583,7 +643,7 @@ export function promptFor(info, env) {
     ? `- Schreibe im Kopf die Zeile „Art: Prüfung“.
 - KEINE Erklärungen, Merkkästen, Figuren, Tipps, Lösungen zum Aufdecken oder Sperren – nur kurze Arbeitsanweisungen, Material (Texte, Tabellen, Abbildungen) und Aufgaben.
 - Gliedere die Prüfung in Stationen als Teilaufgaben oder Themenblöcke (z. B. „## Station: Teil A | Grundwissen“).
-- Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle, Reihenfolge, Freitext) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken, Markieren und Sortieren etwa 1 Punkt je zwei Wörter bzw. Begriffe, ein Satzpuzzle 1–2 Punkte.
+- Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle, Reihenfolge, Freitext, JPad) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken, Markieren und Sortieren etwa 1 Punkt je zwei Wörter bzw. Begriffe, ein Satzpuzzle 1–2 Punkte.
 ${!info.types?.length || info.types.includes('short') ? `- Rechenaufgaben mit eindeutigem Ergebnis als „### Aufgabe“ mit „Antwort:“ (Zahl, ohne Einheit, mehrere richtige mit | trennen) – sie werden automatisch bewertet. Schreibe die erwartete Einheit in den Auftrag.` : ''}
 ${!info.types?.length || info.types.includes('essay') ? `- Offene Aufgaben (erklären, begründen, beschreiben, beurteilen) als „### Freitext“ mit Erwartungshorizont: mehrere Zeilen „Erwartung: … (Punkte)“; die Summe ergibt die Punkte der Aufgabe.` : ''}
 ${info.ask ? `- AUFGABENARTEN – verwende die Arten, die die Lehrkraft gewählt hat, und zwar JEDE mindestens einmal; ohne Vorgabe eine abwechslungsreiche, zum Thema passende Auswahl (Lösungsschritte nur bei Rechenwegen):
@@ -602,7 +662,7 @@ ${!info.types?.length || info.types.includes('gap') ? `- Lückentexte ohne Wortb
 - Grundlagen = direkte Anwendung des Gelernten; Fortgeschritten = Transfer, mehrere Schritte; Experte = offene, knifflige Probleme oder neue Zusammenhänge.
 - Tipps erinnern an das nötige Vorwissen, statt es neu zu erklären.
 ${info.types?.length ? `- AUFGABENSTILE – verwende AUSSCHLIESSLICH diese Aufgabenarten (dazu höchstens kurze Merkkästen), und zwar JEDE mindestens einmal, sinnvoll auf die Stufen verteilt:
-${EXAM_STYLES.filter(s => s[0] !== 'essay' && info.types.includes(s[0])).map(s => `  • ${s[1]}: ${s[3]}`).join('\n')}
+${EXAM_STYLES.filter(s => s[0] !== 'essay' && s[0] !== 'jpad' && info.types.includes(s[0])).map(s => `  • ${s[1]}: ${s[3]}`).join('\n')}
 ` : ''}`
     : `- Schreibe im Kopf die Zeile „Art: Lernpfad“.
 - Jede Station: kurzer Einstieg, dann Erklärung des Neuen (mit Beispiel, gern einem Schaubild), dann mindestens eine Übung (Aufgabe, Quiz, Lückentext oder Zuordnen), die das Neue sofort festigt.

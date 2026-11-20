@@ -1,6 +1,6 @@
 # Prüfungsformat für Probe
 
-> Automatisch erzeugt mit `node tools/doku.mjs` aus `core/pftext.js` (PathFinder 2026-11-19c). Nicht von Hand ändern.
+> Automatisch erzeugt mit `node tools/doku.mjs` aus `core/pftext.js` (PathFinder 2026-11-20a). Nicht von Hand ändern.
 
 Prüfungen für [Probe](https://github.com/alphabrumm/probe) sind Texte im **PathFinder-Textformat** mit `Art: Prüfung`.
 Jede KI kann sie schreiben; Probe liest sie ohne Nacharbeit ein. Der Claude-Skill „probe-pruefung“
@@ -32,6 +32,7 @@ Unter „Prompt für externe KI anzeigen“ zeigt Probe genau die Spezifikation 
 | Satzpuzzle | „### Satzpuzzle“ – ein Satz in einer Zeile, Teile mit „ / “ getrennt (feste Wendungen wie „to London“ als ein Teil); jede weitere korrekte Wortstellung als Zeile „Auch richtig: …“ mit denselben Teilen; das erste Wort klein schreiben (außer Namen und „I“), ohne Satzzeichen am Ende – PathFinder schreibt den Satzanfang selbst groß |
 | Textpuzzle (Reihenfolge) | „### Reihenfolge“ – 4–6 Abschnitte, Sätze oder Dialogzeilen, je Zeile einer, in der richtigen Reihenfolge; die Reihenfolge muss eindeutig sein (Signalwörter, Handlungsablauf) |
 | Freitext | „### Freitext“ mit Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“ |
+| Programmieren in JPad | „### JPad: Titel“ – die Schüler programmieren in JPad (Java): kurzer Auftrag, Startcode als ```java start Klassenname … ``` (optional, je Datei ein Block), „Ausgabe:“ mit der erwarteten Programmausgabe (Teil der Ausgabe genügt) und/oder „Muss:“ für Pflicht-Code (z. B. while); Musterlösung als ```java lösung … ``` (sieht nur die Lehrkraft). Ohne „Erwartung:“-Zeilen wird automatisch nach Ausgabe und Pflicht-Code bewertet; mit „Erwartung: … (Punkte)“ bewertet die Lehrkraft. Java wie in JPad üblich: println() und print() ohne System.out, Wrapper-Typen Integer, Double, Boolean, Character statt int, double, boolean, char |
 
 ## Spezifikation
 
@@ -51,7 +52,7 @@ REGELN
 - Schreibe im Kopf die Zeile „Art: Prüfung“.
 - KEINE Erklärungen, Merkkästen, Figuren, Tipps, Lösungen zum Aufdecken oder Sperren – nur kurze Arbeitsanweisungen, Material (Texte, Tabellen, Abbildungen) und Aufgaben.
 - Gliedere die Prüfung in Stationen als Teilaufgaben oder Themenblöcke (z. B. „## Station: Teil A | Grundwissen“).
-- Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle, Reihenfolge, Freitext) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken, Markieren und Sortieren etwa 1 Punkt je zwei Wörter bzw. Begriffe, ein Satzpuzzle 1–2 Punkte.
+- Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle, Reihenfolge, Freitext, JPad) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken, Markieren und Sortieren etwa 1 Punkt je zwei Wörter bzw. Begriffe, ein Satzpuzzle 1–2 Punkte.
 - Rechenaufgaben mit eindeutigem Ergebnis als „### Aufgabe“ mit „Antwort:“ (Zahl, ohne Einheit, mehrere richtige mit | trennen) – sie werden automatisch bewertet. Schreibe die erwartete Einheit in den Auftrag.
 - Offene Aufgaben (erklären, begründen, beschreiben, beurteilen) als „### Freitext“ mit Erwartungshorizont: mehrere Zeilen „Erwartung: … (Punkte)“; die Summe ergibt die Punkte der Aufgabe.
 - AUFGABENARTEN – verwende die Arten, die die Lehrkraft gewählt hat, und zwar JEDE mindestens einmal; ohne Vorgabe eine abwechslungsreiche, zum Thema passende Auswahl (Lösungsschritte nur bei Rechenwegen):
@@ -66,6 +67,7 @@ REGELN
   • Satzpuzzle: „### Satzpuzzle“ – ein Satz in einer Zeile, Teile mit „ / “ getrennt (feste Wendungen wie „to London“ als ein Teil); jede weitere korrekte Wortstellung als Zeile „Auch richtig: …“ mit denselben Teilen; das erste Wort klein schreiben (außer Namen und „I“), ohne Satzzeichen am Ende – PathFinder schreibt den Satzanfang selbst groß
   • Textpuzzle (Reihenfolge): „### Reihenfolge“ – 4–6 Abschnitte, Sätze oder Dialogzeilen, je Zeile einer, in der richtigen Reihenfolge; die Reihenfolge muss eindeutig sein (Signalwörter, Handlungsablauf)
   • Freitext: „### Freitext“ mit Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“
+  • Programmieren in JPad: „### JPad: Titel“ – die Schüler programmieren in JPad (Java): kurzer Auftrag, Startcode als ```java start Klassenname … ``` (optional, je Datei ein Block), „Ausgabe:“ mit der erwarteten Programmausgabe (Teil der Ausgabe genügt) und/oder „Muss:“ für Pflicht-Code (z. B. while); Musterlösung als ```java lösung … ``` (sieht nur die Lehrkraft). Ohne „Erwartung:“-Zeilen wird automatisch nach Ausgabe und Pflicht-Code bewertet; mit „Erwartung: … (Punkte)“ bewertet die Lehrkraft. Java wie in JPad üblich: println() und print() ohne System.out, Wrapper-Typen Integer, Double, Boolean, Character statt int, double, boolean, char
 - Anforderungsbereiche: wie von der Lehrkraft angegeben, sonst etwa 40 % der Punkte Reproduktion (AFB I), 40 % Anwendung und Transfer (AFB II), 20 % Problemlösen und Beurteilen (AFB III); von leicht nach schwer.
 - Quizfragen mit genau einer richtigen Antwort und plausiblen falschen Antworten; Rückmeldungen nach // sind nicht nötig.
 - Lückentexte ohne Wortbank werden tolerant bewertet (Groß/Klein egal); mehrdeutige Lücken vermeiden oder alle richtigen Antworten mit | angeben.
@@ -149,7 +151,22 @@ Erwartung: erster Teilaspekt der erwarteten Antwort (2)   (Erwartungshorizont, Z
 Erwartung: zweiter Teilaspekt (1)
 Zeilen: 6               (optional: Höhe des Antwortfelds)
 
-Punkte: 2               (in jeder Aufgabe, jedem Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle oder jeder Reihenfolge: Punkte für diese Aufgabe)
+### JPad: Titel         (nur in Prüfungen: Programmieraufgabe, die Schüler in JPad bearbeiten)
+Arbeitsauftrag.
+Ausgabe: Start in 3 2 1  (optional: was das Programm ausgeben soll; mehrzeilig als ```text ausgabe … ```)
+Vergleich: enthält | gleich   (Standard: enthält – Leerzeichen und Zeilenumbrüche zählen nicht)
+Muss: while              (optional, mehrfach: muss im Code vorkommen)
+Erwartung: Teilaspekt (2)   (optional: Erwartungshorizont – dann bewertet die Lehrkraft, die Prüfungen oben sind nur Hinweise)
+Projekt: Rakete          (optional: JPad-Aufgaben mit demselben Projekt bauen nacheinander am selben Programm; Startcode nur bei der ersten)
+```java start Rakete
+Startcode (optional, je Datei ein Block; Name nach „start“, sonst Klassenname bzw. Hauptprogramm)
+```
+```java lösung
+Musterlösung (nur für die Lehrkraft)
+```
+Punkte: 6               (ohne Erwartungshorizont: Punkte × Anteil erfüllter Prüfungen)
+
+Punkte: 2               (in jeder Aufgabe, jedem Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle, jeder Reihenfolge oder JPad-Aufgabe: Punkte für diese Aufgabe)
 
 ### Aufdecken: Mehr erfahren
 Text, der erst nach Antippen erscheint.
@@ -190,6 +207,7 @@ Probe bewertet nach der Abgabe; die Schüler bekommen während der Prüfung kein
 | Sortieren | je Begriff |
 | Satzpuzzle, Reihenfolge | je Teil an richtiger Stelle (längste richtige Teilfolge), beste der erlaubten Lösungen |
 | Freitext | von der Lehrkraft, mit Erwartungshorizont |
+| JPad | ohne `Erwartung:` automatisch je Prüfung (Ausgabe des letzten Programmlaufs, jeder `Muss:`-Code); mit `Erwartung:` von der Lehrkraft – die Prüfungen sind dann nur Hinweise |
 
 **Teilpunkte:** Punkte der Aufgabe × Anteil richtiger Teile, auf halbe Punkte abgerundet.
 Die Lehrkraft kann nachträglich weitere Antworten akzeptieren, Punkte überschreiben oder Aufgaben streichen.

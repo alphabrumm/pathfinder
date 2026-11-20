@@ -762,3 +762,9 @@ label.lp-btn { display: inline-flex; align-items: center; justify-content: cente
 .ed-form .help .ex-plink { color: #4a5fb8; text-decoration: underline; cursor: pointer; }
 .ex-steps { margin: 4px 0 2px; padding-left: 22px; font-size: 14px; line-height: 1.5; }
 #exPrompt { max-height: 340px; }
+/* App-Aufgabe (JPad …) */
+.lp-app .lp-app-file { margin-top: 10px; }
+.lp-app .lp-app-file pre, .lp-app-out { margin: 4px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); font: calc(13px * var(--fz))/1.4 ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-x: auto; max-height: 18em; overflow-y: auto; }
+.lp-app .lp-app-st { margin-top: 6px; color: var(--ink-2); }
+.lp-app .where { margin-left: auto; margin-right: 8px; color: var(--ink-2); font-size: .85em; font-weight: 600; }
+.lp-app .help { font-size: .85em; color: var(--ink-2); font-weight: 400; }

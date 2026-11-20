@@ -38,6 +38,7 @@ const BEWERTUNG = `Probe bewertet nach der Abgabe; die Schüler bekommen währen
 | Sortieren | je Begriff |
 | Satzpuzzle, Reihenfolge | je Teil an richtiger Stelle (längste richtige Teilfolge), beste der erlaubten Lösungen |
 | Freitext | von der Lehrkraft, mit Erwartungshorizont |
+| JPad | ohne \`Erwartung:\` automatisch je Prüfung (Ausgabe des letzten Programmlaufs, jeder \`Muss:\`-Code); mit \`Erwartung:\` von der Lehrkraft – die Prüfungen sind dann nur Hinweise |
 
 **Teilpunkte:** Punkte der Aufgabe × Anteil richtiger Teile, auf halbe Punkte abgerundet.
 Die Lehrkraft kann nachträglich weitere Antworten akzeptieren, Punkte überschreiben oder Aufgaben streichen.
