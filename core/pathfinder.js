@@ -2382,7 +2382,10 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const sb = group.find(x => (x.files || []).some(f => (f.text || '').trim())) || b;
     const start = (sb.files || []).filter(f => (f.text || '').trim()).map(f => ({ name: f.name, text: f.text }));
     const startSig = M.filesSig(start);
-    M.openApp({ app: b.app || 'jpad', url: opts.apps?.[b.app || 'jpad'], task: b.project ? 'projekt:' + b.project : id, title: (b.project ? `Projekt ${b.project} · ` : '') + (plain(b.title) || ''), files: a?.files || start, readonly: !exam || done,
+    // Aufgabenstellung für die App (JPad zeigt sie im Reiter „Aufgabe“); beim gemeinsamen Projekt alle Aufgaben des Projekts
+    const info = { html: M.taskPage({ head: [plain(doc.kicker || ''), plain(doc.title || '')].filter(Boolean).join(' · '), project: b.project || '',
+      tasks: group.map(x => ({ title: plain(x.title) || appN(x.app) + '-Aufgabe', html: x.html || '', img: x.img || '', pts: doc.pointsOn ? ptsOf(x) : null, current: x.id === id })) }) };
+    M.openApp({ app: b.app || 'jpad', url: opts.apps?.[b.app || 'jpad'], task: b.project ? 'projekt:' + b.project : id, title: (b.project ? `Projekt ${b.project} · ` : '') + (plain(b.title) || ''), files: a?.files || start, readonly: !exam || done, info,
       closeLabel: !exam ? 'Schließen (Änderungen werden nicht gespeichert)' : undefined,
       onState: st => {
         if (!exam || EXAM_DONE()) return;

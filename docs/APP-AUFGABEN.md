@@ -22,7 +22,7 @@ Die App wird mit `?pfapp=1` geöffnet und spricht per `postMessage` mit der Prü
 | Richtung | Meldung | Bedeutung |
 | --- | --- | --- |
 | App → Prüfung | `{ type:'pf-app', action:'ready', app, v:1 }` | App bereit (wiederholen, bis `load` kommt) |
-| Prüfung → App | `{ action:'load', task, title, files:[{name,text}], readonly }` | Aufgabe laden; Dateien ersetzen den Inhalt |
+| Prüfung → App | `{ action:'load', task, title, files:[{name,text}], readonly, info? }` | Aufgabe laden; Dateien ersetzen den Inhalt. `info.html` = Aufgabenstellung als HTML-Seite (`taskPage` in pfapp.js; beim gemeinsamen Projekt alle Aufgaben, die geöffnete hervorgehoben) – die App zeigt sie neben dem Code (JPad: Reiter „Aufgabe“) |
 | App → Prüfung | `{ action:'state', task, files, run? }` | nach Änderungen (gebündelt) und nach jedem Lauf: `run = { output, error }` |
 | Prüfung → App | `{ action:'flush', req }` | sofort `state` mit demselben `req` schicken (vor Abgabe/Schließen) |
 | Prüfung → App | `{ action:'stop' }` | laufendes Programm anhalten (Fenster geschlossen) |

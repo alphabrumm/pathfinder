@@ -5,7 +5,8 @@
 //
 //   App-Adresse + ?pfapp=1   → App startet im Prüfungsmodus (ohne Projektliste, Lernpfade, Dateien sichern)
 //   App  → Prüfung  { type:'pf-app', action:'ready', app:'jpad', v:1 }                    (wiederholt, bis „load“ kommt)
-//   Prüfung → App   { type:'pf-app', action:'load', task, title, files:[{name,text}], readonly }
+//   Prüfung → App   { type:'pf-app', action:'load', task, title, files:[{name,text}], readonly, info?:{ html } }
+//                   info.html = Aufgabenstellung als ganze HTML-Seite; die App zeigt sie neben dem Code (JPad: Reiter „Aufgabe“)
 //   App  → Prüfung  { type:'pf-app', action:'state', task, files, run?:{ output, error } } (nach Änderungen, nach jedem Lauf)
 //   Prüfung → App   { type:'pf-app', action:'flush', req }  → App antwortet sofort mit „state“ (req zurück)
 //   Prüfung → App   { type:'pf-app', action:'stop' }        → laufendes Programm anhalten (Fenster geschlossen)
@@ -103,7 +104,7 @@ function status(st) {
 }
 function sendLoad() {
   if (!cur) return; cur.loaded = true;
-  post(cur.frame, { type: 'pf-app', action: 'load', task: cur.task, title: cur.title, files: cur.files, readonly: !!cur.readonly });
+  post(cur.frame, { type: 'pf-app', action: 'load', task: cur.task, title: cur.title, files: cur.files, readonly: !!cur.readonly, ...(cur.info ? { info: cur.info } : {}) });
 }
 
 /**
@@ -116,8 +117,9 @@ function sendLoad() {
  *   readonly  nur ansehen und ausführen (z. B. Lehrkraft bei der Korrektur): Änderungen werden nicht gemeldet
  *   onState   (stand) => …  bei jeder Änderung: { files, sig, at, run? }
  *   onClose   () => …
+ *   info      { html } – Aufgabenstellung als HTML-Seite, die die App neben dem Code anzeigt (optional)
  */
-export function openApp({ app, url, task, title = '', files = [], readonly = false, onState, onClose, closeLabel } = {}) {
+export function openApp({ app, url, task, title = '', files = [], readonly = false, onState, onClose, closeLabel, info } = {}) {
   const d = appDef(app, url ? { [app]: url } : null);
   overlay();
   if (cur) closeApp(true);
@@ -132,14 +134,14 @@ export function openApp({ app, url, task, title = '', files = [], readonly = fal
   if (!d.url) { msg.hidden = false; msg.innerHTML = `<b>${esc(d.n)} ist für Prüfungen noch nicht eingerichtet.</b><span>Bitte gib deiner Lehrkraft Bescheid.</span>`; cur = null; return { close: closeApp }; }
   const f = frameFor(d.url);
   frames.forEach(x => { x.ifr.hidden = x !== f; });
-  cur = { task, title, files: cleanFiles(files), readonly, onState, onClose, frame: f, loaded: false };
+  cur = { task, title, files: cleanFiles(files), readonly, onState, onClose, frame: f, loaded: false, info: info && typeof info.html === 'string' && info.html.length < 4e6 ? { html: info.html } : null };
   if (f.ready) sendLoad();
   else {
     msg.hidden = false; msg.innerHTML = `<span>${esc(d.n)} wird geladen …</span>`;
     const me = cur, t = setTimeout(() => {
       if (cur !== me || f.ready) return;
       msg.innerHTML = `<b>${esc(d.n)} antwortet nicht.</b><span>Prüfe die Internetverbindung. Deine bisherigen Antworten sind gespeichert.</span><button data-retry>Nochmal versuchen</button>`;
-      msg.querySelector('[data-retry]').onclick = () => { frames.delete(d.url); f.ifr.remove(); closeApp(true); openApp({ app, url, task, title, files: me.files, readonly, onState, onClose, closeLabel }); };
+      msg.querySelector('[data-retry]').onclick = () => { frames.delete(d.url); f.ifr.remove(); closeApp(true); openApp({ app, url, task, title, files: me.files, readonly, onState, onClose, closeLabel, info }); };
     }, 25000);
     f.waiters.push(() => { clearTimeout(t); if (cur === me) msg.hidden = true; });
   }
@@ -163,3 +165,35 @@ export async function closeApp(silent = false) {
   if (!silent) c?.onClose?.();
 }
 export const appOpen = () => !!OV && !OV.hidden;
+
+/**
+ * Aufgabenstellung als eigenständige HTML-Seite für die App (läuft dort in einem abgeschotteten iframe).
+ * tasks: [{ title, html, img, pts, current }] – bei einem gemeinsamen Projekt alle Aufgaben des Projekts,
+ * die gerade geöffnete ist hervorgehoben und wird beim Öffnen angezeigt.
+ */
+export function taskPage({ head = '', project = '', tasks = [] } = {}) {
+  const one = tasks.length === 1;
+  const card = (t, i) => `<section class="t${t.current ? ' cur' : ''}"${t.current ? ' id="aktuell"' : ''}><h2>${one ? '' : `<span class="n">${i + 1}</span>`}${esc(t.title || 'Aufgabe')}${t.pts != null ? `<span class="p">${String(t.pts).replace('.', ',')} P.</span>` : ''}</h2>`
+    + `${t.current && !one ? '<div class="now">▶ gerade geöffnet</div>' : ''}${t.img ? `<img src="${esc(t.img)}" alt="">` : ''}<div class="b">${t.html || ''}</div></section>`;
+  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{color-scheme:light dark;--bg:#fff;--ink:#1d1f27;--ink2:#5d6275;--line:#e3e5ee;--acc:#3157f5;--soft:#eef2ff;--code:#f2f3f7}
+@media (prefers-color-scheme:dark){:root{--bg:#161821;--ink:#eceef6;--ink2:#a3a8bb;--line:#2c3040;--acc:#8ea6ff;--soft:#1f2640;--code:#232634}}
+body{margin:0;padding:14px 16px 40px;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,system-ui,sans-serif}
+.k{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);margin-bottom:10px}
+.pr{font-size:13px;color:var(--ink2);margin:-4px 0 12px}
+.t{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:0 0 12px}
+.t.cur{border:2px solid var(--acc);background:var(--soft)}
+h2{font-size:17px;margin:2px 0 6px;display:flex;gap:8px;align-items:baseline}
+.n{display:inline-flex;min-width:1.5em;justify-content:center;border-radius:6px;background:var(--line);font-size:13px;padding:0 4px}
+.cur .n{background:var(--acc);color:#fff}
+.p{margin-left:auto;font-size:13px;font-weight:600;color:var(--ink2);white-space:nowrap}
+.now{font-size:13px;font-weight:700;color:var(--acc);margin-bottom:4px}
+img{max-width:100%;border-radius:8px}
+code,pre{font-family:ui-monospace,Menlo,monospace;font-size:.92em;background:var(--code);border-radius:5px}
+code{padding:1px 4px} pre{padding:8px 10px;overflow-x:auto;white-space:pre-wrap}
+p{margin:.4em 0}
+</style></head><body>${head ? `<div class="k">${esc(head)}</div>` : ''}${project && !one ? `<div class="pr">🔗 Alle Aufgaben des Projekts „${esc(project)}“ bearbeitest du in diesem Programm – lösche nichts.</div>` : ''}
+${tasks.map(card).join('')}
+<script>var a=document.getElementById('aktuell');if(a&&a.previousElementSibling)a.scrollIntoView({block:'start'});</script></body></html>`;
+}
