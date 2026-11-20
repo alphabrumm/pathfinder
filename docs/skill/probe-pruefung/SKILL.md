@@ -156,7 +156,7 @@ Ausgabe: Start in 3 2 1  (optional: was das Programm ausgeben soll; mehrzeilig a
 Vergleich: enthält | gleich   (Standard: enthält – Leerzeichen und Zeilenumbrüche zählen nicht)
 Muss: while              (optional, mehrfach: muss im Code vorkommen)
 Erwartung: Teilaspekt (2)   (optional: Erwartungshorizont – dann bewertet die Lehrkraft, die Prüfungen oben sind nur Hinweise)
-Projekt: Rakete          (optional: JPad-Aufgaben mit demselben Projekt bauen nacheinander am selben Programm; Startcode nur bei der ersten)
+Projekt: Rakete          (optional: JPad-Aufgaben mit demselben Projekt bauen aufeinander auf – jede startet mit einer Kopie des Codes der Aufgabe davor und wird mit ihrem eigenen Stand bewertet; Startcode nur bei der ersten)
 ```java start Rakete
 Startcode (optional, je Datei ein Block; Name nach „start“, sonst Klassenname bzw. Hauptprogramm)
 ```

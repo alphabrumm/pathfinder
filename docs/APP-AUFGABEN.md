@@ -10,7 +10,7 @@ Die App ist nur das Werkzeug und speichert nichts, was die Prüfung braucht.
 | Teil | Datei | Aufgabe |
 | --- | --- | --- |
 | Textformat | `core/pftext.js` (`appSection`) | `### JPad: Titel` mit `Ausgabe:`, `Vergleich:`, `Muss:`, `Erwartung:`, `Projekt:`, ```` ```java start Name ```` , ```` ```java lösung ```` |
-| Baustein `app` | `core/pathfinder.js` | Editor (⚙-Formular, „In JPad ausprobieren“), Schüleransicht, Antwort speichern, Protokoll |
+| Baustein `app` | `core/pathfinder.js` | Editor (⚙-Formular, „In JPad ausprobieren“), Schüleransicht, Antwort speichern, Protokoll; `appBase`: Aufgaben mit gleichem `Projekt:` starten mit einer Kopie des Stands der Aufgabe davor und haben danach ihren eigenen Stand (Hinweis + „Code von dort übernehmen“, wenn die Aufgabe davor später geändert wurde). Erst eine echte Änderung oder ein Programmlauf macht eine Aufgabe „beantwortet“ (`codeSig`). |
 | Fenster + Protokoll | `core/pfapp.js` | `APPS` (Name, Symbol, Standardadresse), `openApp`, `flushApp`, `closeApp` |
 | Bewertung | `core/pfsplit.js` | Schülerfassung ohne erwartete Ausgabe/Pflicht-Code/Musterlösung; `appParts`, `appText`, `appMode` |
 | Plattform | Probe | Adressen (`config.local.php` → `apps`), Abgabe holt den letzten Stand, Auswertung zeigt Code und öffnet ihn in der App |

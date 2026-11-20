@@ -749,7 +749,7 @@ export function startPathFinder(opts = {}) {
     return `<div class="lp-card lp-task lp-app"><div class="hd">${ce('title', b.title, `${N}-Aufgabe`, { tag: 'b', cls: 'lp-ctitle' })}<span class="where">${appIc(b.app)} ${esc(N)}</span></div>${imgHtml(b.img, '', 'klein')}${ce('html', b.html, 'Arbeitsauftrag …', { rich: true })}`
       + files.map(f => `<div class="lp-app-file"><b>${esc(f.name)}</b> <span class="help">Startcode</span><pre class="hl">${highlightCode(f.text, appLang(b.app))}</pre></div>`).join('')
       + `<div><button class="lp-btn alt" data-appopen="1">${appIc(b.app)} ${E() ? `In ${esc(N)} ausprobieren` : `In ${esc(N)} öffnen`}</button></div>`
-      + (E() ? `<div class="ed-hint">${hint}${b.project ? `<br>🔗 Gemeinsames Projekt „${esc(b.project)}“ – Schüler arbeiten in allen Aufgaben dieses Projekts am selben Code.` : ''}${EXAMF() ? '' : '<br><b>Nur in Prüfungen:</b> Im Lernpfad nimm die Programmier-Aufgabe der App.'}</div>` : '') + '</div>';
+      + (E() ? `<div class="ed-hint">${hint}${b.project ? `<br>🔗 Projekt „${esc(b.project)}“: Diese Aufgabe startet mit einer Kopie des Codes der Aufgabe davor (ohne eigenen Startcode) und wird mit ihrem eigenen Stand bewertet.` : ''}${EXAMF() ? '' : '<br><b>Nur in Prüfungen:</b> Im Lernpfad nimm die Programmier-Aufgabe der App.'}</div>` : '') + '</div>';
   }
   function essayEdit(b) {
     const R = b.rubric || [];
@@ -842,6 +842,16 @@ export function startPathFinder(opts = {}) {
     return typeof a === 'string' && a.trim() !== '';
   }
   const examState = b => `<span class="lp-state" data-xstate>${answered(b) ? '✓ beantwortet' : ''}</span>`;
+  /** Hinweis bei Aufgaben eines Projekts: worauf sie aufbaut – und ob die Aufgabe davor danach noch geändert wurde */
+  function appChainHint(b, a, done) {
+    if (!b.project) return '';
+    const base = appBase(b);
+    if (startFiles(b).length || !base.from) return `<div class="help lp-app-st">🔗 Projekt „${esc(b.project)}“: Die folgenden Aufgaben bauen auf deinem Code aus dieser Aufgabe auf.</div>`;
+    const t = esc(plain(base.from.title) || 'der Aufgabe davor');
+    if (!a) return `<div class="help lp-app-st">🔗 Projekt „${esc(b.project)}“: Diese Aufgabe startet mit deinem Code aus „${t}“.</div>`;
+    if (!done && a.base && a.base.from === base.from.id && codeKey(base.files) !== a.base.sig) return `<div class="help lp-app-st lp-app-warn">⚠ Du hast „${t}“ geändert, nachdem du hier angefangen hast. <button class="lp-btn alt" data-apptake="1">⤵ Code von dort übernehmen</button></div>`;
+    return `<div class="help lp-app-st">🔗 Projekt „${esc(b.project)}“: aufgebaut auf deinem Code aus „${t}“.</div>`;
+  }
   function examBlockHtml(b) {
     const NOCORR = 'autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"' + (EXAM_DONE() ? ' disabled' : '');
     const A = prog.ans || (prog.ans = {}), a = A[b.id];
@@ -874,7 +884,7 @@ export function startPathFinder(opts = {}) {
       const out = run && !run.error && String(run.output || '').trim() ? `<pre class="lp-app-out">${esc(String(run.output).trim().split('\n').slice(-6).join('\n'))}</pre>` : '';
       return wrap(b, `<div class="lp-card lp-task lp-exam lp-app"><div class="hd"><b class="lp-ctitle">${esc(plain(b.title)) || N + '-Aufgabe'}</b><span class="where">${appIc(b.app)} ${esc(N)}</span>${examState(b)}</div>${imgHtml(b.img, '', 'klein')}<div>${b.html || ''}</div>`
         + `<div><button class="lp-btn${a ? ' alt' : ''}" data-appopen="1">${appIc(b.app)} ${done ? `In ${esc(N)} ansehen` : a ? `In ${esc(N)} weiterarbeiten` : `In ${esc(N)} bearbeiten`}</button></div>`
-        + `${b.project ? `<div class="help lp-app-st">🔗 Projekt „${esc(b.project)}“: Alle Aufgaben dieses Projekts bearbeitest du im selben Programm. Lösche nichts – am Ende zählt dein letzter Stand.</div>` : ''}<div class="help lp-app-st">${st}</div>${out}</div>`);
+        + appChainHint(b, a, done) + `<div class="help lp-app-st">${st}</div>${out}</div>`);
     }
     if (b.type === 'mark') return wrap(b, markCard(b, true));
     if (b.type === 'sort') return wrap(b, sortCard(b, true));
@@ -1003,6 +1013,7 @@ export function startPathFinder(opts = {}) {
     const run = t.closest('[data-run]');
     if (run) { runAction(run.closest('.blk').dataset.id, run.dataset.run); return; }
     const aop = t.closest('[data-appopen]'); if (aop) { openAppTask(aop.closest('.blk').dataset.id); return; }
+    const atk = t.closest('[data-apptake]'); if (atk) { appTakeBase(atk.closest('.blk').dataset.id); return; }
     if (E()) { const blk = t.closest('.blk'); selId = blk ? blk.dataset.id : null; markSel(); if (blk) curSid = blk.closest('.lp-station')?.dataset.sid || curSid; if (panelOpen && blk && panelWhat !== selId) { panelWhat = selId; drawPanel(); } return; }
     const opt = t.closest('[data-opt]');
     if (EXAM_DONE() && t.closest('.lp-exam')) return;
@@ -1287,7 +1298,7 @@ export function startPathFinder(opts = {}) {
         get: b => (b.alts || []).map(a => a.join(' / ')).join('\n'), set: (b, v) => { b.alts = v.split('\n').map(l => l.split(/\s*\/\s*/).map(x => x.trim()).filter(Boolean)).filter(a => a.length > 1); } }, XP],
     essay: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'lines', l: 'Höhe des Antwortfelds in Zeilen', t: 'number' }, { k: 'rubric', l: 'Erwartungshorizont', t: 'rubric' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }],
     app: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'app', l: 'App', t: 'select', o: [['jpad', '☕ JPad (Java)'], ['qpad', '🗄 QPad (SQL) – noch nicht verfügbar'], ['flowpad', '🔀 FlowPad – noch nicht verfügbar']] },
-      { k: 'project', l: 'Gemeinsames Projekt (optional)', t: 'text', help: 'Aufgaben mit demselben Namen (z. B. Rakete) bauen am selben Programm weiter: Die Schüler sehen in jeder dieser Aufgaben denselben Code; jede Aufgabe prüft den abgegebenen Stand. Startcode nur bei der ersten Aufgabe.' },
+      { k: 'project', l: 'Projekt (optional)', t: 'text', help: 'Aufgaben mit demselben Projektnamen (z. B. Rakete) bauen aufeinander auf: Beim ersten Öffnen bekommt eine Aufgabe eine Kopie des Codes der Aufgabe davor; danach hat sie ihren eigenen Stand und wird damit bewertet. Startcode meist nur bei der ersten Aufgabe – eigener Startcode beginnt neu.' },
       { k: 'files', l: 'Startcode (je Datei; leer = Schüler beginnen mit einem leeren Hauptprogramm)', t: 'appfiles' },
       { k: 'expect', l: 'Erwartete Ausgabe (leer = Ausgabe wird nicht geprüft)', t: 'lines', rows: 3, get: b => b.expect || '', set: (b, v) => { b.expect = v; } },
       { k: 'compare', l: 'Vergleich der Ausgabe', t: 'select', o: [['enthaelt', 'Ausgabe enthält diesen Text (Leerzeichen und Zeilenumbrüche egal)'], ['gleich', 'Ausgabe genau gleich (bis auf Leerzeichen am Zeilenende)']], show: b => !!b.expect },
@@ -2372,28 +2383,56 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   /* ---------- App-Aufgaben (JPad …): Fenster mit der App, Stand als Antwort ---------- */
   let APPM = null;
   const loadAppMod = async () => APPM || (APPM = await import(modUrl('pfapp.js')));
-  /** Aufgaben, die sich den Stand teilen (gleiches „Projekt“ und gleiche App), sonst nur die Aufgabe selbst */
+  /** Aufgaben desselben Projekts (gleiches „Projekt“ und gleiche App) in Dokument-Reihenfolge, sonst nur die Aufgabe selbst */
   const appGroup = b => b.project ? doc.stations.flatMap(s => s.blocks).filter(x => x.type === 'app' && x.project === b.project && (x.app || 'jpad') === (b.app || 'jpad')) : [b];
+  const startFiles = x => (x.files || []).filter(f => (f.text || '').trim()).map(f => ({ name: f.name, text: f.text }));
+  /** Prüfwert über den Code (wie codeSig in pfapp.js): leere Dateien und Leerzeichen am Zeilenende zählen nicht */
+  const codeKey = files => { let h = 0x811c9dc5; const t = JSON.stringify((files || []).map(f => [String(f.name || '').toLowerCase(), String(f.text || '').replace(/[ \t]+$/gm, '').replace(/\s+$/, '')]).filter(f => f[1]));
+    for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
+  /**
+   * Ausgangsstand einer App-Aufgabe: eigener Startcode (von der Lehrkraft) – sonst der Stand der nächsten Aufgabe davor
+   * im selben Projekt, die schon bearbeitet wurde (bzw. deren Startcode). So baut jede Aufgabe auf einer Kopie der vorigen auf
+   * und behält danach ihren eigenen Stand. → { files, from: Aufgabe, deren Stand kopiert wird, at }
+   */
+  function appBase(b) {
+    const g = appGroup(b), k = g.findIndex(x => x.id === b.id);
+    if (startFiles(b).length) return { files: startFiles(b) };
+    for (let i = k - 1; i >= 0; i--) {
+      const a = EXAM() ? prog.ans?.[g[i].id] : null;
+      if (a?.files?.length) return { files: a.files, from: g[i], at: a.at || 0 };
+      if (startFiles(g[i]).length) return { files: startFiles(g[i]), from: g[i], at: 0 };
+    }
+    return { files: [] };
+  }
   async function openAppTask(id) {
     const r = findBlock(id); if (!r) return; const b = r.b;
     let M; try { M = await loadAppMod(); } catch (e) { toast('Die App lässt sich nicht laden.'); return; }
-    const exam = EXAM(), done = EXAM_DONE(), group = appGroup(b), ids = group.map(x => x.id);
-    const a = exam ? ids.map(i => prog.ans?.[i]).filter(Boolean).sort((x, y) => (y.at || 0) - (x.at || 0))[0] : null; // neuester Stand der Gruppe
-    const sb = group.find(x => (x.files || []).some(f => (f.text || '').trim())) || b;
-    const start = (sb.files || []).filter(f => (f.text || '').trim()).map(f => ({ name: f.name, text: f.text }));
-    const startSig = M.filesSig(start);
-    // Aufgabenstellung für die App (JPad zeigt sie im Reiter „Aufgabe“); beim gemeinsamen Projekt alle Aufgaben des Projekts
-    const info = { html: M.taskPage({ head: [plain(doc.kicker || ''), plain(doc.title || '')].filter(Boolean).join(' · '), project: b.project || '',
-      tasks: group.map(x => ({ title: plain(x.title) || appN(x.app) + '-Aufgabe', html: x.html || '', img: x.img || '', pts: doc.pointsOn ? ptsOf(x) : null, current: x.id === id })) }) };
-    M.openApp({ app: b.app || 'jpad', url: opts.apps?.[b.app || 'jpad'], task: b.project ? 'projekt:' + b.project : id, title: (b.project ? `Projekt ${b.project} · ` : '') + (plain(b.title) || ''), files: a?.files || start, readonly: !exam || done, info,
+    const exam = EXAM(), done = EXAM_DONE();
+    let own = exam ? prog.ans?.[id] : null;
+    const base = appBase(b), files = own?.files || base.files, loadSig = M.codeSig(files);
+    const note = !b.project ? '' : own ? `🔗 Projekt „${b.project}“ · dein Code aus dieser Aufgabe` : base.from ? `🔗 Projekt „${b.project}“ · baut auf „${plain(base.from.title) || 'der Aufgabe davor'}“ auf – dein Code von dort ist schon übernommen.` : `🔗 Projekt „${b.project}“`;
+    // Aufgabenstellung für die App (JPad zeigt sie im Reiter „Aufgabe“): nur die geöffnete Aufgabe
+    const info = { html: M.taskPage({ head: [plain(doc.kicker || ''), plain(doc.title || '')].filter(Boolean).join(' · '), project: b.project || '', note,
+      tasks: [{ title: plain(b.title) || appN(b.app) + '-Aufgabe', html: b.html || '', img: b.img || '', pts: doc.pointsOn ? ptsOf(b) : null, current: true }] }) };
+    M.openApp({ app: b.app || 'jpad', url: opts.apps?.[b.app || 'jpad'], task: id, title: plain(b.title) || '', files, readonly: !exam || done, info,
       closeLabel: !exam ? 'Schließen (Änderungen werden nicht gespeichert)' : undefined,
       onState: st => {
         if (!exam || EXAM_DONE()) return;
-        const old = ids.map(i => prog.ans[i]).find(Boolean);
-        const v = { files: st.files, sig: st.sig, at: st.at, ed: !!old?.ed || st.sig !== startSig, ...(st.run ? { run: st.run } : old?.run ? { run: old.run } : {}) };
-        ids.forEach(i => { prog.ans[i] = clone(v); examChanged(i); });
+        const edited = M.codeSig(st.files) !== loadSig;
+        if (!own && !edited && !st.run) return; // nur angesehen: keine Antwort, die Aufgabe bleibt „nicht begonnen“
+        own = prog.ans[id] = { files: st.files, sig: st.sig, at: st.at, ed: !!own?.ed || edited, ...(st.run ? { run: st.run } : own?.run ? { run: own.run } : {}),
+          ...(own?.base ? { base: own.base } : base.from ? { base: { from: base.from.id, sig: codeKey(base.files) } } : {}) };
+        examChanged(id);
       },
       onClose: () => { if (exam) render(); } });
+  }
+  /** Stand der Aufgabe davor erneut übernehmen (wenn sie nach dem Kopieren noch geändert wurde) */
+  function appTakeBase(id) {
+    const r = findBlock(id); if (!r || !EXAM() || EXAM_DONE()) return;
+    const base = appBase({ ...r.b, files: [] }); if (!base.from) return;
+    if (!confirm(`Deinen Code in dieser Aufgabe durch den aktuellen Code aus „${plain(base.from.title) || 'der Aufgabe davor'}“ ersetzen? Was du hier geändert hast, geht verloren.`)) return;
+    prog.ans[id] = { files: clone(base.files), sig: '', at: Date.now(), ed: true, base: { from: base.from.id, sig: codeKey(base.files) } };
+    examChanged(id); render(); toast('Code übernommen – führe ihn in JPad noch einmal aus.');
   }
   /** Antworten einer Aufgabe als Textzeilen – für Protokoll und Vorschau */
   function answerLines(b) {

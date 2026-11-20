@@ -28,6 +28,10 @@ export function filesSig(files) {
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
   return h.toString(36);
 }
+/** Prüfwert nur über den Inhalt: leere Dateien und Leerzeichen am Zeilenende zählen nicht (zeigt, ob wirklich etwas geändert wurde) */
+export function codeSig(files) {
+  return filesSig((files || []).map(f => ({ name: String(f.name || '').toLowerCase(), text: String(f.text || '').replace(/[ \t]+$/gm, '').replace(/\s+$/, '') })).filter(f => f.text));
+}
 const MAX_FILES = 40, MAX_TEXT = 200000, MAX_OUT = 20000;
 /** Meldung der App bereinigen (nur Text, Größen begrenzt) */
 export function cleanFiles(files) {
@@ -168,10 +172,9 @@ export const appOpen = () => !!OV && !OV.hidden;
 
 /**
  * Aufgabenstellung als eigenständige HTML-Seite für die App (läuft dort in einem abgeschotteten iframe).
- * tasks: [{ title, html, img, pts, current }] – bei einem gemeinsamen Projekt alle Aufgaben des Projekts,
- * die gerade geöffnete ist hervorgehoben und wird beim Öffnen angezeigt.
+ * tasks: [{ title, html, img, pts, current }] – meist nur die geöffnete Aufgabe; note: Hinweis darüber (z. B. „baut auf … auf“)
  */
-export function taskPage({ head = '', project = '', tasks = [] } = {}) {
+export function taskPage({ head = '', project = '', tasks = [], note = '' } = {}) {
   const one = tasks.length === 1;
   const card = (t, i) => `<section class="t${t.current ? ' cur' : ''}"${t.current ? ' id="aktuell"' : ''}><h2>${one ? '' : `<span class="n">${i + 1}</span>`}${esc(t.title || 'Aufgabe')}${t.pts != null ? `<span class="p">${String(t.pts).replace('.', ',')} P.</span>` : ''}</h2>`
     + `${t.current && !one ? '<div class="now">▶ gerade geöffnet</div>' : ''}${t.img ? `<img src="${esc(t.img)}" alt="">` : ''}<div class="b">${t.html || ''}</div></section>`;
@@ -193,7 +196,7 @@ img{max-width:100%;border-radius:8px}
 code,pre{font-family:ui-monospace,Menlo,monospace;font-size:.92em;background:var(--code);border-radius:5px}
 code{padding:1px 4px} pre{padding:8px 10px;overflow-x:auto;white-space:pre-wrap}
 p{margin:.4em 0}
-</style></head><body>${head ? `<div class="k">${esc(head)}</div>` : ''}${project && !one ? `<div class="pr">🔗 Alle Aufgaben des Projekts „${esc(project)}“ bearbeitest du in diesem Programm – lösche nichts.</div>` : ''}
+</style></head><body>${head ? `<div class="k">${esc(head)}</div>` : ''}${note ? `<div class="pr">${esc(note)}</div>` : project && !one ? `<div class="pr">🔗 Projekt „${esc(project)}“</div>` : ''}
 ${tasks.map(card).join('')}
 <script>var a=document.getElementById('aktuell');if(a&&a.previousElementSibling)a.scrollIntoView({block:'start'});</script></body></html>`;
 }
