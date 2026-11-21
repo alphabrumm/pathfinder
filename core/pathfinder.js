@@ -432,7 +432,7 @@ export function startPathFinder(opts = {}) {
   function undo() { if (pending) commit(); if (hist.length < 2) return; fut.push(hist.pop()); doc = JSON.parse(hist[hist.length - 1]); save(); render(); updUndo(); drawPanel?.(); aiSync(); }
   function redo() { if (!fut.length) return; const s = fut.pop(); hist.push(s); doc = JSON.parse(s); save(); render(); updUndo(); drawPanel?.(); }
   function updUndo() { if (!$('#bUndo')) return; $('#bUndo').disabled = hist.length < 2; $('#bRedo').disabled = !fut.length; }
-  function openDoc(d) { if (!PLAYER && d.form !== 'pruefung' && (convertNext || (!formOk(d.form) && formOk('pruefung')))) { const r = toExam(d); d = r.d; setTimeout(() => toast(examTakenMsg(r), 5000), 60); } convertNext = false; if (pending) commit(); if (panelOpen) { panelWhat = 'design'; hidePanel(); } doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); selId = null; curSid = null; pageNo = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; drawPanel(); aiSync(); }
+  function openDoc(d) { if (!PLAYER && d.form !== 'pruefung' && (convertNext || (!formOk(d.form) && formOk('pruefung')))) { const r = toExam(d); d = r.d; setTimeout(() => toast(examTakenMsg(r), 5000), 60); } convertNext = false; if (pending) commit(); if (panelOpen) { panelWhat = 'design'; hidePanel(); } doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); if (solvedView) { solvedView = false; progReal = null; mode = 'preview'; modeBtns(); } selId = null; curSid = null; pageNo = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; drawPanel(); aiSync(); }
 
   function findBlock(id) {
     for (const st of doc.stations) { const i = st.blocks.findIndex(b => b.id === id); if (i >= 0) return { st, i, b: st.blocks[i] }; }
@@ -604,6 +604,7 @@ export function startPathFinder(opts = {}) {
     lp.innerHTML = h;
     runAnims();
     xDrawAll(); wPlace();
+    { const sb = $('#modeSeg [data-mode="solved"]'); if (sb) sb.hidden = EXAMF(); }
     if (PLAYER) progSave();
     scroller.scrollTop = sc;
     if (selId && !findBlock(selId)) selId = null;
@@ -3195,18 +3196,48 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     }, true));
   }
 
+  /* ---------- Gelöste Vorschau: alle Aufgaben richtig gelöst, Sperren offen – zum schnellen Durchsehen ---------- */
+  let solvedView = false, progReal = null;
+  function solvedProg() {
+    const P = freshProg(), first = a => String(a || '').split('|')[0].trim();
+    for (const st of doc.stations) {
+      P.visited[st.id] = 1; if (st.check) P.solved['st:' + st.id] = true;
+      for (const b of st.blocks) {
+        if (isCheck(b)) P.solved[b.id] = true;
+        if (b.type === 'quiz') P.quiz[b.id] = Object.fromEntries((b.qs || []).map((q, qi) => [qi, Math.max(0, q.opts.findIndex(o => o.ok))]));
+        else if (b.type === 'gap') { const G = [...String(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].map(m => first(m[1])); P.quiz[b.id] = Object.fromEntries(G.map((g, i) => [i, g])); P.quiz[b.id + ':chk'] = 1; }
+        else if (b.type === 'match') P.quiz[b.id] = Object.fromEntries((b.pairs || []).map((_, i) => [i, i]));
+        else if (b.type === 'task' && b.answer) P.quiz[b.id] = { v: first(b.answer), ok: true };
+        else if (b.type === 'mark') { P.quiz[b.id] = Object.fromEntries([...markParse(b.html).targets].map(k => [k, 1])); P.quiz[b.id + ':chk'] = 1; }
+        else if (b.type === 'sort') { P.quiz[b.id] = Object.fromEntries(sortSides(b).I.map(x => [x.k, x.g])); P.quiz[b.id + ':chk'] = 1; }
+        else if (b.type === 'order') { P.quiz[b.id] = (b.items || []).map((_, i) => 'o' + i); P.quiz[b.id + ':chk'] = 1; }
+        else if (b.type === 'widget' && b.kind === 'experiment') {
+          const x = { h: {}, hok: 1, e: {}, eok: 1, echk: 1 }, mv = xMain(b), sel = xSel(b, {});
+          xGaps(b.hyp).forEach((a, i) => { x.h['h' + i] = a[0]; });
+          xGaps(b.evalHtml).forEach((a, i) => { x.e['e' + i] = a[0]; });
+          x.sel = sel; x.rows = mv < 0 ? [{ s: sel, y: xCalc(b, sel) }] : b.vars[mv].opts.slice(0, 3).map((_, oi) => { const z = sel.slice(); z[mv] = oi; return { s: z, y: xCalc(b, z) }; });
+          P.quiz[b.id] = x;
+        }
+      }
+    }
+    return P;
+  }
+  const modeBtns = () => $$('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === (solvedView ? 'solved' : mode))));
   /* ---------- Leiste oben ---------- */
   function setMode(m) {
     if (pending) commit();
+    if (m === 'solved') { if (!solvedView) { progReal = prog; prog = solvedProg(); solvedView = true; } m = 'preview'; }
+    else if (solvedView) { prog = progReal || freshProg(); progReal = null; solvedView = false; }
     mode = m; selId = null; closePop();
-    $$('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
+    modeBtns();
     if (m === 'preview') { prog.visited[curSid] = 1; animDone.clear(); panelBack = panelOpen; hidePanel(); }
     else if (panelBack && panelFits()) showPanel();
     render();
-    toast(m === 'preview' ? (EXAMF() ? '▶ Vorschau – so sehen es die Schüler, ohne Rückmeldung. „Abgeben“ zeigt eine Probe-Auswertung.' : '▶ Vorschau – so sehen es die Schüler. Fortschritt wird hier nur probeweise gezählt.') : RO ? (EXAMF() ? '👁 Mit Lösungen' : '👁 Ansicht') : '✎ Bearbeiten');
+    toast(solvedView ? '✓ Gelöste Vorschau – alle Aufgaben sind richtig gelöst, Sperren sind offen. Dein Fortschritt aus der Vorschau bleibt erhalten.' : m === 'preview' ? (EXAMF() ? '▶ Vorschau – so sehen es die Schüler, ohne Rückmeldung. „Abgeben“ zeigt eine Probe-Auswertung.' : '▶ Vorschau – so sehen es die Schüler. Fortschritt wird hier nur probeweise gezählt.') : RO ? (EXAMF() ? '👁 Mit Lösungen' : '👁 Ansicht') : '✎ Bearbeiten');
   }
   if (!PLAYER) {
   $('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
+  if ($('#modeSeg') && !$('#modeSeg [data-mode="solved"]')) { const sb = document.createElement('button'); sb.dataset.mode = 'solved'; sb.setAttribute('aria-pressed', 'false'); sb.title = 'Gelöste Vorschau: alle Aufgaben richtig gelöst, Sperren offen – zum schnellen Durchsehen'; sb.textContent = '✓ Gelöst'; $('#modeSeg').appendChild(sb); }
   $('#bUndo').onclick = undo; $('#bRedo').onclick = redo;
   const setSingle = v => { single = v; const b = $('#bSingle'); if (b) { b.classList.toggle('on', single); b.setAttribute('aria-pressed', String(single)); } document.querySelectorAll('#viewSeg button').forEach(x => x.setAttribute('aria-pressed', String((x.dataset.view === 'one') === single))); render(); scroller.scrollTop = 0; };
   if ($('#bSingle')) $('#bSingle').onclick = () => setSingle(!single);
