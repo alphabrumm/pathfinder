@@ -272,9 +272,9 @@ const CORE_SECTIONS = {
   } },
   html: { n: 'HTML', make: S => ({ type: 'html', html: S.raw.join('\n') }) },
   // Widget „Experiment“: Hypothese → Experiment (Größen wählen, messen) → Auswertung → Schlussfolgerung
-  experiment: { n: 'Experiment', keys: ['frage', 'hypothese', 'groesse', 'ergebnis', 'animation', 'auswertung', 'extra', 'schlussfolgerung', 'xp', 'punkte'], make: (S, H) => parseExperiment(S, H, S.title) },
+  experiment: { n: 'Experiment', keys: ['frage', 'hypothese', 'groesse', 'ergebnis', 'animation', 'untersuche', 'auswertung', 'extra', 'schlussfolgerung', 'xp', 'punkte'], make: (S, H) => parseExperiment(S, H, S.title) },
   // Widget: ### Widget: Experiment (wie oben) oder ### Widget: HTML mit eigenem ```html … ``` (läuft geschützt in einem Rahmen)
-  widget: { n: 'Widget', fences: true, keys: ['frage', 'hypothese', 'groesse', 'ergebnis', 'animation', 'auswertung', 'extra', 'schlussfolgerung', 'erledigt', 'hoehe', 'xp', 'punkte'], make(S, H) {
+  widget: { n: 'Widget', fences: true, keys: ['frage', 'hypothese', 'groesse', 'ergebnis', 'animation', 'untersuche', 'auswertung', 'extra', 'schlussfolgerung', 'erledigt', 'hoehe', 'xp', 'punkte'], make(S, H) {
     const [kind, ...rest] = String(S.title || '').split(/\s*[|–-]\s+|\s*:\s*/); const k = norm(kind);
     if (k === 'experiment' || k === 'versuch') return parseExperiment(S, H, rest.join(' ').trim());
     if (k === 'html' || k === 'eigenes' || k === 'eigen' || !k) {
@@ -321,7 +321,9 @@ function parseExperiment(S, H, title) {
   else { const r = parseVar(em[1] + '= 0') || { name: em[1].trim(), sym: em[1].trim(), unit: '' }; res = { name: r.name, sym: r.sym, unit: r.unit, f: em[2].trim() }; if (!expFormula(res.f, V)) H.err(S.line, `Experiment: Rechenvorschrift „${res.f}“ nicht verstanden – erlaubt sind die Symbole der Größen (${V.map(v => v.sym).join(', ')}), Zahlen, + − · / und Klammern.`); }
   if (!V.some(v => !v.fixed)) H.warn(S.line, 'Experiment: Mindestens eine Größe sollte veränderbar sein (ohne „| fest“).');
   const anim = norm(S.one('animation') || ''), md = L => L.length ? mdToHtml(L) : '';
-  return { type: 'widget', kind: 'experiment', title: inline(S.one('frage') || title || ''), intro: H.md(S.body), hyp: md(S.all('hypothese')), vars: V, res: res || { name: 'Ergebnis', sym: 'y', unit: '', f: '0' },
+  let main; const un = (S.one('untersuche') || '').trim();
+  if (un) { main = V.findIndex(v => v.sym === un || norm(v.name) === norm(un)); if (main < 0) { H.warn(S.line, `Experiment: „Untersuche: ${un}“ – keine Größe mit diesem Symbol oder Namen.`); main = undefined; } }
+  return { ...(main != null ? { main } : {}), type: 'widget', kind: 'experiment', title: inline(S.one('frage') || title || ''), intro: H.md(S.body), hyp: md(S.all('hypothese')), vars: V, res: res || { name: 'Ergebnis', sym: 'y', unit: '', f: '0' },
     anim: /wagen|schieb/.test(anim) ? 'wagen' : '', evalHtml: md(S.all('auswertung')), extra: (S.one('extra') || '').split(/\s*[,;]\s*/).filter(Boolean), concl: md(S.all('schlussfolgerung')), xp: S.num('xp', 30) };
 }
 const SEC_ALIAS = { aufgabe: 'aufgabe', auftrag: 'aufgabe', quiz: 'quiz', test: 'quiz', lueckentext: 'lueckentext', luecken: 'lueckentext', zuordnen: 'zuordnen', zuordnung: 'zuordnen', aufdecken: 'aufdecken', aufklappen: 'aufdecken', 'mehr erfahren': 'aufdecken', uml: 'uml', 'uml-klasse': 'uml', klasse: 'uml', html: 'html', freitext: 'freitext', 'offene aufgabe': 'freitext', essay: 'freitext',
@@ -385,7 +387,7 @@ export function parseText(src, env) {
     for (const [l, n] of S.lines) { const m = l.match(/^\s*([A-Za-zÄÖÜäöüß -]{2,24}?)\s*(\((?:verborgen|versteckt)\))?:\s*(.*)$/i); const k = m && norm(m[1]); if (m && keys.has(k)) { (kv[k] = kv[k] || []).push(m[3].trim()); (kh[k] = kh[k] || []).push(!!m[2]); } else { body.push(l); bodyN.push([l, n]); } }
     while (body.length && !body[body.length - 1].trim()) { body.pop(); bodyN.pop(); }
     const Sx = { title: S.title, line: S.line, body, bodyN, raw: S.lines.map(x => x[0]), table: S.table, code: S.code || [], kv, one: k => (kv[k] || [])[0], all: k => kv[k] || [], hid: k => kh[k] || [], num: (k, d) => { const v = (kv[k] || kv.punkte || [])[0]; return v != null && !isNaN(parseInt(v)) ? parseInt(v) : d; } };
-    try { const b = def.make(Sx, H, env); if (b && b.type === 'widget' && doc.form === 'pruefung') { H.warn(S.line, 'Widgets (Experiment, eigenes HTML) gibt es nur in Lernpfaden und Challenges – in der Prüfung weggelassen.'); return; } if (b) { if (kv.punkte) b.pts = parseFloat(String(kv.punkte[0]).replace(',', '.')) || undefined; push(b, S.line); } } catch (e) { H.err(S.line, `Abschnitt „${S.head}“: ${e.message}`); }
+    try { const b = def.make(Sx, H, env); if (b && b.type === 'widget' && doc.form === 'pruefung') { if (b.kind !== 'experiment') { H.warn(S.line, 'Eigene Widgets (HTML) gibt es nur in Lernpfaden und Challenges – in der Prüfung weggelassen.'); return; } if (!kv.punkte) b.pts = 2 + (String(b.evalHtml || '').match(/\[\[(.+?)\]\]/g) || []).length; } if (b) { if (kv.punkte) b.pts = parseFloat(String(kv.punkte[0]).replace(',', '.')) || undefined; push(b, S.line); } } catch (e) { H.err(S.line, `Abschnitt „${S.head}“: ${e.message}`); }
   };
   const KEYRE = /^\s*([A-Za-zÄÖÜäöüß -]{2,24}?)\s*(\((?:verborgen|versteckt)\))?:\s*(.*)$/i;
   const isKeyLine = (S, l) => { const m = l.match(KEYRE); return !!m && (SECS[S.kind].keys || []).includes(norm(m[1])); };
@@ -571,14 +573,14 @@ export function docToText(doc, env, out = {}) {
           if (b.solution) L.push('```' + lang + ' lösung', b.solution, '```');
           break;
         }
-        case 'widget': L.push(...widgetToText(b, md)); break;
+        case 'widget': L.push(...widgetToText(b, md, doc.form === 'pruefung')); break;
         case 'lock': L.push('--- Sperre ---'); break;
         case 'page': L.push('--- Seite ---'); break;
         case 'file': L.push(`%% Datei „${b.name}“ (nur im Editor)`); break;
         default: { const t = plug[b.type]; L.push(t?.toText ? t.toText(b, { md }) : `%% Baustein „${b.type}“ – im Textformat nicht darstellbar`); }
       }
       // Punkte je Aufgabe (bei Freitext mit Erwartungshorizont ergeben sie sich aus den Teilpunkten)
-      if (doc.pointsOn && b.pts != null && CHECK_TYPES.includes(b.type) && !((b.type === 'essay' || b.type === 'app') && (b.rubric || []).length)) L.push(`Punkte: ${b.pts}`);
+      if (doc.pointsOn && b.pts != null && (CHECK_TYPES.includes(b.type) || (b.type === 'widget' && b.kind === 'experiment')) && !((b.type === 'essay' || b.type === 'app') && (b.rubric || []).length)) L.push(`Punkte: ${b.pts}`);
     }
   }
   if (att.length) {
@@ -593,17 +595,18 @@ export function varToText(v) {
   const n = x => String(x).replace('.', ',');
   return `${v.name && v.name !== v.sym ? v.name + ' ' : ''}${v.sym}${v.unit ? ' in ' + v.unit : ''} = ${(v.opts || []).map(o => o.l ? (/^\d/.test(o.l) ? `${n(o.v)} (${o.l})` : `${o.l} ${n(o.v)}`) : n(o.v)).join(', ')}${v.fixed ? ' | fest' + (v.fix ? ' = ' + n(v.opts[v.fix]?.v) : '') : ''}`;
 }
-function widgetToText(b, md) {
+function widgetToText(b, md, exam) {
   const L = [], lines = h => md(h || '').split(/\n+/).map(x => x.trim()).filter(Boolean);
   if (b.kind === 'experiment') {
     L.push('### Widget: Experiment'); if (b.title) L.push(`Frage: ${md(b.title)}`); if (b.intro) L.push(md(b.intro));
+    if (b.main != null && b.vars?.[b.main]) L.push(`Untersuche: ${b.vars[b.main].sym}`);
     lines(b.hyp).forEach(x => L.push(`Hypothese: ${x}`));
     (b.vars || []).forEach(v => L.push(`Größe: ${varToText(v)}`));
     if (b.res) L.push(`Ergebnis: ${b.res.name && b.res.name !== b.res.sym ? b.res.name + ' ' : ''}${b.res.sym}${b.res.unit ? ' in ' + b.res.unit : ''} = ${b.res.f}`);
     if (b.anim) L.push(`Animation: ${b.anim === 'wagen' ? 'Wagen' : b.anim}`);
     lines(b.evalHtml).forEach(x => L.push(`Auswertung: ${x}`)); if (b.extra?.length) L.push(`Extra: ${b.extra.join(', ')}`);
     lines(b.concl).forEach(x => L.push(`Schlussfolgerung: ${x}`));
-    L.push(`XP: ${b.xp ?? 30}`); return L;
+    if (!exam) L.push(`XP: ${b.xp ?? 30}`); return L;
   }
   L.push(`### Widget: HTML${b.title ? ' | ' + md(b.title) : ''}`); if (b.html) L.push(md(b.html));
   if (b.check) L.push('Erledigt: ja'); if (b.h) L.push(`Höhe: ${b.h}`);
@@ -623,6 +626,7 @@ export const EXAM_STYLES = [
   ['sort', 'In Gruppen sortieren', 'Begriffe in Spalten ziehen', '„### Sortieren“ mit 2–4 Gruppen und je 2–5 eindeutig zuzuordnenden Begriffen (je Zeile „Gruppe: Begriff, Begriff“)'],
   ['puzzle', 'Satzpuzzle', 'Wörter in die richtige Reihenfolge bringen', '„### Satzpuzzle“ – ein Satz in einer Zeile, Teile mit „ / “ getrennt (feste Wendungen wie „to London“ als ein Teil); jede weitere korrekte Wortstellung als Zeile „Auch richtig: …“ mit denselben Teilen; das erste Wort klein schreiben (außer Namen und „I“), ohne Satzzeichen am Ende – PathFinder schreibt den Satzanfang selbst groß'],
   ['textorder', 'Textpuzzle (Reihenfolge)', 'Abschnitte oder Dialogzeilen ordnen', '„### Reihenfolge“ – 4–6 Abschnitte, Sätze oder Dialogzeilen, je Zeile einer, in der richtigen Reihenfolge; die Reihenfolge muss eindeutig sein (Signalwörter, Handlungsablauf)'],
+  ['experiment', 'Experiment (Erkenntnisgewinnung)', 'Messreihe planen, messen und auswerten – Naturwissenschaften', '„### Widget: Experiment“ – die Schüler planen und messen selbst: „Frage:“, „Untersuche: <Symbol der untersuchten Größe>“, zwei bis drei „Größe:“-Zeilen mit je 3 Werten OHNE „| fest“ (die faire Messreihe zu planen ist Teil der Leistung), „Ergebnis:“ mit physikalisch richtiger Rechenvorschrift, „Auswertung:“ als Lückentext (Je-desto-Satz, Proportionalität) mit zwei Ablenkern unter „Extra:“; keine „Hypothese:“- und „Schlussfolgerung:“-Zeilen – die Hypothese mit Begründung davor als „### Freitext“, eine Vorhersage danach als „### Aufgabe“ mit „Antwort:“; Punkte: 2 für die Messreihe plus 1 je Auswertungslücke'],
   ['essay', 'Freitext', 'mit Erwartungshorizont, du bewertest', '„### Freitext“ mit Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“'],
   ['jpad', 'Programmieren in JPad', 'Java-Programm in JPad schreiben, nur für Informatik', '„### JPad: Titel“ – die Schüler programmieren in JPad (Java): kurzer Auftrag, Startcode als ```java start Klassenname … ``` (optional, je Datei ein Block), „Ausgabe:“ mit der erwarteten Programmausgabe (Teil der Ausgabe genügt) und/oder „Muss:“ für Pflicht-Code (z. B. while); Musterlösung als ```java lösung … ``` (sieht nur die Lehrkraft). Ohne „Erwartung:“-Zeilen wird automatisch nach Ausgabe und Pflicht-Code bewertet; mit „Erwartung: … (Punkte)“ bewertet die Lehrkraft. Java wie in JPad üblich: println() und print() ohne System.out, Wrapper-Typen Integer, Double, Boolean, Character statt int, double, boolean, char'],
 ];
@@ -732,13 +736,15 @@ Punkte: 2               (in jeder Aufgabe, jedem Quiz, Lückentext, Zuordnen, Ma
 ### Aufdecken: Mehr erfahren
 Text, der erst nach Antippen erscheint.
 
-### Widget: Experiment     (nicht in Prüfungen; Schritt für Schritt: Hypothese → Experiment → Auswertung → Schlussfolgerung)
+### Widget: Experiment     (Lernpfad: Schritt für Schritt Hypothese → Experiment → Auswertung → Schlussfolgerung mit Rückmeldung;
+                          Prüfung: alles auf einmal ohne Rückmeldung – bewertet werden die Messreihe und die Auswertung, keine Schlussfolgerung)
 Frage: Wie hängt Δv von der Kraft ab?
 Hypothese: Wenn stärker geschoben wird, dann [[wird Δv größer|wird Δv kleiner|bleibt Δv gleich]].
                         (jede Wahl zählt; die erste Möglichkeit ist das, was die Messung zeigt – sie wird nach dem Messen verglichen)
 Größe: Kraft F in N = Isaac 30, Anne 60, Vater 90      (Name, Symbol, Einheit = Werte zum Auswählen, gern mit Namen)
 Größe: Masse m in kg = 30 (leer), 60 (1 Sack) | fest   („| fest“: bleibt in dieser Messreihe gleich – faire Messreihe)
 Größe: Einwirkungsdauer Δt in s = 1, 2, 3 | fest
+Untersuche: F            (optional: Symbol der untersuchten Größe; sonst die erste Größe ohne „| fest“)
 Ergebnis: Zusatzgeschwindigkeit Δv in m/s = F · Δt / m   (Rechenvorschrift mit den Symbolen, + − · / und Klammern)
 Animation: Wagen        (optional: Wagen wird angeschoben – braucht Größen in N, kg und s; ohne: Messanzeige)
 Auswertung: Je größer die Kraft, desto [[größer]] ist Δv.   (Lückentext nach dem Messen, mehrere Zeilen möglich)

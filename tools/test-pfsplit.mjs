@@ -170,6 +170,24 @@ test('JPad-Aufgabe: Schülerfassung ohne Lösung, automatische und manuelle Bewe
   assert.equal(R.items[1].pts, 4); assert.equal(R.items[1].suggest, 5);
 });
 
+test('Experiment: Schülerfassung ohne Lösung, Messreihe und Auswertung bewertet', () => {
+  const V = [{ name: 'Kraft', sym: 'F', unit: 'N', opts: [{ l: 'Isaac', v: 30 }, { l: 'Anne', v: 60 }, { l: 'Vater', v: 90 }], fixed: false },
+    { name: 'Masse', sym: 'm', unit: 'kg', opts: [{ l: '', v: 30 }, { l: '', v: 60 }], fixed: false }];
+  const d = { v: 2, id: 'x', form: 'pruefung', title: 'E', design: {}, cert: {}, stations: [{ id: 's', title: 'A', blocks: [
+    { id: 'w1', type: 'widget', kind: 'experiment', pts: 4, title: 'Wie hängt Δv von F ab?', hyp: 'dann [[wird Δv größer|wird Δv kleiner]]', vars: V, main: 0,
+      res: { name: 'Zusatzgeschwindigkeit', sym: 'Δv', unit: 'm/s', f: 'F / m' }, evalHtml: 'Je größer F, desto [[größer]] Δv, doppelt: [[doppelt]].', extra: ['kleiner'], concl: 'proportional' }] }] };
+  const { student: st, key: ky } = splitExam(d), w = st.stations[0].blocks[0];
+  assert.equal(w.type, 'widget'); assert.ok(!JSON.stringify(w).includes('[[größer]]')); assert.equal(w.concl, undefined);
+  assert.deepEqual([...w.ewords].sort(), ['doppelt', 'größer', 'kleiner']);
+  // fair: nur F verändert, drei Werte; Auswertung richtig
+  let R = gradeExam(ky, { w1: { rows: [{ s: [0, 0], y: 1 }, { s: [1, 0], y: 2 }, { s: [2, 0], y: 3 }], e: { e0: 'größer', e1: 'doppelt' } } });
+  assert.equal(R.items[0].pts, 4); assert.ok(R.items[0].text.includes('Messungen'));
+  // unfair: Masse mitverändert → Teilpunkte; eine Lücke falsch
+  R = gradeExam(ky, { w1: { rows: [{ s: [0, 0], y: 1 }, { s: [1, 1], y: 1 }, { s: [2, 0], y: 3 }], e: { e0: 'kleiner', e1: 'doppelt' } } });
+  assert.deepEqual(R.items[0].parts.map(p => p.ok), [true, false, false, true]); assert.equal(R.items[0].pts, 2);
+  R = gradeExam(ky, {}); assert.equal(R.items[0].pts, 0);
+});
+
 test('Zerlegen ändert das Original nicht', () => {
   assert.equal(doc.stations[0].blocks[1].qs[0].opts[0].k, undefined);
   assert.equal(doc.stations[0].blocks[1].qs[0].opts[0].ok, true);

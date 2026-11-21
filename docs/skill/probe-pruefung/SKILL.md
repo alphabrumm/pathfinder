@@ -65,6 +65,7 @@ REGELN
   • In Gruppen sortieren: „### Sortieren“ mit 2–4 Gruppen und je 2–5 eindeutig zuzuordnenden Begriffen (je Zeile „Gruppe: Begriff, Begriff“)
   • Satzpuzzle: „### Satzpuzzle“ – ein Satz in einer Zeile, Teile mit „ / “ getrennt (feste Wendungen wie „to London“ als ein Teil); jede weitere korrekte Wortstellung als Zeile „Auch richtig: …“ mit denselben Teilen; das erste Wort klein schreiben (außer Namen und „I“), ohne Satzzeichen am Ende – PathFinder schreibt den Satzanfang selbst groß
   • Textpuzzle (Reihenfolge): „### Reihenfolge“ – 4–6 Abschnitte, Sätze oder Dialogzeilen, je Zeile einer, in der richtigen Reihenfolge; die Reihenfolge muss eindeutig sein (Signalwörter, Handlungsablauf)
+  • Experiment (Erkenntnisgewinnung): „### Widget: Experiment“ – die Schüler planen und messen selbst: „Frage:“, „Untersuche: <Symbol der untersuchten Größe>“, zwei bis drei „Größe:“-Zeilen mit je 3 Werten OHNE „| fest“ (die faire Messreihe zu planen ist Teil der Leistung), „Ergebnis:“ mit physikalisch richtiger Rechenvorschrift, „Auswertung:“ als Lückentext (Je-desto-Satz, Proportionalität) mit zwei Ablenkern unter „Extra:“; keine „Hypothese:“- und „Schlussfolgerung:“-Zeilen – die Hypothese mit Begründung davor als „### Freitext“, eine Vorhersage danach als „### Aufgabe“ mit „Antwort:“; Punkte: 2 für die Messreihe plus 1 je Auswertungslücke
   • Freitext: „### Freitext“ mit Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“
   • Programmieren in JPad: „### JPad: Titel“ – die Schüler programmieren in JPad (Java): kurzer Auftrag, Startcode als ```java start Klassenname … ``` (optional, je Datei ein Block), „Ausgabe:“ mit der erwarteten Programmausgabe (Teil der Ausgabe genügt) und/oder „Muss:“ für Pflicht-Code (z. B. while); Musterlösung als ```java lösung … ``` (sieht nur die Lehrkraft). Ohne „Erwartung:“-Zeilen wird automatisch nach Ausgabe und Pflicht-Code bewertet; mit „Erwartung: … (Punkte)“ bewertet die Lehrkraft. Java wie in JPad üblich: println() und print() ohne System.out, Wrapper-Typen Integer, Double, Boolean, Character statt int, double, boolean, char
 - Anforderungsbereiche: wie von der Lehrkraft angegeben, sonst etwa 40 % der Punkte Reproduktion (AFB I), 40 % Anwendung und Transfer (AFB II), 20 % Problemlösen und Beurteilen (AFB III); von leicht nach schwer.
@@ -177,13 +178,15 @@ Punkte: 2               (in jeder Aufgabe, jedem Quiz, Lückentext, Zuordnen, Ma
 ### Aufdecken: Mehr erfahren
 Text, der erst nach Antippen erscheint.
 
-### Widget: Experiment     (nicht in Prüfungen; Schritt für Schritt: Hypothese → Experiment → Auswertung → Schlussfolgerung)
+### Widget: Experiment     (Lernpfad: Schritt für Schritt Hypothese → Experiment → Auswertung → Schlussfolgerung mit Rückmeldung;
+                          Prüfung: alles auf einmal ohne Rückmeldung – bewertet werden die Messreihe und die Auswertung, keine Schlussfolgerung)
 Frage: Wie hängt Δv von der Kraft ab?
 Hypothese: Wenn stärker geschoben wird, dann [[wird Δv größer|wird Δv kleiner|bleibt Δv gleich]].
                         (jede Wahl zählt; die erste Möglichkeit ist das, was die Messung zeigt – sie wird nach dem Messen verglichen)
 Größe: Kraft F in N = Isaac 30, Anne 60, Vater 90      (Name, Symbol, Einheit = Werte zum Auswählen, gern mit Namen)
 Größe: Masse m in kg = 30 (leer), 60 (1 Sack) | fest   („| fest“: bleibt in dieser Messreihe gleich – faire Messreihe)
 Größe: Einwirkungsdauer Δt in s = 1, 2, 3 | fest
+Untersuche: F            (optional: Symbol der untersuchten Größe; sonst die erste Größe ohne „| fest“)
 Ergebnis: Zusatzgeschwindigkeit Δv in m/s = F · Δt / m   (Rechenvorschrift mit den Symbolen, + − · / und Klammern)
 Animation: Wagen        (optional: Wagen wird angeschoben – braucht Größen in N, kg und s; ohne: Messanzeige)
 Auswertung: Je größer die Kraft, desto [[größer]] ist Δv.   (Lückentext nach dem Messen, mehrere Zeilen möglich)
@@ -234,6 +237,7 @@ Probe bewertet nach der Abgabe; die Schüler bekommen während der Prüfung kein
 | Satzpuzzle, Reihenfolge | je Teil an richtiger Stelle (längste richtige Teilfolge), beste der erlaubten Lösungen |
 | Freitext | von der Lehrkraft, mit Erwartungshorizont |
 | JPad | ohne `Erwartung:` automatisch je Prüfung (Ausgabe des letzten Programmlaufs, jeder `Muss:`-Code); mit `Erwartung:` von der Lehrkraft – die Prüfungen sind dann nur Hinweise |
+| Experiment | je Teil: verschiedene Werte für die untersuchte Größe, faire Messreihe (nur diese Größe verändert), jede Auswertungslücke; die Hypothese wird nur festgehalten |
 
 **Teilpunkte:** Punkte der Aufgabe × Anteil richtiger Teile, auf halbe Punkte abgerundet.
 Die Lehrkraft kann nachträglich weitere Antworten akzeptieren, Punkte überschreiben oder Aufgaben streichen.

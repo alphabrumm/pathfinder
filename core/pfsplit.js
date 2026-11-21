@@ -10,10 +10,11 @@
 //   match { Schlüssel kb der rechten Karte: Schlüssel ka der gezogenen linken Karte }
 //   task  Text (kurze Antwort, wenn die Aufgabe ein Ergebnis hat, sonst Freitext)
 //   essay Text
+//   widget (Experiment) { rows:[{ s:[Wert-Nr. je Größe], y }], sel:[…], h:{ h0: Begriff }, e:{ e0: Begriff } } – Messungen, Hypothese, Auswertung
 //   app   { files:[{name,text}], sig, at, run:{ output, error, at, sig } } – Stand aus der App (JPad …), siehe pfapp.js;
 //         Aufgaben mit demselben „project“ teilen sich den Stand (er steht dann bei jeder dieser Aufgaben)
 
-export const EXAM_TYPES = new Set(['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order', 'app']);
+export const EXAM_TYPES = new Set(['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order', 'app', 'widget']);
 /** Bausteine ohne Lösungen, die unverändert in die Schülerfassung dürfen */
 const SAFE_TYPES = new Set(['text', 'info', 'image', 'table', 'reveal', 'file', 'code', 'uml', 'html']);
 /** Standard-Notenschlüssel (wie im Abitur): ab 20 % Note 5, ab 40 % Note 4, ab 55 % Note 3, ab 70 % Note 2, ab 85 % Note 1 */
@@ -136,6 +137,7 @@ export function taskTitle(b) {
   if (b.type === 'sort') return 'Sortieren';
   if (b.type === 'order') return b.words ? 'Satzpuzzle' : 'Reihenfolge';
   if (b.type === 'app') return `${appName(b.app)}-Aufgabe`;
+  if (b.type === 'widget' || b.type === 'experiment') return 'Experiment';
   return strip(b.html).slice(0, 60) || 'Aufgabe';
 }
 
@@ -208,6 +210,15 @@ export function splitExam(doc) {
         const t = { id: b.id, type: 'app', pts, title, app: b.app || 'jpad', expect: b.expect || '', compare: b.compare === 'gleich' ? 'gleich' : 'enthaelt', needs: (b.needs || []).filter(Boolean), rubric: (b.rubric || []).map(r => ({ t: r.t || '', p: +r.p || 0 })), solution: b.solution || '', files };
         tasks.push(t);
         if (appMode(t) === 'free') warnings.push(`${title}: ohne erwartete Ausgabe, Pflicht-Code oder Erwartungshorizont – du bewertest sie nach der Abgabe von Hand.`);
+      } else if (b.type === 'widget' && b.kind === 'experiment') {
+        // Schülerfassung: Größen und Rechenvorschrift (zum Messen nötig), Auswertung ohne Antworten, keine Schlussfolgerung
+        const V = (b.vars || []).map(v => ({ name: v.name || '', sym: v.sym || '', unit: v.unit || '', opts: (v.opts || []).map(o => ({ l: o.l || '', v: +o.v })), fixed: !!v.fixed, ...(v.fix ? { fix: v.fix } : {}) }));
+        const main = b.main != null && V[b.main] ? b.main : Math.max(0, V.findIndex(v => !v.fixed)), egaps = gapAnswers(b.evalHtml);
+        out.blocks.push({ id: b.id, type: 'widget', kind: 'experiment', pts, title: b.title || '', intro: b.intro || '', hyp: b.hyp || '', vars: V, res: { name: b.res?.name || '', sym: b.res?.sym || '', unit: b.res?.unit || '', f: b.res?.f || '' }, anim: b.anim || '', main,
+          evalHtml: String(b.evalHtml || '').replace(GAP_RE, '[[…]]'), ewords: shuffle(egaps.map(g => g[0]).concat(b.extra || [])) });
+        tasks.push({ id: b.id, type: 'experiment', pts, title: b.title ? strip(b.title) : 'Experiment', vars: V, main, need: Math.min(3, V[main]?.opts.length || 0), res: { name: b.res?.name || '', sym: b.res?.sym || '', unit: b.res?.unit || '' }, egaps, hyp: b.hyp || '', evalHtml: b.evalHtml || '' });
+        if (!V.length) warnings.push(`Experiment „${title}“ hat keine Größen.`);
+        if (V[main]?.fixed) warnings.push(`Experiment „${title}“: Die untersuchte Größe ist „fest“ – die Schüler können sie nicht verändern.`);
       } else if (SAFE_TYPES.has(b.type) || b.type === 'heading') {
         const c = clone(b); delete c.anim; out.blocks.push(c);
       } else if (b.type === 'page') {
@@ -274,6 +285,18 @@ export function gradeExam(key, answers = {}, opt = {}) {
         // Vorschlag aus den automatischen Prüfungen (nur Hilfe für die Lehrkraft)
         if (it.parts.length) it.suggest = halfFloor(t.pts * it.parts.filter(p => p.ok).length / it.parts.length);
       }
+    } else if (t.type === 'experiment') {
+      const rows = (a?.rows || []).filter(r => Array.isArray(r?.s)), mv = t.main, V = t.vars, need = t.need || 1, mvar = V[mv] || { name: 'Größe', opts: [] };
+      const val = (i, oi) => { const v = V[i], o = v?.opts[oi]; return o ? `${String(o.v).replace('.', ',')}${v.unit ? ' ' + v.unit : ''}` : '?'; };
+      const distinct = new Set(rows.map(r => r.s[mv])).size;
+      // fair: eine Gruppe von Messungen, in der alle anderen Größen gleich sind und die untersuchte Größe genug verschiedene Werte hat
+      const groups = new Map(); rows.forEach(r => { const k = r.s.filter((_, i) => i !== mv).join(','); if (!groups.has(k)) groups.set(k, new Set()); groups.get(k).add(r.s[mv]); });
+      const fairN = Math.max(0, ...[...groups.values()].map(g => g.size));
+      it.parts.push({ label: `Messungen mit verschiedenen Werten für ${mvar.name}`, given: `${distinct} verschiedene Werte`, ok: distinct >= need, expected: `mindestens ${need}` });
+      it.parts.push({ label: `Faire Messreihe (nur ${mvar.name} verändert)`, given: rows.length ? (fairN >= need ? 'ja' : `nein – höchstens ${fairN} Werte bei sonst gleichen Größen`) : 'keine Messung', ok: fairN >= need, expected: `${need} Werte, alle anderen Größen gleich` });
+      t.egaps.forEach((alts, i) => { const g = a?.e?.['e' + i], all = alts.concat(acc['e' + i] || acc[i] || []); it.parts.push({ label: `Auswertung, Lücke ${i + 1}`, given: String(g ?? ''), ok: g != null && String(g).trim() !== '' && all.some(x => normAns(x) === normAns(g)), expected: alts.join(' oder ') }); });
+      const fill = (html, ph, got) => { let i = 0; return strip(String(html || '').replace(GAP_RE, () => { const v = got?.[ph + i++]; return ` [${v != null && String(v).trim() ? v : '___'}] `; })); };
+      it.text = [/\[\[/.test(t.hyp) ? 'Hypothese (ohne Punkte): ' + fill(t.hyp, 'h', a?.h) : '', rows.length ? 'Messungen:\n' + rows.map((r, k) => `${k + 1}) ${r.s.map((oi, i) => `${V[i]?.sym} = ${val(i, oi)}`).join(', ')} → ${t.res.sym} = ${String(Math.round(r.y * 100) / 100).replace('.', ',')}${t.res.unit ? ' ' + t.res.unit : ''}`).join('\n') : 'Keine Messung.'].filter(Boolean).join('\n');
     } else { // Freitext: bewertet die Lehrkraft
       it.auto = false; it.text = typeof a === 'string' ? a : '';
       const m = opt.manual?.[t.id];

@@ -104,7 +104,7 @@ const CORE = {
   order: { n: 'Reihenfolge', ic: '↕', g: 'Aufgaben', h: 'Abschnitte ordnen (Textpuzzle)', make: () => ({ words: false, title: 'Bring die Abschnitte in die richtige Reihenfolge', items: ['Erster Abschnitt', 'Zweiter Abschnitt', 'Dritter Abschnitt'], alts: [], xp: 10 }) },
   essay: { n: 'Freitext', ic: '✍', g: 'Aufgaben', h: 'offene Antwort mit Erwartungshorizont – nur in Prüfungen', exam: true, make: () => ({ title: '', html: '', img: '', lines: 6, rubric: [], pts: 4 }) },
   app: { n: 'Programmieren in JPad', ic: '☕', g: 'Aufgaben', h: 'Schüler programmieren in JPad; Ausgabe und Pflicht-Code werden geprüft – nur in Prüfungen', exam: true, make: () => ({ app: 'jpad', title: '', html: '', img: '', files: [{ name: 'Hauptprogramm', text: '' }], expect: '', compare: 'enthaelt', needs: [], rubric: [], solution: '', pts: 4 }) },
-  widget: { n: 'Experiment', ic: '🔬', g: 'Widgets', h: 'Hypothese → Experiment → Auswertung → Schlussfolgerung', noExam: true, check: b => b.kind === 'experiment' || !!b.check,
+  widget: { n: 'Experiment', ic: '🔬', g: 'Widgets', h: 'Hypothese → Experiment → Auswertung → Schlussfolgerung (in Prüfungen: Messreihe und Auswertung werden bewertet)', check: b => b.kind === 'experiment' || !!b.check,
     label: b => b.kind === 'experiment' ? 'das Experiment' : 'das Widget „' + String(b.title || '').replace(/<[^>]+>/g, '').slice(0, 30) + '“',
     make: () => ({ kind: 'experiment', title: 'Wie hängt das Ergebnis von der Größe ab?', intro: '', hyp: 'Wenn die Größe größer wird, dann [[wird das Ergebnis größer|wird das Ergebnis kleiner|bleibt das Ergebnis gleich]].',
       vars: [{ name: 'Größe', sym: 'x', unit: '', opts: [{ l: '', v: 1 }, { l: '', v: 2 }, { l: '', v: 3 }], fixed: false }], res: { name: 'Ergebnis', sym: 'y', unit: '', f: '2 · x' }, anim: '',
@@ -818,16 +818,20 @@ export function startPathFinder(opts = {}) {
   }
   /* ---------- Widgets: Experiment (eingebaut) und eigenes HTML (geschützter Rahmen) ---------- */
   const XSTEPS = ['Hypothese', 'Experiment', 'Auswertung', 'Schlussfolgerung'];
-  const xSt = b => prog.quiz[b.id] || (prog.quiz[b.id] = {});
+  const xSeen = new Set(), xMsgs = {};
+  const xIn = (id, k) => { const key = id + ':' + k; if (xSeen.has(key)) return ''; xSeen.add(key); return ' xin'; };
+  const xGapsN = h => (String(h || '').match(/\[\[(.+?)\]\]/g) || []).length;
+  const xSt = b => EXAM() ? ansOf(b.id) : prog.quiz[b.id] || (prog.quiz[b.id] = {});
+  const xExam = () => EXAM() || EXAM_DONE();
   const xGaps = h => [...String(h || '').matchAll(/\[\[(.+?)\]\]/g)].map(m => m[1].split('|'));
   const xFmt = x => (Math.round(x * 100) / 100).toLocaleString('de-DE');
   /** Wortbank je Teil: Hypothese = alle Möglichkeiten, Auswertung = Antworten + Ablenker */
-  const xBank = (b, ph) => ph === 'h' ? shuffled([...new Set(xGaps(b.hyp).flat())], b.id + 'h') : shuffled(xGaps(b.evalHtml).map(a => a[0]).concat(b.extra || []), b.id + 'e');
+  const xBank = (b, ph) => ph === 'h' ? shuffled([...new Set(xGaps(b.hyp).flat())], b.id + 'h') : b.ewords || shuffled(xGaps(b.evalHtml).map(a => a[0]).concat(b.extra || []), b.id + 'e');
   const xSel = (b, st) => (b.vars || []).map((v, i) => { const s = st.sel?.[i]; return v.fixed ? (v.fix || 0) : s != null && s < v.opts.length ? s : 0; });
   const xVals = (b, sel) => (b.vars || []).map((v, i) => v.opts[sel[i]]?.v ?? 0);
   const xCalc = (b, sel) => { const f = expFormulaCore(b.res?.f, b.vars || []); const y = f ? f(xVals(b, sel)) : NaN; return isFinite(y) ? y : NaN; };
   /** untersuchte Größe: die erste veränderbare; fair = alle anderen Größen gleich */
-  const xMain = b => (b.vars || []).findIndex(v => !v.fixed);
+  const xMain = b => b.main != null && b.vars?.[b.main] ? b.main : (b.vars || []).findIndex(v => !v.fixed);
   function xSeries(b, st) {
     const mv = xMain(b), rows = st.rows || [];
     if (mv < 0) return { rows, done: rows.length > 0, mv };
@@ -853,8 +857,9 @@ export function startPathFinder(opts = {}) {
       return `<div class="lp-card lp-exp"><div class="hd"><b class="lp-ctitle">🔬 Experiment</b>${xpTag(b)}</div><div class="xq">${b.title || '<i>Forschungsfrage über ⚙</i>'}</div>${b.intro || ''}`
         + (b.hyp ? `<div class="xed"><b>Hypothese:</b> ${b.hyp}</div>` : '') + `<div class="xed"><b>Größen:</b><ul>${V}</ul><b>Ergebnis:</b> ${esc(b.res?.name || '')} ${esc(b.res?.sym || '')} = ${esc(b.res?.f || '')}${b.res?.unit ? ` (${esc(b.res.unit)})` : ''}${b.anim === 'wagen' ? ' · Animation: Wagen' : ''}</div>`
         + (b.evalHtml ? `<div class="xed"><b>Auswertung:</b> ${b.evalHtml}</div>` : '') + (b.concl ? `<div class="xed"><b>Schlussfolgerung:</b> ${b.concl}</div>` : '')
-        + `<div class="ed-hint">Schüler gehen Schritt für Schritt vor: Hypothese → Experiment → Auswertung → Schlussfolgerung · alles über ⚙</div></div>`;
+        + (EXAMF() ? `<div class="ed-hint">In der Prüfung: alles auf einmal, ohne Rückmeldung und ohne Schlussfolgerung. Bewertet werden die Messreihe (verschiedene Werte für ${esc(b.vars?.[xMain(b)]?.name || 'die untersuchte Größe')} · fair: nur diese Größe verändert) und die Auswertung je Lücke${/\[\[/.test(b.hyp || '') ? '; die Hypothese wird nur festgehalten (ohne Punkte)' : ''}. Größen ohne „fest“ lassen – das Planen ist Teil der Leistung.</div>` : `<div class="ed-hint">Schüler gehen Schritt für Schritt vor: Hypothese → Experiment → Auswertung → Schlussfolgerung · alles über ⚙</div>`) + '</div>';
     }
+    if (xExam()) return xExamHtml(b, st);
     const S = xSeries(b, st), hok = !hasH || !!st.hok, eok = !hasE || !!st.eok;
     const phase = !hok ? 0 : !S.done ? 1 : !eok ? 2 : 3;
     let h = `<div class="lp-card lp-gap lp-exp${ok ? ' ok' : ''}"><div class="hd"><b class="lp-ctitle">🔬 Experiment</b>${xpTag(b)}<span class="lp-state">${ok ? '✓ geschafft' : ''}</span></div>`;
@@ -865,21 +870,21 @@ export function startPathFinder(opts = {}) {
     const bank = (ph, got) => { const W = xBank(b, ph), used = Object.values(got || {}), seen = {}; return `<div class="bank"><span class="bl">Ziehen oder erst antippen, dann die Lücke antippen</span>${W.map(w => { const k = seen[w] = (seen[w] || 0) + 1; return `<span class="gchip${used.filter(x => x === w).length >= k ? ' used' : ''}" data-gchip="${esc(w)}">${esc(w)}</span>`; }).join('')}</div>`; };
     // 1 · Hypothese
     if (hasH) {
-      h += `<section class="xph${hok ? ' done' : ''}"><h4><span>1</span> Hypothese – was vermutest du?</h4><div>${slots(b.hyp, 'h', st.h || {}, false, [])}</div>`;
+      h += `<section class="xph${hok ? ' done' : ''}${xIn(b.id, 1)}"><h4><span>1</span> Hypothese – was vermutest du?</h4><div>${slots(b.hyp, 'h', st.h || {}, false, [])}</div>`;
       if (!hok) h += `<div class="help">Hier gibt es kein Richtig oder Falsch – ob deine Vermutung stimmt, zeigt das Experiment.</div>${bank('h', st.h)}<div><button class="lp-btn" data-run="xhyp">Hypothese festhalten</button></div>`;
       h += '</section>';
     }
     // 2 · Experiment
     if (hok) {
       const sel = xSel(b, st), R = xRoles(b);
-      h += `<section class="xph${S.done ? ' done' : ''}"><h4><span>${hasH ? 2 : 1}</span> Experiment – miss eine faire Messreihe</h4><div class="xvars">`;
+      h += `<section class="xph${S.done ? ' done' : ''}${xIn(b.id, 2)}"><h4><span>${hasH ? 2 : 1}</span> Experiment – miss eine faire Messreihe</h4><div class="xvars">`;
       (b.vars || []).forEach((v, vi) => {
         h += `<div class="xvl">${esc(v.name)} <i>${esc(v.sym)}</i>${v.fixed ? ' 🔒' : ''}</div><div class="xseg">${v.opts.map((o, oi) => `<button class="${oi === sel[vi] ? 'on' : ''}${v.fixed && oi !== sel[vi] ? ' fix' : ''}" data-xvar="${vi}.${oi}"${v.fixed && oi !== sel[vi] ? ' disabled' : ''}>${o.l ? `${esc(o.l)}<small>${xFmt(o.v)} ${esc(v.unit)}</small>` : `${xFmt(o.v)} ${esc(v.unit)}`}</button>`).join('')}</div>`;
       });
       h += `</div>${(b.vars || []).some(v => v.fixed) ? '<div class="help">🔒 bleibt in dieser Messreihe gleich – so ist die Messreihe fair.</div>' : ''}`;
       h += xWagon(b) ? `<canvas class="xcv" width="640" height="220" data-xcv="${b.id}"></canvas>` : `<div class="xmeter" data-xmeter="${b.id}"><span>${esc(b.res?.name || 'Messwert')} ${esc(b.res?.sym || '')}</span><b>${st.rows?.length ? xFmt(st.rows[st.rows.length - 1].y) : '–'}</b> ${esc(b.res?.unit || '')}</div>`;
       h += `<div><button class="lp-btn" data-run="xmeasure">▶ ${xWagon(b) ? 'Anschieben und messen' : 'Messen'}</button>${st.rows?.length ? ' <button class="lp-btn alt" data-run="xreset">↺ Neue Messreihe</button>' : ''}</div>`;
-      h += `<div class="xmsg">${esc(st.msg || (S.done ? '' : 'Wähle aus und miss. Du brauchst Messungen mit verschiedenen Werten für ' + (S.mv >= 0 ? b.vars[S.mv].name : 'die Größe') + '.'))}</div>`;
+      h += `<div class="xmsg">${esc(xMsgs[b.id] || (S.done ? '' : 'Wähle aus und miss. Du brauchst Messungen mit verschiedenen Werten für ' + (S.mv >= 0 ? b.vars[S.mv].name : 'die Größe') + '.'))}</div>`;
       if (st.rows?.length) {
         const mv = S.mv;
         h += `<div class="xgrid"><div class="lp-tablewrap"><table class="lp-table xtab"><tr><th>Nr.</th>${b.vars.map((v, i) => `<th${i === mv ? ' class="z"' : ''}>${esc(v.sym)}${v.unit ? ` in ${esc(v.unit)}` : ''}</th>`).join('')}<th>${esc(b.res.sym)}${b.res.unit ? ` in ${esc(b.res.unit)}` : ''}</th></tr>`
@@ -897,12 +902,40 @@ export function startPathFinder(opts = {}) {
     // 3 · Auswertung
     if (hok && S.done && hasE) {
       const alts = xGaps(b.evalHtml);
-      h += `<section class="xph${eok ? ' done' : ''}"><h4><span>${hasH ? 3 : 2}</span> Auswertung</h4><div>${slots(b.evalHtml, 'e', st.e || {}, !!st.echk, alts)}</div>`;
+      h += `<section class="xph${eok ? ' done' : ''}${xIn(b.id, 3)}"><h4><span>${hasH ? 3 : 2}</span> Auswertung</h4><div>${slots(b.evalHtml, 'e', st.e || {}, !!st.echk, alts)}</div>`;
       if (!eok) h += `${bank('e', st.e)}<div><button class="lp-btn" data-run="xeval">Prüfen</button></div>`;
       h += '</section>';
     }
     // 4 · Schlussfolgerung
-    if (hok && S.done && eok && b.concl) h += `<section class="xph done"><h4><span>✓</span> Schlussfolgerung</h4><div class="lp-info merke"><span class="ic">💡</span><div>${b.concl}</div></div></section>`;
+    if (hok && S.done && eok && b.concl) h += `<section class="xph done${xIn(b.id, 4)}"><h4><span>✓</span> Schlussfolgerung</h4><div class="lp-info merke"><span class="ic">💡</span><div>${b.concl}</div></div></section>`;
+    return h + '</div>';
+  }
+  /** Prüfung: alles auf einmal, ohne Rückmeldung; Antworten in prog.ans */
+  function xExamHtml(b, st) {
+    const done = EXAM_DONE(), hasH = /\[\[/.test(b.hyp || ''), hasE = /\[\[/.test(b.evalHtml || ''), mv = xMain(b), sel = xSel(b, st), rows = st.rows || [];
+    let n0 = 0;
+    const slots = (html, ph, got) => { let n = 0; return html.replace(/\[\[(.+?)\]\]/g, () => { const k = ph + n++, v = got[k]; return `<span class="gapslot${v != null ? ' filled' : ''}" data-gslot="${k}" role="button" tabindex="0">${v != null ? esc(v) : ''}</span>`; }); };
+    const bank = (ph, got) => { const W = xBank(b, ph), used = Object.values(got || {}), seen = {}; return done ? '' : `<div class="bank"><span class="bl">Ziehen oder erst antippen, dann die Lücke antippen · Lücke antippen zum Leeren</span>${W.map(w => { const k = seen[w] = (seen[w] || 0) + 1; return `<span class="gchip${used.filter(x => x === w).length >= k ? ' used' : ''}" data-gchip="${esc(w)}">${esc(w)}</span>`; }).join('')}</div>`; };
+    let h = `<div class="lp-card lp-gap lp-exp lp-exam"><div class="hd"><b class="lp-ctitle">🔬 Experiment</b>${examState(b)}</div>`;
+    if (b.title) h += `<div class="xq">❓ ${b.title}</div>`;
+    if (b.intro) h += `<div>${b.intro}</div>`;
+    if (hasH) h += `<section class="xph"><h4><span>${++n0}</span> Hypothese</h4><div>${slots(b.hyp, 'h', st.h || {})}</div>${bank('h', st.h)}</section>`;
+    h += `<section class="xph"><h4><span>${++n0}</span> Experiment – plane und miss eine faire Messreihe</h4><div class="xvars">`;
+    (b.vars || []).forEach((v, vi) => {
+      h += `<div class="xvl">${esc(v.name)} <i>${esc(v.sym)}</i>${v.fixed ? ' 🔒' : ''}</div><div class="xseg">${v.opts.map((o, oi) => `<button class="${oi === sel[vi] ? 'on' : ''}${v.fixed && oi !== sel[vi] ? ' fix' : ''}" data-xvar="${vi}.${oi}"${(v.fixed && oi !== sel[vi]) || done ? ' disabled' : ''}>${o.l ? `${esc(o.l)}<small>${xFmt(o.v)} ${esc(v.unit)}</small>` : `${xFmt(o.v)} ${esc(v.unit)}`}</button>`).join('')}</div>`;
+    });
+    h += '</div>';
+    h += xWagon(b) ? `<canvas class="xcv" width="640" height="220" data-xcv="${b.id}"></canvas>` : `<div class="xmeter" data-xmeter="${b.id}"><span>${esc(b.res?.name || 'Messwert')} ${esc(b.res?.sym || '')}</span><b>${rows.length ? xFmt(rows[rows.length - 1].y) : '–'}</b> ${esc(b.res?.unit || '')}</div>`;
+    if (!done) h += `<div><button class="lp-btn" data-run="xmeasure">▶ ${xWagon(b) ? 'Anschieben und messen' : 'Messen'}</button>${rows.length ? ' <button class="lp-btn alt" data-run="xundo">↶ Letzte Messung löschen</button> <button class="lp-btn alt" data-run="xreset">↺ Alle Messungen löschen</button>' : ''}</div>`;
+    h += `<div class="xmsg">${esc(xMsgs[b.id] || '')}</div>`;
+    if (rows.length) {
+      h += `<div class="xgrid"><div class="lp-tablewrap"><table class="lp-table xtab"><tr><th>Nr.</th>${b.vars.map(v => `<th>${esc(v.sym)}${v.unit ? ` in ${esc(v.unit)}` : ''}</th>`).join('')}<th>${esc(b.res.sym)}${b.res.unit ? ` in ${esc(b.res.unit)}` : ''}</th></tr>`
+        + rows.map((r, k) => `<tr><td>${k + 1}</td>${r.s.map((oi, i) => `<td>${esc(b.vars[i].opts[oi]?.l || xFmt(b.vars[i].opts[oi]?.v))}${b.vars[i].opts[oi]?.l ? `<small> ${xFmt(b.vars[i].opts[oi]?.v)}</small>` : ''}</td>`).join('')}<td><b>${xFmt(r.y)}</b></td></tr>`).join('') + '</table></div>';
+      if (mv >= 0) h += xChart(b, { mv, rows, fair: [], all: true });
+      h += '</div>';
+    }
+    h += '</section>';
+    if (hasE) h += `<section class="xph"><h4><span>${++n0}</span> Auswertung</h4><div>${slots(b.evalHtml, 'e', st.e || {})}</div>${bank('e', st.e)}</section>`;
     return h + '</div>';
   }
   function xChart(b, S) {
@@ -916,29 +949,32 @@ export function startPathFinder(opts = {}) {
     xs.forEach(x => s += `<text x="${X(x)}" y="${Y0 + 15}" font-size="11" text-anchor="middle" fill="var(--ink-2)">${xFmt(x)}</text>`);
     s += `<line x1="${X0}" y1="${Y0}" x2="${X0 + W}" y2="${Y0}" stroke="var(--ink)" stroke-width="2"/><line x1="${X0}" y1="${Y0}" x2="${X0}" y2="${Y0 - H - 6}" stroke="var(--ink)" stroke-width="2"/>`;
     s += `<text x="${X0 + W / 2}" y="${Y0 + 34}" font-size="12" font-weight="bold" text-anchor="middle" fill="var(--ink)">${esc(v.sym)}${v.unit ? ' in ' + esc(v.unit) : ''}</text><text x="6" y="14" font-size="12" font-weight="bold" fill="var(--good)">${esc(b.res.sym)}${b.res.unit ? ' in ' + esc(b.res.unit) : ''}</text>`;
-    const P = S.fair.map(r => [X(v.opts[r.s[mv]].v), Y(r.y)]);
-    if (P.length > 1) s += `<polyline points="${P.map(p => p.join(',')).join(' ')}" fill="none" stroke="var(--good)" stroke-width="2" stroke-dasharray="5 4"/>`;
+    const P = (S.all ? S.rows : S.fair).map(r => [X(v.opts[r.s[mv]].v), Y(r.y)]);
+    if (P.length > 1 && !S.all) s += `<polyline points="${P.map(p => p.join(',')).join(' ')}" fill="none" stroke="var(--good)" stroke-width="2" stroke-dasharray="5 4"/>`;
     P.forEach(p => s += `<circle cx="${p[0]}" cy="${p[1]}" r="6" fill="var(--good)" stroke="var(--surface)" stroke-width="2"/>`);
     return `<div class="xchartw">${s}</svg></div>`;
   }
   function expPlace(b, slot, word) {
-    const st = xSt(b), ph = String(slot)[0]; if (ph !== 'h' && ph !== 'e') return;
-    if (ph === 'h' && st.hok) return; if (ph === 'e' && st.eok) return;
+    const st = xSt(b), ph = String(slot)[0], ex = EXAM(); if (ph !== 'h' && ph !== 'e') return;
+    if (EXAM_DONE()) return;
+    if (!ex && ph === 'h' && st.hok) return; if (!ex && ph === 'e' && st.eok) return;
     const got = st[ph] || (st[ph] = {});
     if (word == null) delete got[slot];
     else { const W = xBank(b, ph); if (!W.includes(word)) return; const copies = W.filter(w => w === word).length, placed = Object.keys(got).filter(k => got[k] === word); if (got[slot] !== word && placed.length >= copies) delete got[placed[0]]; got[slot] = word; }
     if (ph === 'e') delete st.echk;
-    render();
+    render(); if (ex) examChanged(b.id);
   }
   function expSelect(id, spec) {
     const r = findBlock(id); if (!r || xBusy[id]) return; const b = r.b, st = xSt(b), [vi, oi] = spec.split('.').map(Number);
-    if (b.vars[vi]?.fixed) return; st.sel = xSel(b, st); st.sel[vi] = oi; st.msg = ''; render();
+    if (b.vars[vi]?.fixed || EXAM_DONE()) return; st.sel = xSel(b, st); st.sel[vi] = oi; xMsgs[id] = ''; render(); if (EXAM()) examChanged(id);
   }
   const xBusy = {};
   function expRun(a, b) {
     const st = xSt(b), id = b.id;
     if (a === 'xhyp') { const n = xGaps(b.hyp).length, got = st.h || {}; if (Object.keys(got).length < n) { toast('Fülle zuerst alle Lücken deiner Hypothese aus.'); return; } st.hok = 1; render(); return; }
-    if (a === 'xreset') { if (xBusy[id]) return; st.rows = []; st.msg = 'Neue Messreihe – wähle aus und miss.'; render(); return; }
+    if (EXAM_DONE()) return;
+    if (a === 'xreset') { if (xBusy[id]) return; if (EXAM() && !confirm('Alle Messungen dieses Experiments löschen?')) return; st.rows = []; xMsgs[id] = EXAM() ? 'Alle Messungen gelöscht.' : 'Neue Messreihe – wähle aus und miss.'; render(); if (EXAM()) examChanged(id); return; }
+    if (a === 'xundo') { if (xBusy[id]) return; (st.rows || []).pop(); xMsgs[id] = 'Letzte Messung gelöscht.'; render(); if (EXAM()) examChanged(id); return; }
     if (a === 'xeval') {
       const alts = xGaps(b.evalHtml), got = st.e || {}; st.echk = 1;
       if (alts.every((A, i) => got['e' + i] != null && A.some(x => normAns(x) === normAns(got['e' + i])))) { st.eok = 1; solve(id); }
@@ -950,8 +986,9 @@ export function startPathFinder(opts = {}) {
       const sel = xSel(b, st), y = xCalc(b, sel); if (!isFinite(y)) { toast('Die Rechenvorschrift des Experiments ist ungültig (⚙).'); return; }
       const finish = () => {
         delete xBusy[id]; st.rows = (st.rows || []).concat([{ s: sel, y }]);
+        if (EXAM()) { const res = b.res || {}; xMsgs[id] = `Messung ${st.rows.length}: ${res.sym || ''} = ${xFmt(y)} ${res.unit || ''}`; render(); examChanged(id); return; }
         const S = xSeries(b, st), res = b.res || {};
-        st.msg = `Ergebnis: ${res.name || 'Messwert'} ${res.sym || ''} = ${xFmt(y)} ${res.unit || ''}.` + (S.done ? '' : ` Miss jetzt mit einem anderen Wert für ${S.mv >= 0 ? b.vars[S.mv].name : 'die Größe'}.`);
+        xMsgs[id] = `Ergebnis: ${res.name || 'Messwert'} ${res.sym || ''} = ${xFmt(y)} ${res.unit || ''}.` + (S.done ? '' : ` Miss jetzt mit einem anderen Wert für ${S.mv >= 0 ? b.vars[S.mv].name : 'die Größe'}.`);
         if (S.done && !/\[\[/.test(b.evalHtml || '') && (!/\[\[/.test(b.hyp || '') || st.hok)) solve(id); else render();
       };
       xBusy[id] = true;
@@ -1136,6 +1173,7 @@ export function startPathFinder(opts = {}) {
     if (b.type === 'sort') return !!a && sortSides(b).I.every(x => a[x.k] != null);
     if (b.type === 'order') return Array.isArray(a) && a.length > 0 && a.length === orderPool(b).length;
     if (b.type === 'app') return !!a && (!!a.run || !!a.ed);
+    if (b.type === 'widget') { const ne = xGaps(b.evalHtml).length; return !!a && (a.rows || []).length > 0 && Array.from({ length: ne }, (_, i) => String(a.e?.['e' + i] ?? '').trim()).every(Boolean); }
     return typeof a === 'string' && a.trim() !== '';
   }
   const examState = b => `<span class="lp-state" data-xstate>${answered(b) ? '✓ beantwortet' : ''}</span>`;
@@ -2742,7 +2780,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   const fmtPts = x => String(Math.round(x * 100) / 100).replace('.', ',');
   function examTitle(b) {
     const t = plain(b.title || '').trim(); if (t) return t;
-    return { quiz: 'Quiz', gap: 'Lückentext', match: 'Zuordnen', essay: 'Freitext', mark: 'Markieren', sort: 'Sortieren', order: b.words ? 'Satzpuzzle' : 'Reihenfolge', app: appN(b.app) + '-Aufgabe' }[b.type] || 'Aufgabe';
+    return { quiz: 'Quiz', gap: 'Lückentext', match: 'Zuordnen', essay: 'Freitext', mark: 'Markieren', sort: 'Sortieren', order: b.words ? 'Satzpuzzle' : 'Reihenfolge', app: appN(b.app) + '-Aufgabe', widget: 'Experiment' }[b.type] || 'Aufgabe';
   }
   /* ---------- App-Aufgaben (JPad …): Fenster mit der App, Stand als Antwort ---------- */
   let APPM = null;
@@ -2801,6 +2839,15 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   /** Antworten einer Aufgabe als Textzeilen – für Protokoll und Vorschau */
   function answerLines(b) {
     const a = prog.ans?.[b.id], none = '– keine Antwort –';
+    if (b.type === 'widget') {
+      const fill = (html, ph, got) => { let i = 0; return plain(String(html || '').replace(/<br\s*\/?>/gi, ' ').replace(/\[\[(.+?)\]\]/g, () => { const v = got?.[ph + i++]; return ` [${v != null && String(v).trim() ? esc(v) : '___'}] `; })).replace(/\s+/g, ' ').replace(/\s+([.,;:!?])/g, '$1').trim(); };
+      const L = [], rows = a?.rows || [];
+      if (/\[\[/.test(b.hyp || '')) L.push('Hypothese: ' + fill(b.hyp, 'h', a?.h));
+      L.push(rows.length ? 'Messungen:' : 'Messungen: ' + none);
+      rows.forEach((r, k) => L.push(`  ${k + 1}) ${r.s.map((oi, i) => `${b.vars[i]?.sym} = ${xFmt(b.vars[i]?.opts[oi]?.v)} ${b.vars[i]?.unit || ''}`.trim()).join(', ')} → ${b.res?.sym} = ${xFmt(r.y)} ${b.res?.unit || ''}`.trimEnd()));
+      if (/\[\[/.test(b.evalHtml || '')) L.push('Auswertung: ' + fill(b.evalHtml, 'e', a?.e));
+      return L;
+    }
     if (b.type === 'app') { if (!a?.files?.length) return [none]; const L = []; a.files.forEach(f => { L.push(`Datei ${f.name}:`, ...String(f.text).replace(/\s+$/, '').split('\n').map(l => '  ' + l)); }); L.push(a.run ? `Letzter Programmlauf${a.run.error ? ' (mit Fehler abgebrochen)' : ''}: ${String(a.run.output || '').trim().replace(/\s*\n\s*/g, ' | ').slice(0, 300) || '(keine Ausgabe)'}` : 'Programm nie ausgeführt.'); return L; }
     if (b.type === 'quiz') return b.qs.flatMap((q, qi) => { const o = q.opts.find(x => x.k != null && x.k === a?.[qi]); return [`${b.qs.length > 1 ? qi + 1 + '. ' : ''}${plain(q.q)}`, `Antwort: ${o ? plain(o.t) : none}`]; });
     if (b.type === 'gap') { let i = 0; const t = plain(String(b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const v = a?.[i++]; return ` [${v != null && String(v).trim() ? esc(v) : '___'}] `; })).replace(/\s+/g, ' ').replace(/\s+([.,;:!?])/g, '$1').trim(); return [t, ...(gapCount(b) && !answered(b) ? ['(nicht alle Lücken ausgefüllt)'] : [])]; }
@@ -2903,10 +2950,11 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     let tasks = 0, removed = 0;
     for (const s of d.stations) {
       s.check = false; delete s.skin;
-      s.blocks = s.blocks.filter(b => { if (b.type === 'lock') return false; if (!CORE[b.type]) { removed++; return false; } return true; });
+      s.blocks = s.blocks.filter(b => { if (b.type === 'lock') return false; if (!CORE[b.type] || (b.type === 'widget' && b.kind !== 'experiment')) { removed++; return false; } return true; });
       for (const b of s.blocks) {
         if (b.type === 'task') { delete b.tips; delete b.tipsHide; delete b.solHide; }
         if (CORE_CHECK.has(b.type)) { tasks++; if (b.pts == null) b.pts = b.type === 'quiz' ? (b.qs || []).length || 1 : b.type === 'gap' ? Math.max(1, gapCount(b)) : b.type === 'match' ? Math.max(1, (b.pairs || []).length) : b.type === 'mark' ? Math.max(1, markParse(b.html).targets.size) : b.type === 'sort' ? Math.max(1, sortSides(b).I.length) : b.type === 'order' ? Math.max(1, Math.ceil((b.items || []).length / 2)) : b.type === 'essay' ? 4 : b.answer ? 1 : 2; }
+        else if (b.type === 'widget' && b.kind === 'experiment') { tasks++; if (b.pts == null) b.pts = 2 + xGapsN(b.evalHtml); }
       }
       if (!s.blocks.length) s.blocks.push({ id: uid(), type: 'text', html: '' });
     }

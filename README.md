@@ -22,6 +22,11 @@ die Seite später sehen. Gebaut für das iPad (mit oder ohne Tastatur).
 * **Eigenes Widget** (`### Widget: HTML`, Baustein 🧩): eigenes HTML mit Skripten, läuft geschützt in einem Rahmen (sandbox, ohne
   Zugriff auf die Seite), passt seine Höhe selbst an und behält seinen Zustand beim Neuzeichnen. Mit `Erledigt: ja` zählt es als
   Aufgabe – das HTML ruft `pfDone()` auf.
+* **Experiment in Prüfungen:** Dort erscheint alles auf einmal, ohne Rückmeldung, Sperren und Schlussfolgerung. Bewertet werden
+  automatisch die Messreihe (genug verschiedene Werte für die untersuchte Größe, fair: nur diese Größe verändert) und die
+  Auswertung je Lücke; die Hypothese wird nur festgehalten. `Untersuche: F` legt die untersuchte Größe fest; Größen ohne „| fest“
+  lassen, damit das Planen Teil der Leistung ist. Die Schülerfassung enthält die Rechenvorschrift (zum Messen nötig), aber keine
+  Antworten der Auswertung. Hypothese mit Begründung am besten als Freitext davor, eine Vorhersage als Aufgabe mit `Antwort:` danach.
 * **Schrittweise aufdecken** (`Aufdecken: schrittweise` im Kopf oder direkt nach einer Stationszeile, ⚙ Station): Der nächste
   Baustein erscheint erst, wenn die Aufgabe davor gelöst ist.
 * **Freie Lücken** (`Frei: ja` im Lückentext): jede Wahl zählt, die Wortbank zeigt alle Möglichkeiten aus `[[a|b|c]]` – z. B. für Hypothesen.
