@@ -416,6 +416,18 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 .ed-pop.ki-menu { width: min(500px, calc(100vw - 20px)); }
 .ed-pop.ki-menu .ed-pal.ed-pal1 { grid-template-columns: 1fr; width: auto; }
 .ed-pop.ki-menu .ed-pal button { width: 100%; }
+.ki-menu-link { display: block; margin: 10px 4px 2px; padding: 4px 0; border: 0; background: none; color: #5b45c9; font: inherit; font-size: 14px; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+/* KI-Dialog als Assistent (in Probe): vier Schritte */
+.ki-wiz { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 4px; }
+.ki-wstep { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1.5px solid #e3dceb; border-radius: 12px; background: #faf8fc; color: #5d5670; font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+.ki-wstep b { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #ece9f4; color: #5d5670; font-size: 13px; flex-shrink: 0; }
+.ki-wstep.on { border-color: #6b4ce6; background: #f1edfd; color: #2c1f6b; } .ki-wstep.on b { background: #6b4ce6; color: #fff; }
+.ki-wstep.done b { background: #b9a8ff; color: #fff; }
+.ki-wpage { display: grid; gap: 12px; } .ki-wpage[hidden] { display: none; }
+.ki-wintro { margin: 4px 0 0; font-size: 15px; }
+.ki-wnav { margin-top: 6px; align-items: center; } .ki-wnav .sp { flex: 1; }
+.ki-wlink { border: 0; background: none; padding: 4px 0; color: #5b45c9; font: inherit; font-size: 14px; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+@media (max-width: 600px) { .ki-wiz { grid-template-columns: repeat(2, 1fr); } }
 /* Arbeiten mit Prompt und fremder KI (bei API-Key zugeklappt) */
 .ki-manual { display: grid; gap: 12px; }
 .ki-manual > summary { display: none; }
@@ -549,6 +561,9 @@ body.pf-player { background: var(--bg, #fdf8f3); }
   body:not(.pf-player) .ed-pat button[aria-pressed="true"], body:not(.pf-player) .ed-figs button[aria-pressed="true"] { background: #4a3d12; border-color: #f6bf3a; }
   body:not(.pf-player) .ed-figs img { background: #fff; border-radius: 8px; }
   body:not(.pf-player) .ki-step .n { background: #ece9f4; color: #1b1924; }
+  body:not(.pf-player) .ki-wstep { background: var(--dk-surf2); border-color: #3a3550; color: var(--dk-mute); } body:not(.pf-player) .ki-wstep b { background: #3a3550; color: #ddd; }
+  body:not(.pf-player) .ki-wstep.on { background: #2d2550; border-color: #8a72e0; color: #e6deff; } body:not(.pf-player) .ki-wstep.on b { background: #8a72e0; color: #fff; }
+  body:not(.pf-player) .ki-wlink, body:not(.pf-player) .ki-menu-link { color: #b9a8ff; }
   body:not(.pf-player) .ki-api { background: var(--dk-surf2); }
   body:not(.pf-player) .ki-api-on { color: #b9a8ff; }
   body:not(.pf-player) .ki-live { background: #22304a; color: #cfe0ff; }

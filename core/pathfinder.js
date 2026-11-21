@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-20a';
+const PF_BUILD = '2026-11-21a';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1589,13 +1589,13 @@ ${d.theme === 'grid' ? `<span class="help">„Hack“: immer dunkel, Raster-Kopf
   /** gängiges KI-Symbol (Funkelsterne) */
   const KI_ICON = '<svg class="ki-ico" viewBox="0 0 24 24" width="1.1em" height="1.1em" aria-hidden="true"><path fill="currentColor" d="M10 2.5l1.7 5.3a3 3 0 0 0 1.9 1.9L19 11.5l-5.4 1.8a3 3 0 0 0-1.9 1.9L10 20.5l-1.7-5.3a3 3 0 0 0-1.9-1.9L1 11.5l5.4-1.8a3 3 0 0 0 1.9-1.9z"/><path fill="currentColor" d="M19 1.5l.8 2.2a1.4 1.4 0 0 0 .8.8l2.2.8-2.2.8a1.4 1.4 0 0 0-.8.8l-.8 2.2-.8-2.2a1.4 1.4 0 0 0-.8-.8l-2.2-.8 2.2-.8a1.4 1.4 0 0 0 .8-.8z"/></svg>';
   /** Hinweis nach „KI-Prompt generieren“: was jetzt in der KI zu tun ist */
-  function kiCopiedPopup(what = 'mit dem Bau des Lernpfads fertig ist', extra = '') {
+  function kiCopiedPopup(what = 'mit dem Bau des Lernpfads fertig ist', extra = '', onOk = null) {
     const w = document.createElement('div'); w.className = 'ki-pop-bd';
     w.innerHTML = `<div class="ki-pop" role="dialog" aria-modal="true"><div class="ki-pop-ico">${KI_ICON}</div>
       <p>Der Prompt für deine KI (ByLKI, Mistral AI, Claude, …) wurde generiert und in die Zwischenablage kopiert. Gehe jetzt zu deinem KI-Chatbot und füge den Prompt per Rechtsklick oder Tastenkürzel (⌘V bzw. Strg+V) ein.</p>${extra ? `<p><b>${extra}</b></p>` : ''}
       <p>Warte, bis deine KI ${what}, und kopiere ihr Ergebnis hierher ins Feld „Antwort der KI“.</p>
       <button class="lp-btn" data-ok="1">Erledigt</button></div>`;
-    w.addEventListener('click', e => { if (e.target.closest('[data-ok]')) { w.remove(); document.getElementById('kiIn')?.focus(); } });
+    w.addEventListener('click', e => { if (e.target.closest('[data-ok]')) { w.remove(); onOk && onOk(); document.getElementById('kiIn')?.focus(); } });
     document.body.appendChild(w); w.querySelector('[data-ok]').focus();
   }
   /* ---------- KI direkt: eigener Claude-API-Key ---------- */
@@ -2051,6 +2051,47 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     };
   }
 
+  /**
+   * Probe (nur Prüfungen): den KI-Dialog als Assistenten in vier Schritten zeigen – 1 Klasse, Fach und Lernbereich,
+   * 2 Aufgaben (Anforderungsbereiche, Aufgabenstile), 3 Hinweise, Material und Prompt, 4 Antwort der KI einfügen.
+   * Es bleiben dieselben Felder mit derselben Logik; sie werden nur auf Seiten verteilt. Der API-Key steht im Menü „KI-Tools“.
+   * Gibt go(n) zurück.
+   */
+  function kiWizard(el) {
+    const form = $('.ed-form', el), q = sel => $(sel, el), up = (x, sel) => x && x.closest(sel), lab = sel => up(q(sel), 'label');
+    const P = [
+      ['Klasse & Thema', 'Für welche Klasse und welches Thema? Wähle Jahrgangsstufe, Fach und Lernbereich – oder beschreibe ein eigenes Thema.',
+        [lab('[data-k="art"]'), q('#kiBasis'), up(q('[data-k="jg"]'), '.row'), q('#kiFrei'), lab('#kiLb'), q('#kiLpHint'), q('#kiInh'), lab('[data-k="thema"]'), up(q('[data-k="min"]'), '.row')]],
+      ['Aufgaben', 'Wie anspruchsvoll, welche Aufgaben? Lege den Anteil der Anforderungsbereiche fest und wähle die Aufgabenstile.', [q('#kiMix'), q('#kiTypes')]],
+      ['Hinweise & Prompt', 'Was soll die KI noch wissen? Ergänze Hinweise und Material. Dann den Prompt erstellen – er wird kopiert – und in deiner KI (z. B. ByLKI oder Claude) einfügen und abschicken.',
+        [lab('[data-k="extra"]'), q('#kiMat'), up(q('[data-copy="prompt"]'), '.ki-btns'), q('#kiDirRow'), q('#kiLive')]],
+      ['Antwort einfügen', 'Füge hier die komplette Antwort der KI ein – oder lade ihre Datei. Fehler im Format zeigt PathFinder sofort an.',
+        [q('#kiIn'), up(q('#kiFiles'), '.ki-btns'), q('#kiFileList'), q('#kiRes'), up(q('#kiOpen'), '.ki-btns')]],
+    ];
+    const art = lab('[data-k="art"]'); if (art) art.hidden = true; // nur „Digitale Prüfung“ möglich
+    $$('.ki-step', el).forEach(x => { x.hidden = true; });
+    const api = q('#kiApi'); if (api) api.hidden = true;
+    const bar = document.createElement('div'); bar.className = 'ki-wiz';
+    bar.innerHTML = P.map(([n], i) => `<button type="button" class="ki-wstep" data-wgo="${i + 1}"><b>${i + 1}</b><span>${n}</span></button>`).join('');
+    form.prepend(bar);
+    const pages = P.map(([, intro, els], i) => {
+      const pg = document.createElement('div'); pg.className = 'ki-wpage'; pg.dataset.wpage = i + 1;
+      pg.innerHTML = `<p class="help ki-wintro">${intro}</p>`;
+      els.filter(Boolean).forEach(x => pg.append(x));
+      const nav = document.createElement('div'); nav.className = 'ki-btns ki-wnav';
+      nav.innerHTML = (i ? `<button type="button" class="lp-btn alt" data-wgo="${i}">‹ Zurück</button>` : '<button type="button" class="ki-wlink" data-wgo="4">Antwort der KI schon da? Direkt zu Schritt 4 ›</button>')
+        + (i < 3 ? `<span class="sp"></span><button type="button" class="lp-btn${i === 2 ? ' alt' : ''}" data-wgo="${i + 2}">${i === 2 ? 'Weiter: Antwort einfügen' : 'Weiter'} ›</button>` : '');
+      pg.append(nav); form.append(pg); return pg;
+    });
+    const man = q('#kiManual'); if (man) man.hidden = true; // leer: alles ist jetzt auf den Seiten
+    const go = n => {
+      pages.forEach(p => { p.hidden = +p.dataset.wpage !== n; });
+      $$('.ki-wstep', bar).forEach(b => { const k = +b.dataset.wgo; b.classList.toggle('on', k === n); b.classList.toggle('done', k < n); });
+      el.scrollTop = 0; if (n === 4) setTimeout(() => q('#kiIn')?.focus(), 50);
+    };
+    el.addEventListener('click', e => { const b = e.target.closest('[data-wgo]'); if (b) go(+b.dataset.wgo); });
+    go(1); return go;
+  }
   async function openKI(preset = {}) {
     const [T, L, A] = await Promise.all([loadText(), loadLp(), loadApi()]); const env = textEnv();
     const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
@@ -2078,7 +2119,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     let parsed = null, lastAtt = {}, fileAtt = {}, tok = 0, matFiles = []; // matFiles: Arbeitsmaterial für Claude (nur mit API-Key, nicht gespeichert)
     const opt = (v, t, sel) => `<option value="${esc(v)}"${String(sel) === String(v) ? ' selected' : ''}>${esc(t)}</option>`;
     const EX1 = FORMS_OK.length === 1 && FORMS_OK[0] === 'pruefung'; // nur Prüfungen (eingebettet in Probe): Beschriftungen sprechen von der Prüfung
-    const W = EX1 ? { a: 'Prüfung', den: 'die Prüfung', neu: 'neue Prüfung', head: 'Prüfung erstellen', file: 'pruefung.txt' } : { a: 'Lernpfad', den: 'den Lernpfad', neu: 'neuen Lernpfad', head: 'Lernpfad, Challenge oder Prüfung erstellen', file: 'lernpfad.txt' };
+    const W = EX1 ? { a: 'Prüfung', den: 'die Prüfung', neu: 'neue Prüfung', head: 'Prüfung generieren', file: 'pruefung.txt' } : { a: 'Lernpfad', den: 'den Lernpfad', neu: 'neuen Lernpfad', head: 'Lernpfad, Challenge oder Prüfung erstellen', file: 'lernpfad.txt' };
     el.innerHTML = `<header><b>${KI_ICON} ${W.head}</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
         <div class="ki-api" id="kiApi"></div>
@@ -2098,7 +2139,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         <div id="kiLpHint" class="help"></div>
         <div id="kiInh" class="ki-inh"></div>
         <label>Thema <span class="help">(optional – sonst der Lernbereich)</span><input type="text" data-k="thema" value="${esc(info.thema || '')}" placeholder="z. B. Relative Zellbezüge in der Tabellenkalkulation"></label>
-        <label>Weitere Bemerkungen für die KI<textarea data-k="extra" rows="3" placeholder="z. B. mit Alltagsbeispiel Pausenverkauf, eine Station als Challenge, zwischen den Stationen eine Animation, die einen Aspekt erklärt">${esc(info.extra || '')}</textarea></label>
+        <label>Weitere Bemerkungen für die KI<textarea data-k="extra" rows="3" placeholder="${EX1 ? 'z. B. Alltagsbeispiel Pausenverkauf, eine Rechenaufgabe mit Lösungsweg, keine Aufgaben zur Haushaltsinstallation' : 'z. B. mit Alltagsbeispiel Pausenverkauf, eine Station als Challenge, zwischen den Stationen eine Animation, die einen Aspekt erklärt'}">${esc(info.extra || '')}</textarea></label>
         <div id="kiMat" class="ki-mat"></div>
         <div class="row"><label>Umfang<select data-k="min">${L.UMFANG.map(m => opt(m, m + ' Minuten', info.min)).join('')}</select></label><span></span></div>
         <div class="ki-btns" id="kiDirRow" hidden><button class="lp-btn" data-direct="ki">⚡ ${W.a} direkt erstellen</button></div>
@@ -2113,6 +2154,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         <div class="ki-btns"><button class="lp-btn" id="kiOpen" disabled>＋ Als ${W.neu} öffnen</button></div>
         </details>
       </div>`;
+    const goto = EX1 ? kiWizard(el) : null; // in Probe: Assistent in vier Schritten
     const res = $('#kiRes', el), openB = $('#kiOpen', el);
     let imgCheck = Promise.resolve();
     let direct = false;
@@ -2240,7 +2282,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (t.dataset.nobasis) { kiBasis = null; drawBasis(); return; }
       if (t.dataset.matdel != null) { matFiles.splice(+t.dataset.matdel, 1); drawMat(); return; }
       if (t.dataset.inh) { const lb = L.lernbereiche(info.fsel, +info.jg || 0).find(x => x.id === info.lb); if (!lb) return; info.inh = info.inh.length === lb.k.length ? [] : [...lb.k]; drawInh(); save(); return; }
-      if (t.dataset.copy === 'prompt') { const p = ready(); if (!p) return; const pm = withMat(p, false); if (await copyText(T.promptFor(pm, env))) kiCopiedPopup(EX1 ? 'mit der Prüfung fertig ist' : undefined, pm.material ? 'Lade dort auch dein Arbeitsmaterial hoch (z. B. Arbeitsblätter als PDF oder Foto) – sonst fragt die KI zuerst danach.' : ''); else toast('Kopieren ging nicht'); }
+      if (t.dataset.copy === 'prompt') { const p = ready(); if (!p) return; const pm = withMat(p, false); if (await copyText(T.promptFor(pm, env))) kiCopiedPopup(EX1 ? 'mit der Prüfung fertig ist' : undefined, pm.material ? 'Lade dort auch dein Arbeitsmaterial hoch (z. B. Arbeitsblätter als PDF oder Foto) – sonst fragt die KI zuerst danach.' : '', goto && (() => goto(4))); else toast('Kopieren ging nicht'); }
       if (t.dataset.direct === 'ki') {
         const p = ready(); if (!p) return;
         const inp = $('#kiIn', el); inp.value = ''; check();
@@ -2248,7 +2290,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         if (r != null) {
           check(); await imgCheck;
           if (parsed && !parsed.errors.length) { openB.click(); return; }
-          $('#kiManual', el).open = true; res.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          $('#kiManual', el).open = true; goto && goto(4); res.scrollIntoView({ block: 'center', behavior: 'smooth' });
         }
       }
       if (t.dataset.direct === 'fix' && parsed) {
@@ -2807,11 +2849,14 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   }
   if ($('#bKI')) $('#bKI').onclick = e => { // nur in der eigenständigen WebApp: Auswahl der KI-Prompts
     closePop(); pop = document.createElement('div'); pop.className = 'ed-pop ki-menu';
+    const ONLY_EXAM = FORMS_OK.length === 1 && FORMS_OK[0] === 'pruefung'; // eingebettet in Probe
     pop.innerHTML = `<h3>KI-Tools</h3><div class="ed-pal ed-pal1">
-      <button data-k="ki"><b>${KI_ICON} Lernpfad, Challenge oder Prüfung erstellen</b><span>einen neuen Lernpfad, eine Challenge oder eine digitale Prüfung von einer KI schreiben lassen</span></button>
+      ${ONLY_EXAM ? `<button data-k="ki"><b>${KI_ICON} Prüfung generieren</b><span>eine digitale Prüfung Schritt für Schritt von einer KI erstellen lassen</span></button>`
+        : `<button data-k="ki"><b>${KI_ICON} Lernpfad, Challenge oder Prüfung erstellen</b><span>einen neuen Lernpfad, eine Challenge oder eine digitale Prüfung von einer KI schreiben lassen</span></button>`}
       <button data-k="exam"><b>${KI_ICON} Fragensammlung für ByCS generieren</b><span>aus dem offenen Lernpfad: Fragen für Moodle/ByCS (Moodle-XML)</span></button></div>`;
+    if (ONLY_EXAM) pop.insertAdjacentHTML('beforeend', '<button class="ki-menu-link" data-k="api">KI API Key verwenden</button>');
     document.body.appendChild(pop); placePop(e.currentTarget);
-    pop.onclick = ev => { const k = ev.target.closest('[data-k]')?.dataset.k; if (!k) return; closePop(); if (k === 'ki') openKI(); else openExam(); };
+    pop.onclick = ev => { const k = ev.target.closest('[data-k]')?.dataset.k; if (!k) return; closePop(); if (k === 'ki') openKI(); else if (k === 'api') apiSettings(); else openExam(); };
   };
   const bWide = $('#bWide'); if (bWide) bWide.onclick = () => $('#app').classList.toggle('lp-only');
   function infoDlg(title, html) { const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } }; el.innerHTML = `<header><b>${title}</b><button class="ok" data-x="1">Schließen</button></header>${html}`; el.onclick = ev => { if (ev.target.closest('[data-x]')) closeDlg(false); }; }
