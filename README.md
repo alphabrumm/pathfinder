@@ -11,6 +11,23 @@ die Seite später sehen. Gebaut für das iPad (mit oder ohne Tastatur).
   **SCORM-1.2-Lernpaket** für die Aktivität „Lernpaket“: Moodle speichert den Fortschritt und erhält Punkte, Bestanden/nicht bestanden,
   Bearbeitungszeit und die gelösten Aufgaben. App-Bausteine (z. B. FlowPad-Aufgaben) werden dabei zur Selbstkontrolle umgewandelt.
 
+## Widgets und schrittweises Aufdecken (Lernpfad, Challenge)
+
+* **Widget „Experiment“** (`### Widget: Experiment`, Baustein 🔬): führt Schritt für Schritt durch **Hypothese → Experiment → Auswertung → Schlussfolgerung**.
+  Die Hypothese ist ein Lückentext, in dem jede Wahl zählt; im Experiment wählen die Schüler die Werte der Größen
+  (`Größe: Kraft F in N = Isaac 30, Anne 60 | fest`), messen, und das Ergebnis wird aus der Rechenvorschrift berechnet
+  (`Ergebnis: Δv in m/s = F · Δt / m`). Messprotokoll und Diagramm entstehen dabei; „| fest“ sperrt Größen für eine faire Messreihe.
+  Nach der Messung wird die Hypothese verglichen, die Auswertung ist ein Lückentext, die Schlussfolgerung erscheint als Merksatz.
+  `Animation: Wagen` zeigt eine Pixelfigur, die einen Wagen anschiebt (braucht Größen in N, kg und s).
+* **Eigenes Widget** (`### Widget: HTML`, Baustein 🧩): eigenes HTML mit Skripten, läuft geschützt in einem Rahmen (sandbox, ohne
+  Zugriff auf die Seite), passt seine Höhe selbst an und behält seinen Zustand beim Neuzeichnen. Mit `Erledigt: ja` zählt es als
+  Aufgabe – das HTML ruft `pfDone()` auf.
+* **Schrittweise aufdecken** (`Aufdecken: schrittweise` im Kopf oder direkt nach einer Stationszeile, ⚙ Station): Der nächste
+  Baustein erscheint erst, wenn die Aufgabe davor gelöst ist.
+* **Freie Lücken** (`Frei: ja` im Lückentext): jede Wahl zählt, die Wortbank zeigt alle Möglichkeiten aus `[[a|b|c]]` – z. B. für Hypothesen.
+* **Indizes und Hochzahlen** im Text: `v_A`, `v_{End}`, `m/s^2`, `10^{-3}`.
+* Normaler Text nach einem Quiz, Lückentext usw. ist erlaubt: Er steht nach einer Leerzeile und beendet den Abschnitt.
+
 ## Digitale Prüfung
 
 Neben „Lernpfad“ und „Challenge“ gibt es das Format **Digitale Prüfung** (`doc.form = 'pruefung'`, 📂 Dokumente → ＋ Neue digitale Prüfung

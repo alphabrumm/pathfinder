@@ -17,14 +17,24 @@ const norm = s => String(s || '').trim().toLowerCase().replace(/ä/g, 'ae').repl
 
 /* ---------- kleine Formatierung: **fett**, *kursiv*, `Code`, [Link](url), Listen ---------- */
 const escH = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+/** Indizes und Hochzahlen: v_A, v_{End}, m/s^2, 10^{-3} → <sub>/<sup> (nur nach Buchstabe, Ziffer oder Klammer;
+ *  ohne Klammern nur ein einzelnes Zeichen – snake_case bleibt also unverändert) */
+export function subSup(s) {
+  return String(s)
+    .replace(/([\p{L}\p{N})\]])_\{([^{}]{1,24})\}/gu, '$1<sub>$2</sub>')
+    .replace(/([\p{L}\p{N})])_([\p{L}\p{N}])(?![\p{L}\p{N}])/gu, '$1<sub>$2</sub>')
+    .replace(/([\p{L}\p{N})\]])\^\{([^{}]{1,24})\}/gu, '$1<sup>$2</sup>')
+    .replace(/([\p{L}\p{N})])\^(-?\p{N}+|\p{L})(?![\p{L}\p{N}])/gu, '$1<sup>$2</sup>');
+}
 export function inline(s) {
   const codes = []; s = String(s).replace(/`([^`]+)`/g, (m, c) => `\u0000${codes.push(c) - 1}\u0000`);
   const gaps = []; s = s.replace(/\[\[[^\]]*\]\]/g, m => `\u0001${gaps.push(m) - 1}\u0001`);
-  s = escH(s)
+  const links = []; s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (m, t, u) => `\u0002${links.push([t, u]) - 1}\u0002`);
+  s = subSup(escH(s)
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
-    .replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<i>$2</i>')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  return s.replace(/\u0001(\d+)\u0001/g, (m, i) => escH(gaps[i])).replace(/\u0000(\d+)\u0000/g, (m, i) => `<code>${escH(codes[i])}</code>`);
+    .replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<i>$2</i>'));
+  return s.replace(/\u0002(\d+)\u0002/g, (m, i) => `<a href="${escH(links[i][1])}" target="_blank" rel="noopener">${escH(links[i][0])}</a>`)
+    .replace(/\u0001(\d+)\u0001/g, (m, i) => escH(gaps[i])).replace(/\u0000(\d+)\u0000/g, (m, i) => `<code>${escH(codes[i])}</code>`);
 }
 export function mdToHtml(lines) {
   const out = []; let list = null, para = [];
@@ -47,6 +57,7 @@ export function htmlToMd(html) {
     if (t === 'b' || t === 'strong') return `**${inner().trim()}**`;
     if (t === 'i' || t === 'em') return `*${inner().trim()}*`;
     if (t === 'code') return '`' + n.textContent + '`';
+    if (t === 'sub' || t === 'sup') { const x = inner().trim(), c = t === 'sub' ? '_' : '^'; return x ? (/^[\p{L}\p{N}]$/u.test(x) || (t === 'sup' && /^-?\d+$/.test(x)) ? c + x : c + '{' + x + '}') : ''; }
     if (t === 'a') return `[${inner()}](${n.getAttribute('href') || ''})`;
     if (t === 'br') return '\n';
     if (t === 'ul' || t === 'ol') { let k = 0; return '\n' + [...n.children].map(li => (t === 'ol' ? `${++k}. ` : '- ') + walk(li, ctx).trim()).join('\n') + '\n'; }
@@ -203,10 +214,14 @@ const CORE_SECTIONS = {
     qs.forEach(x => { if (x.opts.length < 2) H.err(S.line, `Frage „${x.q.slice(0, 30)}“ braucht mindestens zwei Antworten.`); else if (!x.opts.some(o => o.ok)) H.err(S.line, `Frage „${x.q.slice(0, 30)}“: keine Antwort mit [x] als richtig markiert.`); });
     return { type: 'quiz', qs, xp: S.num('xp', 10) };
   } },
-  lueckentext: { n: 'Lückentext', keys: ['wortbank', 'extra', 'xp', 'punkte'], make(S, H) {
+  lueckentext: { n: 'Lückentext', keys: ['wortbank', 'extra', 'frei', 'xp', 'punkte'], make(S, H) {
     const html = H.md(S.body); if (!/\[\[[^\]]+\]\]/.test(html)) H.err(S.line, 'Lückentext ohne Lücke – schreibe Lücken als [[Antwort]].');
-    const bank = /^(ja|yes|true|an)$/i.test(S.one('wortbank') || '') || !!S.one('extra');
-    return { type: 'gap', title: S.title, sub: '', html, bank, extra: (S.one('extra') || '').split(/\s*[,;]\s*/).filter(Boolean), heft: false, xp: S.num('xp', 10) };
+    // Frei: ja → jede Wahl zählt (z. B. Hypothese); die Wortbank zeigt alle Möglichkeiten aus [[a|b|c]]
+    const free = /^(ja|yes|true|an)$/i.test(S.one('frei') || '');
+    const bank = free || /^(ja|yes|true|an)$/i.test(S.one('wortbank') || '') || !!S.one('extra');
+    const b = { type: 'gap', title: S.title, sub: '', html, bank, extra: (S.one('extra') || '').split(/\s*[,;]\s*/).filter(Boolean), heft: false, xp: S.num('xp', 10) };
+    if (free) b.free = true;
+    return b;
   } },
   zuordnen: { n: 'Zuordnen', keys: ['xp', 'punkte'], make(S, H) {
     const pairs = [];
@@ -256,11 +271,64 @@ const CORE_SECTIONS = {
     return { type: 'uml', name: S.title || 'Klasse', attrs: L.filter(l => !l.includes('(')), methods: L.filter(l => l.includes('(')) };
   } },
   html: { n: 'HTML', make: S => ({ type: 'html', html: S.raw.join('\n') }) },
+  // Widget „Experiment“: Hypothese → Experiment (Größen wählen, messen) → Auswertung → Schlussfolgerung
+  experiment: { n: 'Experiment', keys: ['frage', 'hypothese', 'groesse', 'ergebnis', 'animation', 'auswertung', 'extra', 'schlussfolgerung', 'xp', 'punkte'], make: (S, H) => parseExperiment(S, H, S.title) },
+  // Widget: ### Widget: Experiment (wie oben) oder ### Widget: HTML mit eigenem ```html … ``` (läuft geschützt in einem Rahmen)
+  widget: { n: 'Widget', fences: true, keys: ['frage', 'hypothese', 'groesse', 'ergebnis', 'animation', 'auswertung', 'extra', 'schlussfolgerung', 'erledigt', 'hoehe', 'xp', 'punkte'], make(S, H) {
+    const [kind, ...rest] = String(S.title || '').split(/\s*[|–-]\s+|\s*:\s*/); const k = norm(kind);
+    if (k === 'experiment' || k === 'versuch') return parseExperiment(S, H, rest.join(' ').trim());
+    if (k === 'html' || k === 'eigenes' || k === 'eigen' || !k) {
+      const code = (S.code.find(c => /^html?$/.test(c.lang)) || S.code[0] || {}).code || '';
+      if (!code.trim()) H.err(S.line, 'Widget „HTML“ ohne Inhalt – schreibe das HTML in einen Block ```html … ```.');
+      const b = { type: 'widget', kind: 'html', title: rest.join(' ').trim(), html: H.md(S.body), code, h: Math.max(80, Math.min(2000, parseInt(S.one('hoehe')) || 0)) || 0, xp: S.num('xp', 10) };
+      if (/^(ja|yes|true|an)$/i.test(S.one('erledigt') || '')) b.check = true;
+      return b;
+    }
+    H.warn(S.line, `Widget „${kind}“ gibt es nicht – möglich: Experiment, HTML.`); return null;
+  } },
 };
+/** Experiment aus den Zeilen Größe:, Ergebnis:, Hypothese:, Auswertung:, Schlussfolgerung: */
+function parseNum(x) { return parseFloat(String(x).replace(/\s/g, '').replace(',', '.')); }
+export function parseVar(line) {
+  // „Kraft F in N = Isaac 30, Anne 60, Vater 90 | fest“  →  { name, sym, unit, opts: [{ l, v }], fixed }
+  const [main, ...flags] = String(line).split(/\s+\|\s*/); const eq = main.indexOf('='); if (eq < 0) return null;
+  const head = main.slice(0, eq).trim(), vals = main.slice(eq + 1).trim();
+  const hm = head.match(/^(.*?)\s+in\s+(.+)$/i); const nameSym = (hm ? hm[1] : head).trim(), unit = hm ? hm[2].trim() : '';
+  const parts = nameSym.split(/\s+/), sym = parts.length > 1 ? parts.pop() : parts[0], name = parts.join(' ') || sym;
+  const opts = vals.split(/\s*;\s*|\s*,\s+(?=\D|\d)/).map(x => x.trim()).filter(Boolean).map(x => {
+    const m = x.match(/-?\d+(?:[.,]\d+)?/); if (!m) return null;
+    const l = x.replace(m[0], '').replace(/[()]/g, '').replace(/\s+/g, ' ').trim(); return { l, v: parseNum(m[0]) };
+  }).filter(Boolean);
+  const fl = flags.join(' '), fm = fl.match(/fest(?:\s*=?\s*(-?\d+(?:[.,]\d+)?))?/i);
+  const v = { name, sym, unit, opts, fixed: !!fm };
+  if (fm && fm[1] != null) { const k = opts.findIndex(o => o.v === parseNum(fm[1])); if (k > 0) v.fix = k; }
+  return v;
+}
+/** Rechenvorschrift der Größen (z. B. „F · Δt / m“) → Funktion(werte[]) oder null */
+export function expFormula(f, vars) {
+  let e = ' ' + String(f || '').replace(/[·×⋅]/g, '*').replace(/:/g, '/').replace(/(\d),(\d)/g, '$1.$2').replace(/\^/g, '**').replace(/²/g, '**2').replace(/³/g, '**3') + ' ';
+  const idx = vars.map((v, i) => [v.sym, i]).sort((a, b) => b[0].length - a[0].length);
+  for (const [sym, i] of idx) { if (!sym) continue; const q = sym.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); e = e.replace(new RegExp(`(^|[^\\p{L}\\p{N}_\\]])${q}(?![\\p{L}\\p{N}_])`, 'gu'), `$1 v[${i}] `); }
+  if (!/^[\s\d.+\-*/()v\[\]]*$/.test(e) || !e.trim()) return null;
+  try { const fn = new Function('v', `"use strict";return (${e});`); const t = fn(vars.map(v => v.opts[0]?.v ?? 1)); return typeof t === 'number' ? fn : null; } catch (er) { return null; }
+}
+function parseExperiment(S, H, title) {
+  const vars = S.all('groesse').map(parseVar);
+  vars.forEach((v, k) => { if (!v) H.err(S.line, `Experiment: „Größe: ${S.all('groesse')[k]}“ nicht verstanden – schreibe z. B. „Größe: Kraft F in N = Isaac 30, Anne 60, Vater 90“.`); else if (v.opts.length < 2 && !v.fixed) H.warn(S.line, `Experiment: Größe „${v.name}“ hat weniger als zwei Werte.`); });
+  const V = vars.filter(Boolean), er = S.one('ergebnis') || '', em = er.match(/^(.*?)=(.*)$/);
+  let res = null;
+  if (!em) H.err(S.line, 'Experiment ohne „Ergebnis:“ – schreibe z. B. „Ergebnis: Zusatzgeschwindigkeit Δv in m/s = F · Δt / m“.');
+  else { const r = parseVar(em[1] + '= 0') || { name: em[1].trim(), sym: em[1].trim(), unit: '' }; res = { name: r.name, sym: r.sym, unit: r.unit, f: em[2].trim() }; if (!expFormula(res.f, V)) H.err(S.line, `Experiment: Rechenvorschrift „${res.f}“ nicht verstanden – erlaubt sind die Symbole der Größen (${V.map(v => v.sym).join(', ')}), Zahlen, + − · / und Klammern.`); }
+  if (!V.some(v => !v.fixed)) H.warn(S.line, 'Experiment: Mindestens eine Größe sollte veränderbar sein (ohne „| fest“).');
+  const anim = norm(S.one('animation') || ''), md = L => L.length ? mdToHtml(L) : '';
+  return { type: 'widget', kind: 'experiment', title: inline(S.one('frage') || title || ''), intro: H.md(S.body), hyp: md(S.all('hypothese')), vars: V, res: res || { name: 'Ergebnis', sym: 'y', unit: '', f: '0' },
+    anim: /wagen|schieb/.test(anim) ? 'wagen' : '', evalHtml: md(S.all('auswertung')), extra: (S.one('extra') || '').split(/\s*[,;]\s*/).filter(Boolean), concl: md(S.all('schlussfolgerung')), xp: S.num('xp', 30) };
+}
 const SEC_ALIAS = { aufgabe: 'aufgabe', auftrag: 'aufgabe', quiz: 'quiz', test: 'quiz', lueckentext: 'lueckentext', luecken: 'lueckentext', zuordnen: 'zuordnen', zuordnung: 'zuordnen', aufdecken: 'aufdecken', aufklappen: 'aufdecken', 'mehr erfahren': 'aufdecken', uml: 'uml', 'uml-klasse': 'uml', klasse: 'uml', html: 'html', freitext: 'freitext', 'offene aufgabe': 'freitext', essay: 'freitext',
   markieren: 'markieren', markiere: 'markieren', 'im text markieren': 'markieren', sortieren: 'sortieren', sortiere: 'sortieren', gruppen: 'sortieren', kategorisieren: 'sortieren',
   satzpuzzle: 'satzpuzzle', wortpuzzle: 'satzpuzzle', satzbau: 'satzpuzzle', reihenfolge: 'reihenfolge', textpuzzle: 'reihenfolge', ordnen: 'reihenfolge',
-  jpad: 'jpad', 'jpad-aufgabe': 'jpad', qpad: 'qpad', 'qpad-aufgabe': 'qpad', flowpad: 'flowpad', 'flowpad-aufgabe': 'flowpad' };
+  jpad: 'jpad', 'jpad-aufgabe': 'jpad', qpad: 'qpad', 'qpad-aufgabe': 'qpad', flowpad: 'flowpad', 'flowpad-aufgabe': 'flowpad',
+  widget: 'widget', experiment: 'experiment', versuch: 'experiment' };
 /** Bausteine, die als Aufgabe zählen (Punkte, Fortschritt) */
 export const CHECK_TYPES = ['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order', 'app'];
 
@@ -297,7 +365,7 @@ export function parseText(src, env) {
       for (;;) { const t = lines.length ? lines[lines.length - 1].trim() : null; if (t === '') { lines.pop(); continue; } if (t !== null && /^(`{3,}|~{3,})(text|markdown|md|txt)$/i.test(t)) { lines.pop(); continue; } if (t !== null && isF(t) && lines.filter(isF).length % 2 === 1) { lines.pop(); continue; } break; }
     } }
   Object.assign(att, env.files || {}); // mitgelieferte Dateien haben Vorrang
-  let st = null, sec = null, para = [], i = 0, inHead = true, goalsMode = false, pendAnim = '';
+  let st = null, sec = null, para = [], i = 0, inHead = true, goalsMode = false, pendAnim = '', stepAll = false;
   const uid = env.uid;
   const station = (n) => { if (!st) { H.warn(n, 'Inhalt vor der ersten Station – eine Station „Start“ wurde angelegt.'); st = { id: uid(), title: 'Start', sub: '', check: false, blocks: [] }; doc.stations.push(st); } return st; };
   const push = (b, n) => { b.id = b.id || uid(); if (pendAnim && (b.type === 'text' || b.type === 'info')) b.anim = pendAnim; pendAnim = ''; station(n).blocks.push(b); };
@@ -317,8 +385,19 @@ export function parseText(src, env) {
     for (const [l, n] of S.lines) { const m = l.match(/^\s*([A-Za-zÄÖÜäöüß -]{2,24}?)\s*(\((?:verborgen|versteckt)\))?:\s*(.*)$/i); const k = m && norm(m[1]); if (m && keys.has(k)) { (kv[k] = kv[k] || []).push(m[3].trim()); (kh[k] = kh[k] || []).push(!!m[2]); } else { body.push(l); bodyN.push([l, n]); } }
     while (body.length && !body[body.length - 1].trim()) { body.pop(); bodyN.pop(); }
     const Sx = { title: S.title, line: S.line, body, bodyN, raw: S.lines.map(x => x[0]), table: S.table, code: S.code || [], kv, one: k => (kv[k] || [])[0], all: k => kv[k] || [], hid: k => kh[k] || [], num: (k, d) => { const v = (kv[k] || kv.punkte || [])[0]; return v != null && !isNaN(parseInt(v)) ? parseInt(v) : d; } };
-    try { const b = def.make(Sx, H, env); if (b) { if (kv.punkte) b.pts = parseFloat(String(kv.punkte[0]).replace(',', '.')) || undefined; push(b, S.line); } } catch (e) { H.err(S.line, `Abschnitt „${S.head}“: ${e.message}`); }
+    try { const b = def.make(Sx, H, env); if (b && b.type === 'widget' && doc.form === 'pruefung') { H.warn(S.line, 'Widgets (Experiment, eigenes HTML) gibt es nur in Lernpfaden und Challenges – in der Prüfung weggelassen.'); return; } if (b) { if (kv.punkte) b.pts = parseFloat(String(kv.punkte[0]).replace(',', '.')) || undefined; push(b, S.line); } } catch (e) { H.err(S.line, `Abschnitt „${S.head}“: ${e.message}`); }
   };
+  const KEYRE = /^\s*([A-Za-zÄÖÜäöüß -]{2,24}?)\s*(\((?:verborgen|versteckt)\))?:\s*(.*)$/i;
+  const isKeyLine = (S, l) => { const m = l.match(KEYRE); return !!m && (SECS[S.kind].keys || []).includes(norm(m[1])); };
+  const GRAMMAR = { quiz: l => /^\?\s*\S|^\[( |x|X|✓)?\]/.test(l), zuordnen: l => /->|→|=>/.test(l), sortieren: l => /^[-•]?\s*[^:]{1,60}:\s*\S/.test(l) };
+  const isBoundary = l => /^(#{1,3}\s|!\[|```|-{3,}|\[\s*(merke|tipp|achtung|begriff|regel|abschluss|hinweis|wichtig|definition|figur|überschrift|ueberschrift)\b)/i.test(l);
+  function secEnds(S, l, at) {
+    if (isKeyLine(S, l)) return false;
+    const g = GRAMMAR[S.kind];
+    if (g) { if (g(l)) return false; for (let k = at + 1; k < lines.length; k++) { const x = lines[k].trim(); if (isBoundary(x)) break; if (x && g(x)) return false; } return true; }
+    if (S.kind === 'html') return !!S.fenced;
+    return !!S.sawKey || (!!S.fenced && SECS[S.kind].fences && S.kind === 'widget');
+  }
   const lastCheckable = () => { const bl = st ? st.blocks : []; for (let k = bl.length - 1; k >= 0; k--) if (CHECK_TYPES.includes(bl[k].type) || (env.isCheck && env.isCheck(bl[k]))) return bl[k]; return null; };
 
   for (; i < lines.length; i++) {
@@ -328,9 +407,9 @@ export function parseText(src, env) {
     if (fence) {
       const code = []; i++; while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) code.push(lines[i++]);
       if (i >= lines.length) H.warn(n, 'Code-Block ohne schließendes ```.');
-      if (sec && sec.kind === 'html') { sec.lines.push(...code.map((c, k) => [c, n + k + 1])); continue; }
+      if (sec && sec.kind === 'html') { sec.lines.push(...code.map((c, k) => [c, n + k + 1])); sec.fenced = true; continue; }
       // Abschnitte mit eigenen Codeblöcken (z. B. Startcode, Musterlösung) – Zusatz nach der Sprache: ```java start
-      if (sec && SECS[sec.kind].fences) { const extra = raw.trim().replace(/^`{3,}\s*[\w+#-]*\s*/, ''); sec.code.push({ lang: (fence[1] || '').toLowerCase(), tag: norm(extra), raw: extra, code: code.join('\n') }); continue; }
+      if (sec && SECS[sec.kind].fences) { sec.fenced = true; const extra = raw.trim().replace(/^`{3,}\s*[\w+#-]*\s*/, ''); sec.code.push({ lang: (fence[1] || '').toLowerCase(), tag: norm(extra), raw: extra, code: code.join('\n') }); continue; }
       closeSec(); flushPara();
       if (/^svg$/i.test(fence[1])) { const src = cleanSvg(code.join('\n')); if (src) { images.push({ n, src }); push({ type: 'image', src, alt: '', caption: '', size: 'voll' }, n); } else H.warn(n, 'SVG-Grafik ist ungültig oder zu groß – weggelassen.'); continue; }
       push({ type: 'code', lang: (fence[1] || 'text').toLowerCase(), code: code.join('\n'), ...(/\s(ohne-knopf|nocopy)\s*$/i.test(l) ? { nocopy: true } : {}) }, n); continue;
@@ -349,6 +428,7 @@ export function parseText(src, env) {
       if (k === 'untertitel') { doc.subtitle = v; continue; }
       if (k === 'art') { doc.form = /challenge/i.test(v) ? 'challenge' : /pr(ü|ue|u)fung|klausur|schulaufgabe|test/i.test(v) ? 'pruefung' : 'lernpfad'; if (doc.form === 'pruefung') { doc.pointsOn = true; doc.cert.on = false; } else doc.kicker = doc.kicker.replace(/Lernpfad|Challenge/, doc.form === 'challenge' ? 'Challenge' : 'Lernpfad'); continue; }
       if (k === 'kopfzeile') { doc.kicker = v; continue; }
+      if (k === 'aufdecken') { if (/schritt/i.test(v)) stepAll = true; continue; }
       if (k === 'seiten') { if (/station/i.test(v)) doc.pages = 'stationen'; else if (!/^(nein|aus|keine|eine)$/i.test(v.trim())) H.warn(n, 'Seiten: „Stationen“ (jede Station auf einer eigenen Seite) oder weglassen.'); continue; }
       if (k === 'farbe' || k === 'farben') { const p = env.palettes.findIndex(x => norm(x.n) === norm(v)); if (p >= 0) doc.design.pal = p; else H.warn(n, `Farbe „${v}“ gibt es nicht. Möglich: ${env.palettes.map(x => x.n).join(', ')}.`); continue; }
       if (k === 'schrift') { const f = FONTS[norm(v)]; if (f) doc.design.font = f; else H.warn(n, 'Schrift: Pixel, schlicht, elegant oder Handwriting.'); continue; }
@@ -361,6 +441,7 @@ export function parseText(src, env) {
       if (k === 'ziele' || k === 'lernziele') { goalsMode = true; if (v) doc.goals.push(inline(v)); continue; }
     }
     if (inHead && goalsMode && (m = l.match(/^[-•*]\s+(.+)$/))) { doc.goals.push(inline(m[1])); continue; }
+    if (st && !sec && !st.blocks.length && !para.length && (m = l.match(/^aufdecken:\s*(.+)$/i))) { if (/schritt/i.test(m[1])) st.step = true; else if (!/^(nein|aus|alles|sofort)$/i.test(m[1].trim())) H.warn(n, 'Aufdecken: „schrittweise“ (nächster Baustein erst, wenn die Aufgabe davor gelöst ist) oder weglassen.'); continue; }
     if (st && !sec && !st.blocks.length && !para.length && (m = l.match(/^animation:\s*(.+)$/i))) { const a = ANIM[norm(m[1])]; if (a) st.anim = a; else H.warn(n, 'Animation: tippen, einblenden, glitch oder leuchten.'); continue; }
     if (!sec && (m = l.match(/^\{\s*(tippen|schreibmaschine|einblenden|glitch|leuchten)\s*\}\s*(.*)$/i))) { flushPara(); pendAnim = ANIM[norm(m[1])]; if (!m[2]) continue; lines[i] = m[2]; i--; continue; }
     if (inHead && l && !st) { if (/^[-•*]\s/.test(l) || /^[A-Za-zÄÖÜäöüß ]{3,20}:/.test(l)) { H.warn(n, `Kopf: „${l.slice(0, 40)}“ nicht erkannt.`); continue; } }
@@ -403,7 +484,10 @@ export function parseText(src, env) {
       i = k - 1; const w = Math.max(...rows.map(r => r.length)); rows.forEach(r => { while (r.length < w) r.push(''); });
       push({ type: 'table', head, rows }, n); continue;
     }
-    if (sec) { if (/^\s*\|.*\|\s*$/.test(raw)) { const r = l.slice(1, -1).split('|').map(c => c.trim()); if (!r.every(c => /^:?-{2,}:?$/.test(c))) sec.table.push(r); } else sec.lines.push([raw, n]); continue; }
+    // Normaler Text nach einer Leerzeile beendet einen Abschnitt, wenn er nicht mehr dazugehören kann
+    // (z. B. Text nach einem Quiz oder nach „Wortbank:“, „XP:“ …) – dann geht es mit normalem Text weiter
+    if (sec && l && sec.blank && secEnds(sec, l, i)) { closeSec(); i--; continue; }
+    if (sec) { sec.blank = !l; if (l && isKeyLine(sec, l)) sec.sawKey = true; if (/^\s*\|.*\|\s*$/.test(raw)) { const r = l.slice(1, -1).split('|').map(c => c.trim()); if (!r.every(c => /^:?-{2,}:?$/.test(c))) sec.table.push(r); } else sec.lines.push([raw, n]); continue; }
     if (!st && !l) continue;
     if (!l) { flushPara(); continue; }
     if (!st && inHead) { doc.subtitle = doc.subtitle || l; continue; }
@@ -412,7 +496,7 @@ export function parseText(src, env) {
   closeSec(); flushPara();
   if (!doc.title) H.err(1, 'Titel fehlt – die erste Zeile sollte „# Titel“ sein.');
   if (!doc.stations.length) H.err(1, 'Keine Station gefunden – Stationen beginnen mit „## Station: Titel“.');
-  doc.stations.forEach(s => { if (!s.blocks.length) s.blocks.push({ id: uid(), type: 'text', html: '' }); });
+  doc.stations.forEach(s => { if (!s.blocks.length) s.blocks.push({ id: uid(), type: 'text', html: '' }); if (stepAll) s.step = true; });
   const all = doc.stations.flatMap(s => s.blocks);
   const stats = { stations: doc.stations.length, blocks: all.length, tasks: all.filter(b => CHECK_TYPES.includes(b.type) || (env.isCheck && env.isCheck(b))).length };
   stats.images = images.length;
@@ -449,6 +533,7 @@ export function docToText(doc, env, out = {}) {
   for (const s of doc.stations) {
     L.push('', `## Station: ${md(s.title)}${s.sub ? ' | ' + md(s.sub) : ''}`);
     if (s.anim) L.push(`Animation: ${s.anim}`);
+    if (s.step) L.push('Aufdecken: schrittweise');
     for (const b of s.blocks) {
       L.push('');
       if (b.anim && (b.type === 'text' || b.type === 'info')) L.push(`{${b.anim}}`);
@@ -466,7 +551,7 @@ export function docToText(doc, env, out = {}) {
         case 'task': L.push(`### Aufgabe: ${md(b.title)}`, md(b.html)); if (b.answer) L.push(`Antwort: ${b.answer}`); if (b.img) L.push(`Bild: ${ref(b.img, 'bild')}`); (b.tips || []).forEach((t, i) => L.push(`Tipp${b.tipsHide?.[i] ? ' (verborgen)' : ''}: ${md(t)}`)); if (b.solution) L.push(`Lösung${b.solHide ? ' (verborgen)' : ''}: ${md(b.solution).replace(/\n+/g, ' ')}`); if (doc.form !== 'pruefung') L.push(`XP: ${b.xp}`); break;
         case 'essay': L.push(`### Freitext: ${md(b.title)}`, md(b.html)); if (b.img) L.push(`Bild: ${ref(b.img, 'bild')}`); (b.rubric || []).forEach(r => L.push(`Erwartung: ${r.t} (${String(r.p).replace('.', ',')})`)); if ((b.lines || 6) !== 6) L.push(`Zeilen: ${b.lines}`); break;
         case 'quiz': L.push('### Quiz'); b.qs.forEach(q => { L.push(`? ${md(q.q)}`); q.opts.forEach(o => L.push(`[${o.ok ? 'x' : ' '}] ${md(o.t)}${o.fb ? ' // ' + md(o.fb) : ''}`)); }); break;
-        case 'gap': L.push(`### Lückentext${b.title ? ': ' + md(b.title) : ''}`, md(b.html)); if (b.bank) L.push('Wortbank: ja'); if (b.extra?.length) L.push(`Extra: ${b.extra.join(', ')}`); break;
+        case 'gap': L.push(`### Lückentext${b.title ? ': ' + md(b.title) : ''}`, md(b.html)); if (b.free) L.push('Frei: ja'); else if (b.bank) L.push('Wortbank: ja'); if (b.extra?.length) L.push(`Extra: ${b.extra.join(', ')}`); break;
         case 'match': L.push(`### Zuordnen: ${md(b.title)}`, ...b.pairs.map(p => `${p.a} -> ${p.b}`)); break;
         case 'mark': L.push(`### Markieren: ${md(b.title)}`, md(b.html)); break;
         case 'sort': L.push(`### Sortieren: ${md(b.title)}`, ...(b.groups || []).map(g => `${g.name}: ${(g.items || []).join(', ')}`)); break;
@@ -486,6 +571,7 @@ export function docToText(doc, env, out = {}) {
           if (b.solution) L.push('```' + lang + ' lösung', b.solution, '```');
           break;
         }
+        case 'widget': L.push(...widgetToText(b, md)); break;
         case 'lock': L.push('--- Sperre ---'); break;
         case 'page': L.push('--- Seite ---'); break;
         case 'file': L.push(`%% Datei „${b.name}“ (nur im Editor)`); break;
@@ -500,6 +586,28 @@ export function docToText(doc, env, out = {}) {
     for (const a of att) { if (a.svg) L.push('', `${a.name}: ${a.svg.trim()}`); else L.push(`%% ${a.name}: Rasterbild – bleibt im Editor gespeichert, Verweis „anhang:${a.name}“ einfach stehen lassen`); }
   }
   return L.join('\n').replace(/\n{3,}/g, '\n\n') + '\n';
+}
+
+/** Widget → Textzeilen */
+export function varToText(v) {
+  const n = x => String(x).replace('.', ',');
+  return `${v.name && v.name !== v.sym ? v.name + ' ' : ''}${v.sym}${v.unit ? ' in ' + v.unit : ''} = ${(v.opts || []).map(o => o.l ? (/^\d/.test(o.l) ? `${n(o.v)} (${o.l})` : `${o.l} ${n(o.v)}`) : n(o.v)).join(', ')}${v.fixed ? ' | fest' + (v.fix ? ' = ' + n(v.opts[v.fix]?.v) : '') : ''}`;
+}
+function widgetToText(b, md) {
+  const L = [], lines = h => md(h || '').split(/\n+/).map(x => x.trim()).filter(Boolean);
+  if (b.kind === 'experiment') {
+    L.push('### Widget: Experiment'); if (b.title) L.push(`Frage: ${md(b.title)}`); if (b.intro) L.push(md(b.intro));
+    lines(b.hyp).forEach(x => L.push(`Hypothese: ${x}`));
+    (b.vars || []).forEach(v => L.push(`Größe: ${varToText(v)}`));
+    if (b.res) L.push(`Ergebnis: ${b.res.name && b.res.name !== b.res.sym ? b.res.name + ' ' : ''}${b.res.sym}${b.res.unit ? ' in ' + b.res.unit : ''} = ${b.res.f}`);
+    if (b.anim) L.push(`Animation: ${b.anim === 'wagen' ? 'Wagen' : b.anim}`);
+    lines(b.evalHtml).forEach(x => L.push(`Auswertung: ${x}`)); if (b.extra?.length) L.push(`Extra: ${b.extra.join(', ')}`);
+    lines(b.concl).forEach(x => L.push(`Schlussfolgerung: ${x}`));
+    L.push(`XP: ${b.xp ?? 30}`); return L;
+  }
+  L.push(`### Widget: HTML${b.title ? ' | ' + md(b.title) : ''}`); if (b.html) L.push(md(b.html));
+  if (b.check) L.push('Erledigt: ja'); if (b.h) L.push(`Höhe: ${b.h}`);
+  L.push('```html', b.code || '', '```'); return L;
 }
 
 /* ---------- Aufgabenstile für digitale Prüfungen (KI-Dialog) ---------- */
@@ -538,9 +646,13 @@ Kopfbild-Art: klein | groß | Hintergrund
 Titel-Animation: tippen | einblenden | glitch | leuchten   (optional, ebenso Untertitel-Animation)
 Seiten: Stationen              (optional: jede Station auf einer eigenen Seite mit „Weiter“ und „Zurück“)
 
+Aufdecken: schrittweise        (optional, nicht in Prüfungen: in allen Stationen erscheint der nächste Baustein erst, wenn die Aufgabe davor gelöst ist)
+
 ## Station: Titel der Station | kurze Unterzeile
 Animation: einblenden          (optional, direkt nach der Stationszeile: Animation des Stationstitels)
+Aufdecken: schrittweise        (optional, direkt nach der Stationszeile: nur in dieser Station Schritt für Schritt aufdecken)
 Normaler Text. Leerzeile = neuer Absatz. **fett**, *kursiv*, \`Code\`, Listen mit „- “.
+Indizes und Hochzahlen: v_A, v_{End}, m/s^2, 10^{-3}   (ein Zeichen ohne Klammern, mehrere in { })
 [Überschrift 1] Zwischenüberschrift   (auch [Überschrift 2] und [Überschrift 3]: kleinere Überschriften innerhalb einer Station)
 
 [Merke] Wichtiger Merksatz.          (auch: [Tipp], [Achtung], [Begriff: Wort], [Regel], [Abschluss])
@@ -569,6 +681,7 @@ XP: 20
 Satz mit [[Lücke]] und [[Antwort|andere erlaubte Antwort]].
 Wortbank: ja            (optional: Begriffe zum Ziehen)
 Extra: Ablenker, Ablenker   (optional: falsche Begriffe in der Wortbank)
+Frei: ja                (optional, z. B. für eine Hypothese: jede Wahl zählt; die Wortbank zeigt alle Möglichkeiten aus [[a|b|c]])
 
 ### Zuordnen: Ordne zu
 Begriff -> Erklärung
@@ -618,6 +731,26 @@ Punkte: 2               (in jeder Aufgabe, jedem Quiz, Lückentext, Zuordnen, Ma
 
 ### Aufdecken: Mehr erfahren
 Text, der erst nach Antippen erscheint.
+
+### Widget: Experiment     (nicht in Prüfungen; Schritt für Schritt: Hypothese → Experiment → Auswertung → Schlussfolgerung)
+Frage: Wie hängt Δv von der Kraft ab?
+Hypothese: Wenn stärker geschoben wird, dann [[wird Δv größer|wird Δv kleiner|bleibt Δv gleich]].
+                        (jede Wahl zählt; die erste Möglichkeit ist das, was die Messung zeigt – sie wird nach dem Messen verglichen)
+Größe: Kraft F in N = Isaac 30, Anne 60, Vater 90      (Name, Symbol, Einheit = Werte zum Auswählen, gern mit Namen)
+Größe: Masse m in kg = 30 (leer), 60 (1 Sack) | fest   („| fest“: bleibt in dieser Messreihe gleich – faire Messreihe)
+Größe: Einwirkungsdauer Δt in s = 1, 2, 3 | fest
+Ergebnis: Zusatzgeschwindigkeit Δv in m/s = F · Δt / m   (Rechenvorschrift mit den Symbolen, + − · / und Klammern)
+Animation: Wagen        (optional: Wagen wird angeschoben – braucht Größen in N, kg und s; ohne: Messanzeige)
+Auswertung: Je größer die Kraft, desto [[größer]] ist Δv.   (Lückentext nach dem Messen, mehrere Zeilen möglich)
+Extra: kleiner, halb    (Ablenker für die Auswertung)
+Schlussfolgerung: Δv ist proportional zur Kraft.   (erscheint am Ende als Merksatz)
+XP: 30
+
+### Widget: HTML | Titel    (nicht in Prüfungen; eigene kleine Web-App, läuft geschützt in einem Rahmen und passt ihre Höhe selbst an)
+Erledigt: ja            (optional: zählt als Aufgabe – das HTML ruft pfDone() auf, wenn die Schüler fertig sind)
+\`\`\`html
+<button onclick="pfDone()">Fertig</button>
+\`\`\`
 
 ### UML: Klassenname
 - attribut: Typ
@@ -724,7 +857,7 @@ ${ex ? '' : `- Tipps bauen aufeinander auf: zuerst ein kleiner Denkanstoß, zule
 `}- Bilder und Animationen: Zeichne passende Abbildungen selbst als SVG – im Abschnitt ## Anhang am Ende als „name: <svg …> … </svg>“, oben mit anhang:name einbinden. SVG darf animiert sein (<animate>, <animateTransform>, <animateMotion> oder CSS-@keyframes in <style> innerhalb des SVG). Immer viewBox angeben, gut lesbare Schrift (font-family="sans-serif"), keine Skripte, keine externen Links, Schriften oder Bilder. Lieber wenige, aussagekräftige Grafiken (z. B. Schaubild, Ablauf, Beispiel-Tabelle) als Deko.
 - Rasterbilder (PNG, GIF, JPG) nur als data:image/…;base64,…, und nur wenn du die Datei wirklich erzeugt hast (z. B. mit einem Code-Werkzeug) – niemals Base64 ausdenken. Sonst ein Bild-Platzhalter: ![Beschreibung]()
 - Keine Bilder aus dem Internet.
-- Innerhalb eines ###-Abschnitts (Aufgabe, Quiz, Lückentext, Zuordnen …) keine Bild-Zeilen und keine Infokästen: Sie beenden den Abschnitt. Bilder und Kästen gehören davor oder dahinter (bei Aufgaben stattdessen „Bild: anhang:name“).
+- Innerhalb eines ###-Abschnitts (Aufgabe, Quiz, Lückentext, Zuordnen …) keine Bild-Zeilen und keine Infokästen: Sie beenden den Abschnitt. Bilder und Kästen gehören davor oder dahinter (bei Aufgaben stattdessen „Bild: anhang:name“). Normaler Text nach einem Abschnitt steht nach einer Leerzeile.
 - Im Lückentext ist JEDE [[Lücke]] eine Antwort, die Schüler einsetzen müssen – Arbeitsanweisungen ohne Lücken als normalen Text vor den Abschnitt schreiben.
 
 ${formatHelp(env)}`;

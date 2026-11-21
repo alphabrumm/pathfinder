@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-21f';
+const PF_BUILD = '2026-11-22a';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -104,12 +104,47 @@ const CORE = {
   order: { n: 'Reihenfolge', ic: '↕', g: 'Aufgaben', h: 'Abschnitte ordnen (Textpuzzle)', make: () => ({ words: false, title: 'Bring die Abschnitte in die richtige Reihenfolge', items: ['Erster Abschnitt', 'Zweiter Abschnitt', 'Dritter Abschnitt'], alts: [], xp: 10 }) },
   essay: { n: 'Freitext', ic: '✍', g: 'Aufgaben', h: 'offene Antwort mit Erwartungshorizont – nur in Prüfungen', exam: true, make: () => ({ title: '', html: '', img: '', lines: 6, rubric: [], pts: 4 }) },
   app: { n: 'Programmieren in JPad', ic: '☕', g: 'Aufgaben', h: 'Schüler programmieren in JPad; Ausgabe und Pflicht-Code werden geprüft – nur in Prüfungen', exam: true, make: () => ({ app: 'jpad', title: '', html: '', img: '', files: [{ name: 'Hauptprogramm', text: '' }], expect: '', compare: 'enthaelt', needs: [], rubric: [], solution: '', pts: 4 }) },
+  widget: { n: 'Experiment', ic: '🔬', g: 'Widgets', h: 'Hypothese → Experiment → Auswertung → Schlussfolgerung', noExam: true, check: b => b.kind === 'experiment' || !!b.check,
+    label: b => b.kind === 'experiment' ? 'das Experiment' : 'das Widget „' + String(b.title || '').replace(/<[^>]+>/g, '').slice(0, 30) + '“',
+    make: () => ({ kind: 'experiment', title: 'Wie hängt das Ergebnis von der Größe ab?', intro: '', hyp: 'Wenn die Größe größer wird, dann [[wird das Ergebnis größer|wird das Ergebnis kleiner|bleibt das Ergebnis gleich]].',
+      vars: [{ name: 'Größe', sym: 'x', unit: '', opts: [{ l: '', v: 1 }, { l: '', v: 2 }, { l: '', v: 3 }], fixed: false }], res: { name: 'Ergebnis', sym: 'y', unit: '', f: '2 · x' }, anim: '',
+      evalHtml: 'Bei doppeltem x ist y [[doppelt]] so groß.', extra: ['halb'], concl: 'y ist proportional zu x.', xp: 30 }) },
+  widgethtml: { n: 'Eigenes Widget', ic: '🧩', g: 'Widgets', h: 'eigene kleine Web-App (HTML), läuft geschützt im Rahmen', alias: 'widget', noExam: true,
+    make: () => ({ kind: 'html', title: '', html: '', code: '<p>Hallo!</p>\n<button onclick="pfDone()">Fertig</button>', check: false, h: 0, xp: 10 }) },
   lock: { n: 'Sperre', ic: '🔒', g: 'Ablauf', h: 'Ab hier erst frei, wenn … gelöst', make: () => ({ after: '' }) },
   page: { n: 'Nächste Seite', ic: '📄', g: 'Ablauf', h: 'Ab hier eine neue Seite mit „Weiter“ und „Zurück“', make: () => ({}) },
 };
 /** Absatzstile des Bausteins „Text“ (ohne Angabe: normaler Text) */
 const PS = { h1: 'Überschrift 1', h2: 'Überschrift 2', h3: 'Überschrift 3' };
 const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order', 'app']);
+
+/* Experiment-Widget: Größen „Kraft F in N = Isaac 30, Anne 60 | fest“ und Rechenvorschrift (gleiche Regeln wie in pftext.js) */
+const pNum = x => parseFloat(String(x).replace(/\s/g, '').replace(',', '.'));
+function parseVarCore(line) {
+  const [main, ...flags] = String(line).split(/\s+\|\s*/); const eq = main.indexOf('='); if (eq < 0) return null;
+  const head = main.slice(0, eq).trim(), vals = main.slice(eq + 1).trim(), hm = head.match(/^(.*?)\s+in\s+(.+)$/i);
+  const parts = (hm ? hm[1] : head).trim().split(/\s+/), sym = parts.length > 1 ? parts.pop() : parts[0];
+  const opts = vals.split(/\s*;\s*|\s*,\s+/).map(x => x.trim()).filter(Boolean).map(x => { const m = x.match(/-?\d+(?:[.,]\d+)?/); return m ? { l: x.replace(m[0], '').replace(/[()]/g, '').replace(/\s+/g, ' ').trim(), v: pNum(m[0]) } : null; }).filter(Boolean);
+  const fm = flags.join(' ').match(/fest(?:\s*=?\s*(-?\d+(?:[.,]\d+)?))?/i), v = { name: parts.join(' ') || sym, sym, unit: hm ? hm[2].trim() : '', opts, fixed: !!fm };
+  if (fm && fm[1] != null) { const k = opts.findIndex(o => o.v === pNum(fm[1])); if (k > 0) v.fix = k; }
+  return v;
+}
+const varToTextCore = v => { const n = x => String(x).replace('.', ','); return `${v.name && v.name !== v.sym ? v.name + ' ' : ''}${v.sym}${v.unit ? ' in ' + v.unit : ''} = ${(v.opts || []).map(o => o.l ? (/^\d/.test(o.l) ? `${n(o.v)} (${o.l})` : `${o.l} ${n(o.v)}`) : n(o.v)).join(', ')}${v.fixed ? ' | fest' + (v.fix ? ' = ' + n(v.opts[v.fix]?.v) : '') : ''}`; };
+const FCACHE = new Map();
+function expFormulaCore(f, vars) {
+  const key = f + '\u0001' + vars.map(v => v.sym).join('\u0001'); if (FCACHE.has(key)) return FCACHE.get(key);
+  let e = ' ' + String(f || '').replace(/[·×⋅]/g, '*').replace(/:/g, '/').replace(/(\d),(\d)/g, '$1.$2').replace(/\^/g, '**').replace(/²/g, '**2').replace(/³/g, '**3') + ' ';
+  vars.map((v, i) => [v.sym, i]).sort((a, b) => b[0].length - a[0].length).forEach(([sym, i]) => { if (!sym) return; const q = sym.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); e = e.replace(new RegExp(`(^|[^\\p{L}\\p{N}_\\]])${q}(?![\\p{L}\\p{N}_])`, 'gu'), `$1 v[${i}] `); });
+  let fn = null;
+  if (/^[\s\d.+\-*/()v[\]]*$/.test(e) && e.trim()) { try { fn = new Function('v', `"use strict";return (${e});`); if (typeof fn(vars.map(v => v.opts?.[0]?.v ?? 1)) !== 'number') fn = null; } catch (er) { fn = null; } }
+  FCACHE.set(key, fn); return fn;
+}
+/** einfache Formatierung für Formularfelder: **fett**, *kursiv*, v_A, m^2 – Lücken [[…]] bleiben stehen */
+const mdLite = t => String(t || '').split(/\n+/).map(x => x.trim()).filter(Boolean).map(x => esc(x).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<i>$2</i>')
+  .replace(/([\p{L}\p{N})\]])_\{([^{}]{1,24})\}/gu, '$1<sub>$2</sub>').replace(/([\p{L}\p{N})])_([\p{L}\p{N}])(?![\p{L}\p{N}])/gu, '$1<sub>$2</sub>')
+  .replace(/([\p{L}\p{N})\]])\^\{([^{}]{1,24})\}/gu, '$1<sup>$2</sup>').replace(/([\p{L}\p{N})])\^(-?\p{N}+|\p{L})(?![\p{L}\p{N}])/gu, '$1<sup>$2</sup>')).join('<br>');
+const unLite = h => String(h || '').replace(/<br\s*\/?>|<\/p>\s*<p>/gi, '\n').replace(/<sub>([^<]*)<\/sub>/gi, (m, x) => x.length === 1 ? '_' + x : `_{${x}}`).replace(/<sup>([^<]*)<\/sup>/gi, (m, x) => x.length === 1 || /^-?\d+$/.test(x) ? '^' + x : `^{${x}}`)
+  .replace(/<\/?b>/gi, '**').replace(/<\/?i>/gi, '*').replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 const APP_INFO = { jpad: ['JPad', '☕', 'java'], qpad: ['QPad', '🗄', 'sql'], flowpad: ['FlowPad', '🔀', 'text'] };
 const appN = a => (APP_INFO[a] || APP_INFO.jpad)[0], appIc = a => (APP_INFO[a] || APP_INFO.jpad)[1], appLang = a => (APP_INFO[a] || APP_INFO.jpad)[2];
 /** Markieren: Text in antippbare Wörter zerlegen (wie markWords in pfsplit.js). tpl enthält Platzhalter \u0002n\u0003 für Wort n; targets = Wörter in {{…}} */
@@ -542,6 +577,12 @@ export function startPathFinder(opts = {}) {
           open = true; return;
         }
         h += blockHtml(b);
+        // Schrittweise aufdecken: nach jeder Aufgabe geht es erst weiter, wenn sie gelöst ist
+        if (s.step && !E() && !EXAMF() && isCheck(b) && sg.blocks.slice(i + 1).some(x => x.type !== 'page')) {
+          if (open) h += '</div></div>';
+          h += `<div class="lp-lock step${prog.solved[b.id] ? '' : ' locked'}"><div class="lp-lock-note">⬇ Weiter geht es, sobald du ${esc(blockLabel(b))} gelöst hast.</div><div class="lp-lock-body">`;
+          open = true;
+        }
       });
       if (open) h += '</div></div>';
       if (E()) h += plus(s.id, s.blocks.length);
@@ -555,6 +596,7 @@ export function startPathFinder(opts = {}) {
     h += `</main><footer class="lp-foot">${doc.form === 'challenge' ? 'Challenge' : EXAMF() ? 'Digitale Prüfung' : 'Lernpfad'} · läuft komplett im Browser${scorm?.ok ? ' · Fortschritt wird in der Lernplattform gespeichert' : ''}</footer>`;
     lp.innerHTML = h;
     runAnims();
+    xDrawAll(); wPlace();
     if (PLAYER) progSave();
     scroller.scrollTop = sc;
     if (selId && !findBlock(selId)) selId = null;
@@ -647,7 +689,7 @@ export function startPathFinder(opts = {}) {
   function tools(b) {
     const t = def(b);
     const form = b.type === 'info' || (t && (t.form || FORMS[b.type]));
-    return `<div class="ed-tools" contenteditable="false"><button class="grip" data-bact="grip" title="Ziehen zum Verschieben" aria-label="Verschieben">⠿</button><span class="lbl">${esc(b.type === 'info' ? (INFO_KINDS[b.kind]?.[1] || 'Infokasten') : b.type === 'text' && PS[b.ps] && !doc.skin ? PS[b.ps] : t?.n || b.type)}</span>`
+    return `<div class="ed-tools" contenteditable="false"><button class="grip" data-bact="grip" title="Ziehen zum Verschieben" aria-label="Verschieben">⠿</button><span class="lbl">${esc(b.type === 'info' ? (INFO_KINDS[b.kind]?.[1] || 'Infokasten') : b.type === 'text' && PS[b.ps] && !doc.skin ? PS[b.ps] : b.type === 'widget' && b.kind !== 'experiment' ? 'Eigenes Widget' : t?.n || b.type)}</span>`
       + `<button data-bact="up" title="Nach oben (⌥↑)">↑</button><button data-bact="down" title="Nach unten (⌥↓)">↓</button>`
       + `<button data-bact="dup" title="Verdoppeln">⧉</button>${form ? '<button data-bact="cfg" title="Einstellungen">⚙</button>' : ''}<button class="del" data-bact="del" title="Löschen">🗑</button></div>`;
   }
@@ -743,10 +785,9 @@ export function startPathFinder(opts = {}) {
         if (E()) return wrap(b, `<div class="lp-card lp-gap${b.heft ? ' heft' : ''}">${head}${xpTag(b)}${ce('html', b.html, 'Text mit [[Lücke]] …', { rich: true })}<div class="ed-hint">Lücken als <b>[[Antwort]]</b>, mehrere richtige mit | trennen: [[mal|*]]${b.bank ? ` · Begriffe zum Ziehen${b.extra.length ? ` + ${b.extra.length} Ablenker` : ''}` : ''} · ⚙ für Begriffe und Hefteintrag</div></div>`);
         const got = prog.quiz[b.id] || {}; let n = 0;
         if (b.bank) {
-          const answers = [...(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].map(m => m[1].split('|')[0]);
-          const words = shuffled(answers.concat(b.extra || []), b.id), used = Object.values(got), seen = {};
+          const words = shuffled(gapWords(b), b.id), used = Object.values(got), seen = {};
           const html = (b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const i = n++; const v = got[i]; const st = prog.quiz[b.id + ':chk'] ? (v != null && isGapOk(b, i, v, got) ? ' ok' : ' no') : ''; return `<span class="gapslot${v != null ? ' filled' : ''}${st}" data-gslot="${i}" role="button" tabindex="0">${v != null ? esc(v) : ''}</span>`; });
-          return wrap(b, `<div class="lp-card lp-gap${b.heft ? ' heft' : ''}">${head}${xpTag(b)}<div>${html}</div><div class="bank"><span class="bl">Begriffe · ziehen oder erst Begriff, dann Lücke antippen</span>${words.map(w => { const k = seen[w] = (seen[w] || 0) + 1; return `<span class="gchip${used.filter(x => x === w).length >= k ? ' used' : ''}" data-gchip="${esc(w)}">${esc(w)}</span>`; }).join('')}</div><div><button class="lp-btn" data-run="gapcheck">Prüfen</button><span class="lp-state" style="margin-left:8px">${ok ? '✓ alles richtig' : ''}</span></div></div>`);
+          return wrap(b, `<div class="lp-card lp-gap${b.heft ? ' heft' : ''}">${head}${xpTag(b)}<div>${html}</div><div class="bank"><span class="bl">Begriffe · ziehen oder erst Begriff, dann Lücke antippen</span>${words.map(w => { const k = seen[w] = (seen[w] || 0) + 1; return `<span class="gchip${used.filter(x => x === w).length >= k ? ' used' : ''}" data-gchip="${esc(w)}">${esc(w)}</span>`; }).join('')}</div><div><button class="lp-btn" data-run="gapcheck">${b.free ? 'Festhalten' : 'Prüfen'}</button><span class="lp-state" style="margin-left:8px">${ok ? (b.free ? '✓ notiert' : '✓ alles richtig') : ''}</span></div></div>`);
         }
         const html = (b.html || '').replace(/\[\[(.+?)\]\]/g, () => `<input data-gap="${n}" value="${esc(got[n] || '')}" autocomplete="off" autocapitalize="off" spellcheck="false" data-n="${n++}">`);
         return wrap(b, `<div class="lp-card lp-gap${b.heft ? ' heft' : ''}">${head}${xpTag(b)}<div>${html}</div><div class="lp-state" style="margin-top:6px">${ok ? '✓ alles richtig' : ''}</div></div>`);
@@ -765,6 +806,7 @@ export function startPathFinder(opts = {}) {
       case 'order': if (E()) return wrap(b, `<div class="lp-card lp-order ${b.words ? 'words' : 'paras'}">${ce('title', b.title, b.words ? 'Satzpuzzle' : 'Reihenfolge', { tag: 'b', cls: 'lp-ctitle' })}${xpTag(b)}<div class="oarea">${(b.items || []).map((t, i) => `<span class="gchip ochip${b.words ? '' : ' para'}">${b.words ? esc(t) : `<i>${i + 1}</i>${t}`}</span>`).join('')}</div><div class="ed-hint">Richtige Reihenfolge – Schüler sehen die Teile gemischt.${(b.alts || []).length ? ` ${b.alts.length} weitere richtige Reihenfolge${b.alts.length > 1 ? 'n' : ''}.` : ''} Teile über ⚙.</div></div>`);
         return wrap(b, orderCard(b, false));
       case 'page': return wrap(b, `<div class="lp-pagebreak"><span>📄 Nächste Seite</span></div>`);
+      case 'widget': return wrap(b, widgetHtml(b));
       case 'lock': { const ref = findBlock(b.after); return wrap(b, `<div class="lp-card" style="border-style:dashed;text-align:center;color:var(--ink-2)">🔒 <b>Sperre</b> – alles darunter in dieser Station wird erst frei, wenn <b>${ref ? esc(blockLabel(ref.b)) : '<i>(noch keine Aufgabe gewählt – ⚙)</i>'}</b> gelöst ist.</div>`); }
       case 'code': return wrap(b, `<div class="lp-card lp-code"><b class="lp-ctitle">${esc(b.file || 'Code')}</b> ${b.file ? '' : `<span style="color:var(--ink-2);font-size:.85em">${esc(b.lang)}</span>`}${E() ? `<pre contenteditable="true" data-f="code" data-ph="Code …" spellcheck="false">${esc(b.code)}</pre>` : `<pre class="hl">${highlightCode(b.code || '', b.lang)}</pre>`}${b.nocopy ? (E() ? '<div class="ed-hint">ohne Knopf – nur zum Anschauen (⚙)</div>' : '') : `<button class="lp-btn alt" data-run="copy">⧉ ${esc(host.copyLabel || 'Kopieren')}</button>`}</div>`);
       case 'uml': return wrap(b, `<div class="lp-uml">${ce('name', b.name, 'Klassenname', { tag: 'div', cls: 'un' })}<div class="us">${(b.attrs || []).map(a => `<div>${esc(a)}</div>`).join('') || '<div>&nbsp;</div>'}</div><div class="us">${(b.methods || []).map(a => `<div>${esc(a)}</div>`).join('') || '<div>&nbsp;</div>'}</div></div>${E() ? '<div class="ed-hint">Attribute und Methoden über ⚙</div>' : ''}`);
@@ -774,6 +816,223 @@ export function startPathFinder(opts = {}) {
     const app = b.app || (b.type.startsWith('fp') || ['sheet', 'action', 'legend'].includes(b.type) ? 'FlowPad' : 'eine App');
     return wrap(b, `<div class="lp-missing"><span class="app">braucht ${esc(typeof app === 'string' ? app : 'eine App')}</span>${b.title ? `<div><b>${esc(plain(b.title))}</b></div>` : ''}${b.html ? `<div>${b.html}</div>` : ''}${b.label ? `<div>${esc(b.label)}</div>` : ''}</div>`);
   }
+  /* ---------- Widgets: Experiment (eingebaut) und eigenes HTML (geschützter Rahmen) ---------- */
+  const XSTEPS = ['Hypothese', 'Experiment', 'Auswertung', 'Schlussfolgerung'];
+  const xSt = b => prog.quiz[b.id] || (prog.quiz[b.id] = {});
+  const xGaps = h => [...String(h || '').matchAll(/\[\[(.+?)\]\]/g)].map(m => m[1].split('|'));
+  const xFmt = x => (Math.round(x * 100) / 100).toLocaleString('de-DE');
+  /** Wortbank je Teil: Hypothese = alle Möglichkeiten, Auswertung = Antworten + Ablenker */
+  const xBank = (b, ph) => ph === 'h' ? shuffled([...new Set(xGaps(b.hyp).flat())], b.id + 'h') : shuffled(xGaps(b.evalHtml).map(a => a[0]).concat(b.extra || []), b.id + 'e');
+  const xSel = (b, st) => (b.vars || []).map((v, i) => { const s = st.sel?.[i]; return v.fixed ? (v.fix || 0) : s != null && s < v.opts.length ? s : 0; });
+  const xVals = (b, sel) => (b.vars || []).map((v, i) => v.opts[sel[i]]?.v ?? 0);
+  const xCalc = (b, sel) => { const f = expFormulaCore(b.res?.f, b.vars || []); const y = f ? f(xVals(b, sel)) : NaN; return isFinite(y) ? y : NaN; };
+  /** untersuchte Größe: die erste veränderbare; fair = alle anderen Größen gleich */
+  const xMain = b => (b.vars || []).findIndex(v => !v.fixed);
+  function xSeries(b, st) {
+    const mv = xMain(b), rows = st.rows || [];
+    if (mv < 0) return { rows, done: rows.length > 0, mv };
+    const groups = new Map();
+    rows.forEach(r => { const k = r.s.filter((_, i) => i !== mv).join(','); if (!groups.has(k)) groups.set(k, new Map()); groups.get(k).set(r.s[mv], r); });
+    const need = Math.min(3, b.vars[mv].opts.length); let best = null;
+    for (const g of groups.values()) if (!best || g.size >= best.size) best = g;
+    const fair = best ? [...best.values()].sort((a, c) => a.s[mv] - c.s[mv]) : [];
+    return { rows, fair, done: fair.length >= need, mv, unfair: groups.size > 1 };
+  }
+  const xRoles = b => { const V = b.vars || [], u = x => V.findIndex(v => String(v.unit).trim() === x); return { F: u('N'), m: u('kg'), t: u('s') }; };
+  const xWagon = b => b.anim === 'wagen' && (r => r.m >= 0 && r.t >= 0)(xRoles(b));
+  function widgetHtml(b) {
+    if (b.kind !== 'experiment') {
+      const ok = !!prog.solved[b.id];
+      return `<div class="lp-card lp-widget${ok ? ' ok' : ''}">${b.title || b.check ? `<div class="hd"><b class="lp-ctitle">${esc(plain(b.title || 'Widget'))}</b>${xpTag(b)}<span class="lp-state">${ok ? '✓ geschafft' : ''}</span></div>` : ''}${b.html ? `<div>${b.html}</div>` : ''}`
+        + `<div class="pf-wslot" data-wslot="${b.id}" style="height:${(b.h || wHeights[b.id] || 160)}px"></div>`
+        + (E() ? `<div class="ed-hint">Eigenes HTML läuft geschützt in einem Rahmen${b.check ? ' · zählt als Aufgabe, sobald das HTML <b>pfDone()</b> aufruft' : ''} · HTML über ⚙</div>` : '') + '</div>';
+    }
+    const st = xSt(b), ok = !!prog.solved[b.id], hasH = /\[\[/.test(b.hyp || ''), hasE = /\[\[/.test(b.evalHtml || '');
+    if (E()) {
+      const V = (b.vars || []).map(v => `<li><b>${esc(v.name)} ${esc(v.sym)}</b>${v.unit ? ` in ${esc(v.unit)}` : ''}: ${v.opts.map(o => esc((o.l ? o.l + ' ' : '') + xFmt(o.v))).join(', ')}${v.fixed ? ' <span class="help">🔒 fest</span>' : ''}</li>`).join('');
+      return `<div class="lp-card lp-exp"><div class="hd"><b class="lp-ctitle">🔬 Experiment</b>${xpTag(b)}</div><div class="xq">${b.title || '<i>Forschungsfrage über ⚙</i>'}</div>${b.intro || ''}`
+        + (b.hyp ? `<div class="xed"><b>Hypothese:</b> ${b.hyp}</div>` : '') + `<div class="xed"><b>Größen:</b><ul>${V}</ul><b>Ergebnis:</b> ${esc(b.res?.name || '')} ${esc(b.res?.sym || '')} = ${esc(b.res?.f || '')}${b.res?.unit ? ` (${esc(b.res.unit)})` : ''}${b.anim === 'wagen' ? ' · Animation: Wagen' : ''}</div>`
+        + (b.evalHtml ? `<div class="xed"><b>Auswertung:</b> ${b.evalHtml}</div>` : '') + (b.concl ? `<div class="xed"><b>Schlussfolgerung:</b> ${b.concl}</div>` : '')
+        + `<div class="ed-hint">Schüler gehen Schritt für Schritt vor: Hypothese → Experiment → Auswertung → Schlussfolgerung · alles über ⚙</div></div>`;
+    }
+    const S = xSeries(b, st), hok = !hasH || !!st.hok, eok = !hasE || !!st.eok;
+    const phase = !hok ? 0 : !S.done ? 1 : !eok ? 2 : 3;
+    let h = `<div class="lp-card lp-gap lp-exp${ok ? ' ok' : ''}"><div class="hd"><b class="lp-ctitle">🔬 Experiment</b>${xpTag(b)}<span class="lp-state">${ok ? '✓ geschafft' : ''}</span></div>`;
+    if (b.title) h += `<div class="xq">❓ ${b.title}</div>`;
+    if (b.intro) h += `<div>${b.intro}</div>`;
+    h += `<ol class="xsteps">${XSTEPS.map((n, i) => (i === 0 && !hasH) || (i === 2 && !hasE) || (i === 3 && !b.concl) ? '' : `<li class="${i < phase || ok ? 'ok' : i === phase ? 'on' : ''}">${n}</li>`).join('')}</ol>`;
+    const slots = (html, ph, got, chk, alts) => { let n = 0; return html.replace(/\[\[(.+?)\]\]/g, () => { const k = ph + n, v = got[k], i = n++; const c = chk && v != null ? (alts[i].some(a => normAns(a) === normAns(v)) ? ' ok' : ' no') : ''; return `<span class="gapslot${v != null ? ' filled' : ''}${c}" data-gslot="${k}" role="button" tabindex="0">${v != null ? esc(v) : ''}</span>`; }); };
+    const bank = (ph, got) => { const W = xBank(b, ph), used = Object.values(got || {}), seen = {}; return `<div class="bank"><span class="bl">Ziehen oder erst antippen, dann die Lücke antippen</span>${W.map(w => { const k = seen[w] = (seen[w] || 0) + 1; return `<span class="gchip${used.filter(x => x === w).length >= k ? ' used' : ''}" data-gchip="${esc(w)}">${esc(w)}</span>`; }).join('')}</div>`; };
+    // 1 · Hypothese
+    if (hasH) {
+      h += `<section class="xph${hok ? ' done' : ''}"><h4><span>1</span> Hypothese – was vermutest du?</h4><div>${slots(b.hyp, 'h', st.h || {}, false, [])}</div>`;
+      if (!hok) h += `<div class="help">Hier gibt es kein Richtig oder Falsch – ob deine Vermutung stimmt, zeigt das Experiment.</div>${bank('h', st.h)}<div><button class="lp-btn" data-run="xhyp">Hypothese festhalten</button></div>`;
+      h += '</section>';
+    }
+    // 2 · Experiment
+    if (hok) {
+      const sel = xSel(b, st), R = xRoles(b);
+      h += `<section class="xph${S.done ? ' done' : ''}"><h4><span>${hasH ? 2 : 1}</span> Experiment – miss eine faire Messreihe</h4><div class="xvars">`;
+      (b.vars || []).forEach((v, vi) => {
+        h += `<div class="xvl">${esc(v.name)} <i>${esc(v.sym)}</i>${v.fixed ? ' 🔒' : ''}</div><div class="xseg">${v.opts.map((o, oi) => `<button class="${oi === sel[vi] ? 'on' : ''}${v.fixed && oi !== sel[vi] ? ' fix' : ''}" data-xvar="${vi}.${oi}"${v.fixed && oi !== sel[vi] ? ' disabled' : ''}>${o.l ? `${esc(o.l)}<small>${xFmt(o.v)} ${esc(v.unit)}</small>` : `${xFmt(o.v)} ${esc(v.unit)}`}</button>`).join('')}</div>`;
+      });
+      h += `</div>${(b.vars || []).some(v => v.fixed) ? '<div class="help">🔒 bleibt in dieser Messreihe gleich – so ist die Messreihe fair.</div>' : ''}`;
+      h += xWagon(b) ? `<canvas class="xcv" width="640" height="220" data-xcv="${b.id}"></canvas>` : `<div class="xmeter" data-xmeter="${b.id}"><span>${esc(b.res?.name || 'Messwert')} ${esc(b.res?.sym || '')}</span><b>${st.rows?.length ? xFmt(st.rows[st.rows.length - 1].y) : '–'}</b> ${esc(b.res?.unit || '')}</div>`;
+      h += `<div><button class="lp-btn" data-run="xmeasure">▶ ${xWagon(b) ? 'Anschieben und messen' : 'Messen'}</button>${st.rows?.length ? ' <button class="lp-btn alt" data-run="xreset">↺ Neue Messreihe</button>' : ''}</div>`;
+      h += `<div class="xmsg">${esc(st.msg || (S.done ? '' : 'Wähle aus und miss. Du brauchst Messungen mit verschiedenen Werten für ' + (S.mv >= 0 ? b.vars[S.mv].name : 'die Größe') + '.'))}</div>`;
+      if (st.rows?.length) {
+        const mv = S.mv;
+        h += `<div class="xgrid"><div class="lp-tablewrap"><table class="lp-table xtab"><tr><th>Nr.</th>${b.vars.map((v, i) => `<th${i === mv ? ' class="z"' : ''}>${esc(v.sym)}${v.unit ? ` in ${esc(v.unit)}` : ''}</th>`).join('')}<th>${esc(b.res.sym)}${b.res.unit ? ` in ${esc(b.res.unit)}` : ''}</th></tr>`
+          + st.rows.map((r, k) => `<tr${S.fair && !S.fair.includes(r) && S.fair.length ? ' class="xoff"' : ''}><td>${k + 1}</td>${r.s.map((oi, i) => `<td${i === mv ? ' class="z"' : ''}>${esc(b.vars[i].opts[oi]?.l || xFmt(b.vars[i].opts[oi]?.v))}${b.vars[i].opts[oi]?.l ? `<small> ${xFmt(b.vars[i].opts[oi]?.v)}</small>` : ''}</td>`).join('')}<td><b>${xFmt(r.y)}</b></td></tr>`).join('') + '</table></div>';
+        if (mv >= 0) h += xChart(b, S);
+        h += '</div>';
+        if (S.unfair) h += `<div class="help">Grau: Diese Messungen gehören nicht zur fairen Messreihe – dort war noch eine andere Größe verändert.</div>`;
+      }
+      if (S.done && hasH) {
+        const H = xGaps(b.hyp), got = st.h || {};
+        h += `<div class="xhyp">${H.map((alts, i) => { const v = got['h' + i], same = v != null && normAns(v) === normAns(alts[0]); return `<div class="${same ? 'ok' : 'no'}">Deine Vermutung: „<b>${esc(v ?? '–')}</b>“<br>${same ? '✓ Die Messung bestätigt das.' : `✗ Die Messung zeigt: <b>${esc(alts[0])}</b>.`}</div>`; }).join('')}</div>`;
+      }
+      h += '</section>';
+    }
+    // 3 · Auswertung
+    if (hok && S.done && hasE) {
+      const alts = xGaps(b.evalHtml);
+      h += `<section class="xph${eok ? ' done' : ''}"><h4><span>${hasH ? 3 : 2}</span> Auswertung</h4><div>${slots(b.evalHtml, 'e', st.e || {}, !!st.echk, alts)}</div>`;
+      if (!eok) h += `${bank('e', st.e)}<div><button class="lp-btn" data-run="xeval">Prüfen</button></div>`;
+      h += '</section>';
+    }
+    // 4 · Schlussfolgerung
+    if (hok && S.done && eok && b.concl) h += `<section class="xph done"><h4><span>✓</span> Schlussfolgerung</h4><div class="lp-info merke"><span class="ic">💡</span><div>${b.concl}</div></div></section>`;
+    return h + '</div>';
+  }
+  function xChart(b, S) {
+    const mv = S.mv, v = b.vars[mv], xs = v.opts.map(o => o.v), sel0 = (S.fair[0] || S.rows[0]).s;
+    let ymax = 0; v.opts.forEach((_, oi) => { const s = sel0.slice(); s[mv] = oi; ymax = Math.max(ymax, xCalc(b, s) || 0); });
+    S.rows.forEach(r => ymax = Math.max(ymax, r.y)); ymax = ymax > 0 ? ymax * 1.1 : 1;
+    const step = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000].find(s => ymax / s <= 6) || ymax / 5;
+    const X0 = 46, Y0 = 190, W = 240, H = 160, xmax = Math.max(...xs) * 1.1 || 1, X = x => X0 + x / xmax * W, Y = y => Y0 - y / ymax * H;
+    let s = `<svg viewBox="0 0 300 240" class="xchart" font-family="sans-serif">`;
+    for (let y = 0; y <= ymax + 1e-9; y += step) s += `<line x1="${X0}" y1="${Y(y)}" x2="${X0 + W}" y2="${Y(y)}" stroke="var(--line)"/><text x="${X0 - 6}" y="${Y(y) + 4}" font-size="11" text-anchor="end" fill="var(--ink-2)">${xFmt(y)}</text>`;
+    xs.forEach(x => s += `<text x="${X(x)}" y="${Y0 + 15}" font-size="11" text-anchor="middle" fill="var(--ink-2)">${xFmt(x)}</text>`);
+    s += `<line x1="${X0}" y1="${Y0}" x2="${X0 + W}" y2="${Y0}" stroke="var(--ink)" stroke-width="2"/><line x1="${X0}" y1="${Y0}" x2="${X0}" y2="${Y0 - H - 6}" stroke="var(--ink)" stroke-width="2"/>`;
+    s += `<text x="${X0 + W / 2}" y="${Y0 + 34}" font-size="12" font-weight="bold" text-anchor="middle" fill="var(--ink)">${esc(v.sym)}${v.unit ? ' in ' + esc(v.unit) : ''}</text><text x="6" y="14" font-size="12" font-weight="bold" fill="var(--good)">${esc(b.res.sym)}${b.res.unit ? ' in ' + esc(b.res.unit) : ''}</text>`;
+    const P = S.fair.map(r => [X(v.opts[r.s[mv]].v), Y(r.y)]);
+    if (P.length > 1) s += `<polyline points="${P.map(p => p.join(',')).join(' ')}" fill="none" stroke="var(--good)" stroke-width="2" stroke-dasharray="5 4"/>`;
+    P.forEach(p => s += `<circle cx="${p[0]}" cy="${p[1]}" r="6" fill="var(--good)" stroke="var(--surface)" stroke-width="2"/>`);
+    return `<div class="xchartw">${s}</svg></div>`;
+  }
+  function expPlace(b, slot, word) {
+    const st = xSt(b), ph = String(slot)[0]; if (ph !== 'h' && ph !== 'e') return;
+    if (ph === 'h' && st.hok) return; if (ph === 'e' && st.eok) return;
+    const got = st[ph] || (st[ph] = {});
+    if (word == null) delete got[slot];
+    else { const W = xBank(b, ph); if (!W.includes(word)) return; const copies = W.filter(w => w === word).length, placed = Object.keys(got).filter(k => got[k] === word); if (got[slot] !== word && placed.length >= copies) delete got[placed[0]]; got[slot] = word; }
+    if (ph === 'e') delete st.echk;
+    render();
+  }
+  function expSelect(id, spec) {
+    const r = findBlock(id); if (!r || xBusy[id]) return; const b = r.b, st = xSt(b), [vi, oi] = spec.split('.').map(Number);
+    if (b.vars[vi]?.fixed) return; st.sel = xSel(b, st); st.sel[vi] = oi; st.msg = ''; render();
+  }
+  const xBusy = {};
+  function expRun(a, b) {
+    const st = xSt(b), id = b.id;
+    if (a === 'xhyp') { const n = xGaps(b.hyp).length, got = st.h || {}; if (Object.keys(got).length < n) { toast('Fülle zuerst alle Lücken deiner Hypothese aus.'); return; } st.hok = 1; render(); return; }
+    if (a === 'xreset') { if (xBusy[id]) return; st.rows = []; st.msg = 'Neue Messreihe – wähle aus und miss.'; render(); return; }
+    if (a === 'xeval') {
+      const alts = xGaps(b.evalHtml), got = st.e || {}; st.echk = 1;
+      if (alts.every((A, i) => got['e' + i] != null && A.some(x => normAns(x) === normAns(got['e' + i])))) { st.eok = 1; solve(id); }
+      else { render(); toast(alts.some((_, i) => got['e' + i] == null) ? 'Fülle zuerst alle Lücken aus.' : 'Noch nicht alles richtig – rote Lücken nochmal ansehen.'); }
+      return;
+    }
+    if (a === 'xmeasure') {
+      if (xBusy[id]) return;
+      const sel = xSel(b, st), y = xCalc(b, sel); if (!isFinite(y)) { toast('Die Rechenvorschrift des Experiments ist ungültig (⚙).'); return; }
+      const finish = () => {
+        delete xBusy[id]; st.rows = (st.rows || []).concat([{ s: sel, y }]);
+        const S = xSeries(b, st), res = b.res || {};
+        st.msg = `Ergebnis: ${res.name || 'Messwert'} ${res.sym || ''} = ${xFmt(y)} ${res.unit || ''}.` + (S.done ? '' : ` Miss jetzt mit einem anderen Wert für ${S.mv >= 0 ? b.vars[S.mv].name : 'die Größe'}.`);
+        if (S.done && !/\[\[/.test(b.evalHtml || '') && (!/\[\[/.test(b.hyp || '') || st.hok)) solve(id); else render();
+      };
+      xBusy[id] = true;
+      if (xWagon(b) && !reduceMotion()) xAnimate(b, sel, y, finish);
+      else { const m = $(`[data-xmeter="${id}"] b`, lp); let t0 = null; const go = ts => { if (t0 == null) t0 = ts; const p = Math.min(1, (ts - t0) / 700), e = $(`[data-xmeter="${id}"] b`, lp); if (e) e.textContent = xFmt(y * p); if (p < 1) requestAnimationFrame(go); else finish(); }; if (m) requestAnimationFrame(go); else finish(); }
+    }
+  }
+  /* Wagen-Animation: Pixelfigur schiebt Δt lang, danach misst ein Pendelschlag den Weg in 1 s */
+  const PIXEL_FIG = {"isaac":{"schieb0":[[[5,21,3,7,"#6b6f7a"],[9,21,3,7,"#6b6f7a"],[4,27,4,2,"#4a3b30"],[9,27,4,2,"#4a3b30"],[4,13,8,9,"#5b8fc7"],[11,15,6,3,"#5b8fc7"],[17,15,2,3,"#f9cfa5"],[4,4,8,9,"#f9cfa5"],[3,7,1,2,"#f9cfa5"],[12,7,1,2,"#f9cfa5"],[3,2,10,3,"#8a5a2b"],[3,4,2,9,"#8a5a2b"],[11,4,2,9,"#8a5a2b"]],[[7,14,2,8,"#4775a8"],[6,13,4,1,"#ffffff"],[7,14,2,1,"#ffffff"],[5,4,3,1,"#8a5a2b"],[9,4,2,1,"#8a5a2b"],[4,2,3,1,"#6e4520"],[6,6,1,1,"#6e4520"],[9,6,1,1,"#6e4520"],[6,7,1,2,"#2b2118"],[9,7,1,2,"#2b2118"],[6,7,1,1,"#5c5c5c"],[9,7,1,1,"#5c5c5c"],[5,9,1,1,"#f4a0a0"],[10,9,1,1,"#f4a0a0"],[6,10,1,1,"#b5523b"],[7,11,2,1,"#b5523b"],[9,10,1,1,"#b5523b"]]],"schieb1":[[[4,21,3,7,"#6b6f7a"],[10,21,3,7,"#6b6f7a"],[3,27,4,2,"#4a3b30"],[10,27,4,2,"#4a3b30"],[4,13,8,9,"#5b8fc7"],[11,15,6,3,"#5b8fc7"],[17,15,2,3,"#f9cfa5"],[4,4,8,9,"#f9cfa5"],[3,7,1,2,"#f9cfa5"],[12,7,1,2,"#f9cfa5"],[3,2,10,3,"#8a5a2b"],[3,4,2,9,"#8a5a2b"],[11,4,2,9,"#8a5a2b"]],[[7,14,2,8,"#4775a8"],[6,13,4,1,"#ffffff"],[7,14,2,1,"#ffffff"],[5,4,3,1,"#8a5a2b"],[9,4,2,1,"#8a5a2b"],[4,2,3,1,"#6e4520"],[6,6,1,1,"#6e4520"],[9,6,1,1,"#6e4520"],[6,7,1,2,"#2b2118"],[9,7,1,2,"#2b2118"],[6,7,1,1,"#5c5c5c"],[9,7,1,1,"#5c5c5c"],[5,9,1,1,"#f4a0a0"],[10,9,1,1,"#f4a0a0"],[6,10,1,1,"#b5523b"],[7,11,2,1,"#b5523b"],[9,10,1,1,"#b5523b"]]],"steh":[[[5,21,3,7,"#6b6f7a"],[9,21,3,7,"#6b6f7a"],[4,27,4,2,"#4a3b30"],[9,27,4,2,"#4a3b30"],[4,13,8,9,"#5b8fc7"],[2,14,2,6,"#5b8fc7"],[12,14,2,6,"#5b8fc7"],[2,20,2,2,"#f9cfa5"],[12,20,2,2,"#f9cfa5"],[4,4,8,9,"#f9cfa5"],[3,7,1,2,"#f9cfa5"],[12,7,1,2,"#f9cfa5"],[3,2,10,3,"#8a5a2b"],[3,4,2,9,"#8a5a2b"],[11,4,2,9,"#8a5a2b"]],[[7,14,2,8,"#4775a8"],[6,13,4,1,"#ffffff"],[7,14,2,1,"#ffffff"],[5,4,3,1,"#8a5a2b"],[9,4,2,1,"#8a5a2b"],[4,2,3,1,"#6e4520"],[6,6,1,1,"#6e4520"],[9,6,1,1,"#6e4520"],[6,7,1,2,"#2b2118"],[9,7,1,2,"#2b2118"],[6,7,1,1,"#5c5c5c"],[9,7,1,1,"#5c5c5c"],[5,9,1,1,"#f4a0a0"],[10,9,1,1,"#f4a0a0"],[6,10,1,1,"#b5523b"],[7,11,2,1,"#b5523b"],[9,10,1,1,"#b5523b"]]]},"anne":{"schieb0":[[[5,25,2,3,"#f1e4d0"],[9,25,2,3,"#f1e4d0"],[4,27,4,2,"#6b3b3b"],[9,27,4,2,"#6b3b3b"],[4,13,8,7,"#e2697a"],[3,19,10,7,"#e2697a"],[11,15,6,3,"#e2697a"],[17,15,2,3,"#f9cfa5"],[4,4,8,9,"#f9cfa5"],[3,7,1,2,"#f9cfa5"],[12,7,1,2,"#f9cfa5"],[3,2,10,3,"#e39a3b"],[3,4,1,6,"#e39a3b"],[12,4,1,6,"#e39a3b"],[2,9,2,6,"#e39a3b"],[12,9,2,6,"#e39a3b"]],[[6,19,4,6,"#fff4e6"],[6,13,4,1,"#ffffff"],[7,14,2,1,"#ffffff"],[5,4,6,1,"#e39a3b"],[2,14,2,1,"#e2697a"],[12,14,2,1,"#e2697a"],[5,2,3,1,"#c47d26"],[6,6,1,1,"#c47d26"],[9,6,1,1,"#c47d26"],[6,7,1,2,"#2b2118"],[9,7,1,2,"#2b2118"],[6,7,1,1,"#5c5c5c"],[9,7,1,1,"#5c5c5c"],[5,9,1,1,"#f4a0a0"],[10,9,1,1,"#f4a0a0"],[6,10,1,1,"#b5523b"],[7,11,2,1,"#b5523b"],[9,10,1,1,"#b5523b"]]],"schieb1":[[[5,25,2,3,"#f1e4d0"],[9,25,2,3,"#f1e4d0"],[4,27,4,2,"#6b3b3b"],[9,27,4,2,"#6b3b3b"],[4,13,8,7,"#e2697a"],[3,19,10,7,"#e2697a"],[11,15,6,3,"#e2697a"],[17,15,2,3,"#f9cfa5"],[4,4,8,9,"#f9cfa5"],[3,7,1,2,"#f9cfa5"],[12,7,1,2,"#f9cfa5"],[3,2,10,3,"#e39a3b"],[3,4,1,6,"#e39a3b"],[12,4,1,6,"#e39a3b"],[2,9,2,6,"#e39a3b"],[12,9,2,6,"#e39a3b"]],[[6,19,4,6,"#fff4e6"],[6,13,4,1,"#ffffff"],[7,14,2,1,"#ffffff"],[5,4,6,1,"#e39a3b"],[2,14,2,1,"#e2697a"],[12,14,2,1,"#e2697a"],[5,2,3,1,"#c47d26"],[6,6,1,1,"#c47d26"],[9,6,1,1,"#c47d26"],[6,7,1,2,"#2b2118"],[9,7,1,2,"#2b2118"],[6,7,1,1,"#5c5c5c"],[9,7,1,1,"#5c5c5c"],[5,9,1,1,"#f4a0a0"],[10,9,1,1,"#f4a0a0"],[6,10,1,1,"#b5523b"],[7,11,2,1,"#b5523b"],[9,10,1,1,"#b5523b"]]],"steh":[[[5,25,2,3,"#f1e4d0"],[9,25,2,3,"#f1e4d0"],[4,27,4,2,"#6b3b3b"],[9,27,4,2,"#6b3b3b"],[4,13,8,7,"#e2697a"],[3,19,10,7,"#e2697a"],[2,14,2,6,"#e2697a"],[12,14,2,6,"#e2697a"],[2,20,2,2,"#f9cfa5"],[12,20,2,2,"#f9cfa5"],[4,4,8,9,"#f9cfa5"],[3,7,1,2,"#f9cfa5"],[12,7,1,2,"#f9cfa5"],[3,2,10,3,"#e39a3b"],[3,4,1,6,"#e39a3b"],[12,4,1,6,"#e39a3b"],[2,9,2,6,"#e39a3b"],[12,9,2,6,"#e39a3b"]],[[6,19,4,6,"#fff4e6"],[6,13,4,1,"#ffffff"],[7,14,2,1,"#ffffff"],[5,4,6,1,"#e39a3b"],[2,14,2,1,"#e2697a"],[12,14,2,1,"#e2697a"],[5,2,3,1,"#c47d26"],[6,6,1,1,"#c47d26"],[9,6,1,1,"#c47d26"],[6,7,1,2,"#2b2118"],[9,7,1,2,"#2b2118"],[6,7,1,1,"#5c5c5c"],[9,7,1,1,"#5c5c5c"],[5,9,1,1,"#f4a0a0"],[10,9,1,1,"#f4a0a0"],[6,10,1,1,"#b5523b"],[7,11,2,1,"#b5523b"],[9,10,1,1,"#b5523b"]]]},"vater":{"schieb0":[[[5,21,3,7,"#5d5a55"],[9,21,3,7,"#5d5a55"],[4,27,4,2,"#3e3029"],[9,27,4,2,"#3e3029"],[4,13,8,9,"#9a7352"],[11,15,6,3,"#9a7352"],[17,15,2,3,"#f9cfa5"],[4,4,8,9,"#f9cfa5"],[3,7,1,2,"#f9cfa5"],[12,7,1,2,"#f9cfa5"],[2,3,12,2,"#3b3b3b"],[4,0,8,3,"#3b3b3b"],[4,5,8,1,"#5a3d28"],[4,10,8,4,"#5a3d28"]],[[7,14,2,8,"#7f5c40"],[6,13,4,1,"#ffffff"],[7,14,2,1,"#ffffff"],[4,2,8,1,"#8b2f2f"],[6,10,4,1,"#f9cfa5"],[6,6,1,1,"#432c1c"],[9,6,1,1,"#432c1c"],[6,7,1,2,"#2b2118"],[9,7,1,2,"#2b2118"],[6,7,1,1,"#5c5c5c"],[9,7,1,1,"#5c5c5c"],[5,9,1,1,"#f4a0a0"],[10,9,1,1,"#f4a0a0"],[6,11,1,1,"#b5523b"],[7,12,2,1,"#b5523b"],[9,11,1,1,"#b5523b"]]],"schieb1":[[[4,21,3,7,"#5d5a55"],[10,21,3,7,"#5d5a55"],[3,27,4,2,"#3e3029"],[10,27,4,2,"#3e3029"],[4,13,8,9,"#9a7352"],[11,15,6,3,"#9a7352"],[17,15,2,3,"#f9cfa5"],[4,4,8,9,"#f9cfa5"],[3,7,1,2,"#f9cfa5"],[12,7,1,2,"#f9cfa5"],[2,3,12,2,"#3b3b3b"],[4,0,8,3,"#3b3b3b"],[4,5,8,1,"#5a3d28"],[4,10,8,4,"#5a3d28"]],[[7,14,2,8,"#7f5c40"],[6,13,4,1,"#ffffff"],[7,14,2,1,"#ffffff"],[4,2,8,1,"#8b2f2f"],[6,10,4,1,"#f9cfa5"],[6,6,1,1,"#432c1c"],[9,6,1,1,"#432c1c"],[6,7,1,2,"#2b2118"],[9,7,1,2,"#2b2118"],[6,7,1,1,"#5c5c5c"],[9,7,1,1,"#5c5c5c"],[5,9,1,1,"#f4a0a0"],[10,9,1,1,"#f4a0a0"],[6,11,1,1,"#b5523b"],[7,12,2,1,"#b5523b"],[9,11,1,1,"#b5523b"]]],"steh":[[[5,21,3,7,"#5d5a55"],[9,21,3,7,"#5d5a55"],[4,27,4,2,"#3e3029"],[9,27,4,2,"#3e3029"],[4,13,8,9,"#9a7352"],[2,14,2,6,"#9a7352"],[12,14,2,6,"#9a7352"],[2,20,2,2,"#f9cfa5"],[12,20,2,2,"#f9cfa5"],[4,4,8,9,"#f9cfa5"],[3,7,1,2,"#f9cfa5"],[12,7,1,2,"#f9cfa5"],[2,3,12,2,"#3b3b3b"],[4,0,8,3,"#3b3b3b"],[4,5,8,1,"#5a3d28"],[4,10,8,4,"#5a3d28"]],[[7,14,2,8,"#7f5c40"],[6,13,4,1,"#ffffff"],[7,14,2,1,"#ffffff"],[4,2,8,1,"#8b2f2f"],[6,10,4,1,"#f9cfa5"],[6,6,1,1,"#432c1c"],[9,6,1,1,"#432c1c"],[6,7,1,2,"#2b2118"],[9,7,1,2,"#2b2118"],[6,7,1,1,"#5c5c5c"],[9,7,1,1,"#5c5c5c"],[5,9,1,1,"#f4a0a0"],[10,9,1,1,"#f4a0a0"],[6,11,1,1,"#b5523b"],[7,12,2,1,"#b5523b"],[9,11,1,1,"#b5523b"]]]}};
+  const PIXEL_KIND = ['isaac', 'anne', 'vater'];
+  function xSprite(ctx, kind, pose, x, y, k) {
+    const d = PIXEL_FIG[kind][pose], parts = d[0], det = d[1];
+    ctx.fillStyle = '#3a3330'; parts.forEach(r => ctx.fillRect(Math.round(x + (r[0] - 1) * k), Math.round(y + (r[1] - 1) * k), (r[2] + 2) * k, (r[3] + 2) * k));
+    parts.concat(det).forEach(r => { ctx.fillStyle = r[4]; ctx.fillRect(Math.round(x + r[0] * k), Math.round(y + r[1] * k), r[2] * k, r[3] * k); });
+  }
+  function xScene(cv, b, sel, xw, xp, tt, push, info) {
+    const ctx = cv.getContext('2d'), W = cv.width, PX = 40, cam = Math.max(0, xw - 5), R = xRoles(b);
+    ctx.clearRect(0, 0, W, 220); ctx.fillStyle = '#e8f4fb'; ctx.fillRect(0, 0, W, 220);
+    ctx.fillStyle = '#cfe3a8'; ctx.fillRect(0, 170, W, 50); ctx.fillStyle = '#8fb36a'; ctx.fillRect(0, 170, W, 3);
+    ctx.fillStyle = '#5b4636'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+    for (let m = Math.floor(cam) - 3; m < cam + W / PX + 1; m++) { if (m < 0) continue; const px = 100 + (m - cam) * PX; ctx.fillRect(px - 1, 170, 2, m % 5 === 0 ? 14 : 7); if (m % 5 === 0) ctx.fillText(m + ' m', px, 198); }
+    const ang = Math.sin(tt * Math.PI) * .35;
+    ctx.strokeStyle = '#5b4636'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(W - 70, 14); ctx.lineTo(W - 30, 14); ctx.stroke();
+    ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(W - 50, 14); ctx.lineTo(W - 50 + Math.sin(ang) * 50, 14 + Math.cos(ang) * 50); ctx.stroke();
+    ctx.fillStyle = '#e39a3b'; ctx.beginPath(); ctx.arc(W - 50 + Math.sin(ang) * 54, 14 + Math.cos(ang) * 54, 7, 0, 7); ctx.fill();
+    ctx.fillStyle = '#3a3330'; ctx.textAlign = 'right'; ctx.font = 'bold 14px sans-serif'; ctx.fillText('t = ' + xFmt(tt) + ' s', W - 80, 24);
+    const wx = 100 + (xw - cam) * PX, mi = R.m >= 0 ? sel[R.m] : 0, mv = R.m >= 0 ? b.vars[R.m].opts[mi]?.v : '';
+    ctx.fillStyle = '#3a3330'; ctx.fillRect(wx - 3, 115, 102, 44); ctx.fillStyle = '#8b5a2b'; ctx.fillRect(wx, 118, 96, 38);
+    for (let s = 0; s < Math.min(3, mi); s++) { ctx.fillStyle = '#3a3330'; ctx.fillRect(wx + 4 + s * 30, 92, 30, 28); ctx.fillStyle = '#d9b77e'; ctx.fillRect(wx + 6 + s * 30, 94, 26, 24); }
+    [wx + 18, wx + 78].forEach(r => { ctx.fillStyle = '#3a3330'; ctx.beginPath(); ctx.arc(r, 160, 11, 0, 7); ctx.fill(); ctx.fillStyle = '#d9b77e'; ctx.beginPath(); ctx.arc(r, 160, 4, 0, 7); ctx.fill(); });
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(xFmt(mv) + ' ' + (R.m >= 0 ? b.vars[R.m].unit : ''), wx + 48, 142);
+    const px0 = 100 + (xp - cam) * PX - 76, fi = R.F >= 0 ? sel[R.F] : 0, kind = PIXEL_KIND[fi % 3];
+    if (px0 > -90) {
+      xSprite(ctx, kind, push ? (Math.floor(tt * 4) % 2 ? 'schieb1' : 'schieb0') : (xp > 0 ? 'steh' : 'schieb0'), px0, 54, 4);
+      const o = R.F >= 0 ? b.vars[R.F].opts[fi] : null; ctx.fillStyle = '#3a3330'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(o?.l || '', px0 + 32, 44);
+      if (push) { const L = 20 + 18 * (fi + 1), y = 74; ctx.strokeStyle = '#c2414f'; ctx.fillStyle = '#c2414f'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(wx + 4, y); ctx.lineTo(wx + L, y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(wx + L + 12, y); ctx.lineTo(wx + L - 2, y - 8); ctx.lineTo(wx + L - 2, y + 8); ctx.fill(); ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(R.F >= 0 ? b.vars[R.F].sym : 'Kraft', wx + L + 16, y + 5); }
+    }
+    if (info) { ctx.fillStyle = '#3a3330'; ctx.textAlign = 'left'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(info, 12, 24); }
+  }
+  function xAnimate(b, sel, y, finish) {
+    const R = xRoles(b), dt = b.vars[R.t].opts[sel[R.t]].v, a = y / dt, xEnd = .5 * a * dt * dt, cv0 = () => $(`[data-xcv="${b.id}"]`, lp);
+    let t0 = null;
+    const step = ts => {
+      if (t0 == null) t0 = ts; const t = (ts - t0) / 1000, cv = cv0();
+      let xw, xp, info;
+      if (t < dt) { xw = .5 * a * t * t; xp = xw; info = `Die Kraft wirkt ${xFmt(dt)} s lang.`; }
+      else { const tr = t - dt; xw = xEnd + y * tr; xp = xEnd; info = tr < 1 ? 'Messung: Wie weit rollt der Wagen in 1 s?' : `In 1 s ist der Wagen ${xFmt(y)} m weit gerollt.`; }
+      if (cv) xScene(cv, b, sel, xw, xp, t, t < dt, info);
+      if (t < dt + 1.6) requestAnimationFrame(step); else finish();
+    };
+    requestAnimationFrame(step);
+  }
+  function xDrawAll() { $$('[data-xcv]', lp).forEach(cv => { if (xBusy[cv.dataset.xcv]) return; const r = findBlock(cv.dataset.xcv); if (r) xScene(cv, r.b, xSel(r.b, xSt(r.b)), 0, 0, 0, false, ''); }); }
+
+  /* Eigenes HTML: läuft in einem Rahmen über der Seite, damit es beim Neuzeichnen nicht neu startet */
+  const wFrames = new Map(), wHeights = {};
+  let wLayer = null;
+  const wDoc = b => `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;background:transparent;font-family:system-ui,sans-serif}</style><script>(function(){var id=${JSON.stringify(b.id)};function h(){var e=document.body;if(!e)return;parent.postMessage({pfw:id,h:Math.ceil(Math.max(e.scrollHeight,e.getBoundingClientRect().height))},'*')}window.pfDone=function(){parent.postMessage({pfw:id,done:1},'*')};addEventListener('load',h);try{new ResizeObserver(h).observe(document.documentElement)}catch(x){setInterval(h,600)}})();<\/script></head><body>${b.code || ''}</body></html>`;
+  function wPlace() {
+    if (!wLayer) { wLayer = document.createElement('div'); wLayer.className = 'pf-wlayer'; scroller.appendChild(wLayer); }
+    const sr = scroller.getBoundingClientRect(), seen = new Set();
+    for (const slot of $$('[data-wslot]', lp)) {
+      const id = slot.dataset.wslot, r = findBlock(id); if (!r) continue; seen.add(id);
+      const sig = r.b.code + '|' + r.b.h;
+      let f = wFrames.get(id);
+      if (!f || f.sig !== sig) { f?.el.remove(); const el = document.createElement('iframe'); el.className = 'pf-wframe'; el.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals'); el.title = plain(r.b.title) || 'Widget'; el.srcdoc = wDoc(r.b); wLayer.appendChild(el); f = { el, sig }; wFrames.set(id, f); }
+      const rc = slot.getBoundingClientRect(), vis = !!slot.offsetParent && rc.width > 0;
+      Object.assign(f.el.style, { display: vis ? 'block' : 'none', top: (rc.top - sr.top + scroller.scrollTop) + 'px', left: (rc.left - sr.left + scroller.scrollLeft) + 'px', width: rc.width + 'px', height: slot.style.height });
+    }
+    for (const [id, f] of wFrames) if (!seen.has(id)) { if (!findBlock(id)) { f.el.remove(); wFrames.delete(id); } else f.el.style.display = 'none'; }
+  }
+  window.addEventListener('message', e => {
+    const d = e.data; if (!d || typeof d !== 'object' || !d.pfw) return;
+    const f = wFrames.get(d.pfw); if (!f || e.source !== f.el.contentWindow) return;
+    const r = findBlock(d.pfw); if (!r) return;
+    if (d.h && !r.b.h) { const hh = Math.max(60, Math.min(3000, +d.h || 0)); if (Math.abs((wHeights[d.pfw] || 0) - hh) > 2) { wHeights[d.pfw] = hh; const s = $(`[data-wslot="${d.pfw}"]`, lp); if (s) { s.style.height = hh + 'px'; wPlace(); } } }
+    if (d.done && r.b.check && !E() && !prog.solved[d.pfw]) solve(d.pfw);
+  });
+  if (window.ResizeObserver) new ResizeObserver(() => { if (wFrames.size || $('[data-wslot]', lp)) wPlace(); }).observe(lp);
+  window.addEventListener('resize', () => { if (wFrames.size) wPlace(); });
+
   /* ---------- Digitale Prüfung: Antworten erfassen, ohne zu prüfen ---------- */
   /** App-Aufgabe im Editor (und außerhalb von Prüfungen): Auftrag, Startcode, was geprüft wird */
   function appEdit(b) {
@@ -796,7 +1055,9 @@ export function startPathFinder(opts = {}) {
   const ansOf = id => { const a = prog.ans || (prog.ans = {}); return a[id] && typeof a[id] === 'object' ? a[id] : (a[id] = {}); };
   const gapCount = b => (String(b.html || '').match(/\[\[(.+?)\]\]/g) || []).length;
   /** Begriffe der Wortbank: in der Schülerfassung vorgegeben, sonst aus den Lücken und Ablenkern */
-  const bankWords = b => b.words || shuffled([...String(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].map(m => m[1].split('|')[0]).concat(b.extra || []), b.id);
+  const bankWords = b => b.words || shuffled(gapWords(b), b.id);
+  /** Begriffe der Wortbank: die erste Antwort jeder Lücke und die Ablenker – bei „Frei: ja“ alle Möglichkeiten */
+  const gapWords = b => (b.free ? [...new Set([...String(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].flatMap(m => m[1].split('|')))] : [...String(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].map(m => m[1].split('|')[0])).concat(b.extra || []);
   /** Zuordnen: linke Karten (gemischt) und rechte Felder; in der Schülerfassung schon vorgegeben */
   function matchSides(b) {
     if (b.left && b.right) return { L: b.left, R: b.right };
@@ -979,6 +1240,7 @@ export function startPathFinder(opts = {}) {
   }
   /** Lücke i richtig? got = alle Eingaben des Lückentexts: bei „[[a]] = [[b]]“ zählt auch die vertauschte Reihenfolge (wie gapSwaps in pfsplit.js) */
   function isGapOk(b, i, v, got) {
+    if (b.free) return v != null && String(v).trim() !== ''; // Hypothese: jede Wahl zählt
     const G = [...(b.html || '').matchAll(/\[\[(.+?)\]\]/g)], one = (k, x) => x != null && !!G[k] && G[k][1].split('|').some(y => normAns(y) === normAns(x));
     if (one(i, v) || !got) return one(i, v);
     const s = String(b.html || '').replace(/&nbsp;|\u00a0/g, ' '), m = [...s.matchAll(/\[\[(.+?)\]\]/g)];
@@ -1056,6 +1318,7 @@ export function startPathFinder(opts = {}) {
     if (EXAM_DONE() && t.closest('.lp-exam')) return;
     if (opt && EXAM()) { const id = opt.closest('.blk').dataset.id, r = findBlock(id), [qi, i] = opt.dataset.opt.split('.').map(Number), k = r.b.qs[qi].opts[i].k, a = ansOf(id); if (a[qi] === k) delete a[qi]; else a[qi] = k; render(); examChanged(id); return; }
     if (opt) { const id = opt.closest('.blk').dataset.id, r = findBlock(id), [qi, i] = opt.dataset.opt.split('.').map(Number); const st = prog.quiz[id] || (prog.quiz[id] = {}); st[qi] = i; if (r.b.qs.every((q, k) => q.opts[st[k]]?.ok)) solve(id); else render(); return; }
+    const xv = t.closest('[data-xvar]'); if (xv) { expSelect(xv.closest('.blk').dataset.id, xv.dataset.xvar); return; }
     if (Date.now() - dragEnd < 400 && t.closest('[data-chip], [data-gchip], [data-schip], [data-sput], [data-ochip], [data-oput]')) return;
     const mw = t.closest('[data-mw]');
     if (mw) { const id = mw.closest('.blk').dataset.id, k = mw.dataset.mw, st = EXAM() ? ansOf(id) : (prog.quiz[id] = prog.quiz[id] || {}); if (st[k]) delete st[k]; else st[k] = 1; if (EXAM()) { render(); examChanged(id); } else { delete prog.quiz[id + ':chk']; render(); } return; }
@@ -1070,7 +1333,7 @@ export function startPathFinder(opts = {}) {
     if (slot && EXAM() && !$('.chip.picked', slot.closest('.blk'))) { const id = slot.closest('.blk').dataset.id, r = findBlock(id), k = matchSides(r.b).R[+slot.dataset.slot]?.k, a = ansOf(id); if (k && a[k] != null) { delete a[k]; render(); examChanged(id); } return; }
     if (slot) { const pick = $('.chip.picked', slot.closest('.blk')); if (pick) placeChip(slot.closest('.blk').dataset.id, +pick.dataset.chip, +slot.dataset.slot); return; }
     const gs = t.closest('[data-gslot]');
-    if (gs) { const id = gs.closest('.blk').dataset.id, pick = $('.gchip.picked', gs.closest('.blk')); placeGap(id, +gs.dataset.gslot, pick ? pick.dataset.gchip : null); }
+    if (gs) { const id = gs.closest('.blk').dataset.id, pick = $('.gchip.picked', gs.closest('.blk')); placeGap(id, slotK(gs.dataset.gslot), pick ? pick.dataset.gchip : null); }
   });
   lp.addEventListener('toggle', ev => {
     if (E()) return;
@@ -1097,6 +1360,7 @@ export function startPathFinder(opts = {}) {
     if (r.b.pairs.every((_, i) => got[i] === i)) solve(id); else render();
   }
   function placeGap(id, slot, word) {
+    const rx = findBlock(id); if (rx?.b.type === 'widget') { expPlace(rx.b, slot, word); return; }
     if (EXAM()) {
       const a = ansOf(id);
       if (word == null) delete a[slot];
@@ -1108,13 +1372,14 @@ export function startPathFinder(opts = {}) {
     if (word == null) delete got[slot];
     else if (got[slot] !== word) {
       // dasselbe Wort kann mehrmals in der Bank stehen (z. B. zwei Lücken „Spitze“) – erst wenn alle Kärtchen liegen, wird eines umgelegt
-      const b = findBlock(id)?.b, copies = b ? [...(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].map(m => m[1].split('|')[0]).concat(b.extra || []).filter(w => w === word).length : 1;
+      const b = findBlock(id)?.b, copies = b ? gapWords(b).filter(w => w === word).length : 1;
       const placed = Object.keys(got).filter(k => got[k] === word);
       if (placed.length >= copies) delete got[placed[0]];
       got[slot] = word;
     }
     render();
   }
+  const slotK = v => /^\d+$/.test(String(v)) ? +v : v;
   function solve(id, keepFocus) {
     prog.solved[id] = true;
     const r = findBlock(id); if (doc.form === 'challenge' && r?.b.xp) toast(`⚡ +${r.b.xp} XP`);
@@ -1157,7 +1422,7 @@ export function startPathFinder(opts = {}) {
     pop = document.createElement('div'); pop.className = 'ed-pop';
     let filter = '', hi = 0;
     const draw = () => {
-      const items = Object.entries(T).filter(([k, t]) => (doc.skin ? SKIN_TYPES.has(k) : !t.skinOnly)).filter(([k, t]) => EXAMF() ? !!CORE[k] && k !== 'lock' : !t.exam).filter(([k, t]) => !filter ||(t.n + ' ' + t.h + ' ' + k).toLowerCase().includes(filter));
+      const items = Object.entries(T).filter(([k, t]) => (doc.skin ? SKIN_TYPES.has(k) : !t.skinOnly)).filter(([k, t]) => EXAMF() ? !!CORE[k] && k !== 'lock' && !t.noExam : !t.exam).filter(([k, t]) => !filter ||(t.n + ' ' + t.h + ' ' + k).toLowerCase().includes(filter));
       let g = '', h = `<h3>${c.slash ? `Baustein: „/${esc(filter)}“` : 'Baustein einfügen'}</h3><div class="ed-pal">`;
       items.forEach(([k, t], i) => { if (t.g !== g) { g = t.g; h += `<div class="grp">${g}</div>`; } h += `<button data-type="${k}" class="${i === hi ? 'hi' : ''}"><b>${t.ic} ${esc(t.n)}</b><span>${esc(t.h)}</span></button>`; });
       if (!items.length) h += '<div class="grp">nichts gefunden</div>';
@@ -1290,7 +1555,7 @@ export function startPathFinder(opts = {}) {
     const id = s.closest('.blk').dataset.id, D = d.el.dataset;
     if (D.schip != null || D.sput != null) placeSort(id, D.schip ?? D.sput, +s.dataset.scol);
     else if (D.ochip != null || D.oput != null) placeOrder(id, D.ochip ?? D.oput, s.dataset.oput ?? 'end');
-    else if (d.gap) placeGap(id, +s.dataset.gslot, D.gchip); else placeChip(id, +D.chip, +s.dataset.slot);
+    else if (d.gap) placeGap(id, slotK(s.dataset.gslot), D.gchip); else placeChip(id, +D.chip, +s.dataset.slot);
   }
 
   /* ---------- Stationen: springen, aktuelle merken ---------- */
@@ -1322,7 +1587,7 @@ export function startPathFinder(opts = {}) {
     html: [{ k: 'html', l: 'HTML', t: 'code', help: 'Wird für Schüler so angezeigt. Skripte laufen erst im exportierten Lernpfad.' }],
     task: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'answer', l: 'Ergebnis zur Selbstkontrolle (optional)', t: 'text', help: 'Leer = Schüler hakt „Erledigt“ ab. Sonst tippen sie das Ergebnis ein; mehrere richtige mit | trennen. Zahlen werden mit Komma oder Punkt erkannt.', show: () => !doc.skin && !EXAMF() }, { k: 'answer', l: 'Ergebnis (wird automatisch bewertet)', t: 'text', help: 'Leer = Schüler schreiben eine freie Antwort, die du bewertest. Mehrere richtige mit | trennen; Zahlen werden mit Komma oder Punkt erkannt.', show: () => EXAMF() }, { k: 'tips', l: 'Tipps (werden nacheinander aufgedeckt)', t: 'list', ph: 'Tipp', vis: 'tipsHide', show: () => !EXAMF() }, { k: 'solution', l: 'Lösung zum Aufdecken (leer = keine)', t: 'text', show: () => !EXAMF() }, { k: 'solution', l: 'Musterlösung (nur für dich bei der Korrektur)', t: 'text', show: () => EXAMF() }, { k: 'solHide', l: 'Lösung für Schüler sichtbar', t: 'shown', show: b => !!b.solution && !EXAMF() }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }, XP],
     quiz: [{ k: 'qs', l: 'Fragen', t: 'qs' }, XP],
-    gap: [{ k: 'title', l: 'Überschrift / Arbeitsauftrag (optional)', t: 'text' }, { k: 'bank', l: 'Begriffe zum Ziehen anbieten (statt Tippen)', t: 'check' }, { k: 'extra', l: 'Zusätzliche falsche Begriffe (Ablenker)', t: 'list', ph: 'Begriff', show: b => b.bank }, { k: 'heft', l: 'Als Hefteintrag gestalten (mit Titel)', t: 'check' }, XP],
+    gap: [{ k: 'title', l: 'Überschrift / Arbeitsauftrag (optional)', t: 'text' }, { k: 'bank', l: 'Begriffe zum Ziehen anbieten (statt Tippen)', t: 'check' }, { k: 'free', l: 'Frei (z. B. Hypothese): jede Wahl zählt, die Wortbank zeigt alle Möglichkeiten aus [[a|b|c]]', t: 'check' }, { k: 'extra', l: 'Zusätzliche falsche Begriffe (Ablenker)', t: 'list', ph: 'Begriff', show: b => b.bank }, { k: 'heft', l: 'Als Hefteintrag gestalten (mit Titel)', t: 'check' }, XP],
     match: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'pairs', l: 'Paare', t: 'pairs' }, XP],
     mark: [{ k: 'title', l: 'Arbeitsauftrag', t: 'text' }, XP],
     sort: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'groups', l: 'Gruppen und Begriffe', t: 'lines', rows: 6, help: 'Je Zeile eine Gruppe: „Gruppe: Begriff, Begriff, Begriff“',
@@ -1343,6 +1608,21 @@ export function startPathFinder(opts = {}) {
       { k: 'needs', l: 'Muss im Code vorkommen (je Zeile eins, z. B. while)', t: 'lines', rows: 3, get: b => (b.needs || []).join('\n'), set: (b, v) => { b.needs = v.split('\n').map(x => x.trim()).filter(Boolean); } },
       { k: 'rubric', l: 'Erwartungshorizont (optional – dann bewertest du, die Prüfungen oben sind nur Hinweise)', t: 'rubric' },
       { k: 'solution', l: 'Musterlösung (nur für dich bei der Korrektur)', t: 'code' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }],
+    widget: [
+      { k: 'title', l: 'Forschungsfrage', t: 'text', show: b => b.kind === 'experiment' }, { k: 'title', l: 'Überschrift (optional)', t: 'text', show: b => b.kind !== 'experiment' },
+      { k: 'hyp', l: 'Hypothese (Lücken als [[erwartet|andere Möglichkeit|…]] – jede Wahl zählt, die erste Möglichkeit zeigt die Messung)', t: 'lines', rows: 3, show: b => b.kind === 'experiment', get: b => unLite(b.hyp), set: (b, v) => { b.hyp = mdLite(v); } },
+      { k: 'vars', l: 'Größen – je Zeile eine', t: 'lines', rows: 4, show: b => b.kind === 'experiment', help: 'Name Symbol in Einheit = Werte, z. B. „Kraft F in N = Isaac 30, Anne 60, Vater 90“; mit „| fest“ bleibt die Größe gleich (faire Messreihe).',
+        get: b => (b.vars || []).map(varToTextCore).join('\n'), set: (b, v) => { const V = v.split('\n').map(parseVarCore).filter(x => x && x.opts.length); if (V.length) b.vars = V; } },
+      { k: 'res', l: 'Ergebnis und Rechenvorschrift', t: 'lines', rows: 1, show: b => b.kind === 'experiment', help: 'z. B. „Zusatzgeschwindigkeit Δv in m/s = F · Δt / m“ – mit den Symbolen der Größen, + − · / und Klammern.',
+        get: b => b.res ? `${b.res.name && b.res.name !== b.res.sym ? b.res.name + ' ' : ''}${b.res.sym}${b.res.unit ? ' in ' + b.res.unit : ''} = ${b.res.f}` : '',
+        set: (b, v) => { const m = v.match(/^(.*?)=(.*)$/); if (!m) return; const r = parseVarCore(m[1] + '= 0'); if (r) b.res = { name: r.name, sym: r.sym, unit: r.unit, f: m[2].trim() }; } },
+      { k: 'anim', l: 'Animation', t: 'select', show: b => b.kind === 'experiment', o: [['', 'Messanzeige'], ['wagen', 'Wagen wird angeschoben (Größen in N, kg und s)']] },
+      { k: 'evalHtml', l: 'Auswertung (Lückentext mit [[Antwort]])', t: 'lines', rows: 3, show: b => b.kind === 'experiment', get: b => unLite(b.evalHtml), set: (b, v) => { b.evalHtml = mdLite(v); } },
+      { k: 'extra', l: 'Ablenker für die Auswertung', t: 'list', ph: 'Begriff', show: b => b.kind === 'experiment' },
+      { k: 'concl', l: 'Schlussfolgerung (erscheint am Ende als Merksatz)', t: 'lines', rows: 2, show: b => b.kind === 'experiment', get: b => unLite(b.concl), set: (b, v) => { b.concl = mdLite(v); } },
+      { k: 'code', l: 'HTML des Widgets', t: 'code', show: b => b.kind !== 'experiment', help: 'Läuft geschützt in einem eigenen Rahmen (Skripte erlaubt, kein Zugriff auf die Seite). pfDone() meldet „erledigt“.' },
+      { k: 'check', l: 'Zählt als Aufgabe (erledigt, sobald das HTML pfDone() aufruft)', t: 'check', show: b => b.kind !== 'experiment' },
+      { k: 'h', l: 'Feste Höhe in Pixeln (0 = passt sich selbst an)', t: 'number', show: b => b.kind !== 'experiment' }, XP],
     lock: [{ k: 'after', l: 'Frei, sobald gelöst ist:', t: 'target' }],
     code: [{ k: 'lang', l: 'Sprache', t: 'select', o: [['java', 'Java'], ['python', 'Python'], ['sql', 'SQL'], ['text', 'Text']] }, { k: 'file', l: 'Dateiname über dem Code (optional)', t: 'text' }, { k: 'mark', l: 'Zeilen hervorheben (z. B. 3-5)', t: 'text', show: () => !!doc.skin }, { k: 'nocopy', l: 'ohne Knopf (nur zum Anschauen, z. B. wenn der Code schon im Projekt steht oder eine Aufgabe verraten würde)', t: 'check' }],
     uml: [{ k: 'name', l: 'Klassenname', t: 'text' }, { k: 'attrs', l: 'Attribute', t: 'list', ph: 'Attribut' }, { k: 'methods', l: 'Methoden', t: 'list', ph: 'Methode' }],
@@ -1375,8 +1655,8 @@ export function startPathFinder(opts = {}) {
         { k: 'show.quiz', l: 'Ergebnis je Station zeigen', t: 'check' }, { k: 'show.xp', l: 'XP zeigen (Challenge)', t: 'check' }];
       apply = () => { doc.cert = b; commit(); render(); };
     } else if (id.startsWith('st:')) {
-      const s = doc.stations.find(x => x.id === id.slice(3)); b = live ? s : { title: s.title, sub: s.sub, nr: s.nr || '', check: s.check, anim: s.anim || '' }; title = '⚙ Station';
-      fields = [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'sub', l: 'Untertitel', t: 'text' }, { k: 'nr', l: 'Eigenes Zeichen statt Nummer (z. B. ✂)', t: 'text', help: 'leer = automatische Nummer' }, { k: 'check', l: 'Haken „Station erledigt“ am Ende', t: 'check' }, { k: 'anim', l: 'Animation des Stationstitels', t: 'select', o: ANIM_OPTS }];
+      const s = doc.stations.find(x => x.id === id.slice(3)); b = live ? s : { title: s.title, sub: s.sub, nr: s.nr || '', check: s.check, step: !!s.step, anim: s.anim || '' }; title = '⚙ Station';
+      fields = [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'sub', l: 'Untertitel', t: 'text' }, { k: 'nr', l: 'Eigenes Zeichen statt Nummer (z. B. ✂)', t: 'text', help: 'leer = automatische Nummer' }, { k: 'check', l: 'Haken „Station erledigt“ am Ende', t: 'check' }, { k: 'step', l: 'Schrittweise aufdecken: nach jeder Aufgabe geht es erst weiter, wenn sie gelöst ist', t: 'check', show: () => !EXAMF() }, { k: 'anim', l: 'Animation des Stationstitels', t: 'select', o: ANIM_OPTS }];
       apply = () => { Object.assign(s, b); commit(); render(); };
     } else {
       const r = findBlock(id); b = live ? r.b : clone(r.b); const t = def(b);
@@ -2730,6 +3010,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const b = r.b, t = def(b);
     if (t?.run) { t.run(a, b, ctx); return; }
     if (E() && a !== 'download') { toast('In der <b>Vorschau</b> (⌘P) ausprobieren'); return; }
+    if (b.type === 'widget') { expRun(a, b); return; }
     if (a === 'done') { prog.solved[id] = !prog.solved[id]; render(); }
     if (a === 'answer') {
       const inp = $(`.blk[data-id="${id}"] [data-ans]`, lp), v = inp?.value || '';

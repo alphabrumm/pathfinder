@@ -5,7 +5,7 @@ description: Digitale Prüfungen für Probe (probe.pandapy.de) im PathFinder-Tex
 
 # Probe-Prüfungen
 
-Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-21e). Die Spezifikation unten ist dieselbe, die Probe
+Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-22a). Die Spezifikation unten ist dieselbe, die Probe
 als „Prompt für externe KI“ anzeigt. Weicht etwas vom aktuellen Probe-Verhalten ab, gilt der Code in alphabrumm/pathfinder
 (`core/pftext.js`, `core/pfsplit.js`).
 
@@ -74,7 +74,7 @@ REGELN
 - Bilder und Animationen: Zeichne passende Abbildungen selbst als SVG – im Abschnitt ## Anhang am Ende als „name: <svg …> … </svg>“, oben mit anhang:name einbinden. SVG darf animiert sein (<animate>, <animateTransform>, <animateMotion> oder CSS-@keyframes in <style> innerhalb des SVG). Immer viewBox angeben, gut lesbare Schrift (font-family="sans-serif"), keine Skripte, keine externen Links, Schriften oder Bilder. Lieber wenige, aussagekräftige Grafiken (z. B. Schaubild, Ablauf, Beispiel-Tabelle) als Deko.
 - Rasterbilder (PNG, GIF, JPG) nur als data:image/…;base64,…, und nur wenn du die Datei wirklich erzeugt hast (z. B. mit einem Code-Werkzeug) – niemals Base64 ausdenken. Sonst ein Bild-Platzhalter: ![Beschreibung]()
 - Keine Bilder aus dem Internet.
-- Innerhalb eines ###-Abschnitts (Aufgabe, Quiz, Lückentext, Zuordnen …) keine Bild-Zeilen und keine Infokästen: Sie beenden den Abschnitt. Bilder und Kästen gehören davor oder dahinter (bei Aufgaben stattdessen „Bild: anhang:name“).
+- Innerhalb eines ###-Abschnitts (Aufgabe, Quiz, Lückentext, Zuordnen …) keine Bild-Zeilen und keine Infokästen: Sie beenden den Abschnitt. Bilder und Kästen gehören davor oder dahinter (bei Aufgaben stattdessen „Bild: anhang:name“). Normaler Text nach einem Abschnitt steht nach einer Leerzeile.
 - Im Lückentext ist JEDE [[Lücke]] eine Antwort, die Schüler einsetzen müssen – Arbeitsanweisungen ohne Lücken als normalen Text vor den Abschnitt schreiben.
 
 FORMAT (PathFinder-Text):
@@ -91,9 +91,13 @@ Kopfbild-Art: klein | groß | Hintergrund
 Titel-Animation: tippen | einblenden | glitch | leuchten   (optional, ebenso Untertitel-Animation)
 Seiten: Stationen              (optional: jede Station auf einer eigenen Seite mit „Weiter“ und „Zurück“)
 
+Aufdecken: schrittweise        (optional, nicht in Prüfungen: in allen Stationen erscheint der nächste Baustein erst, wenn die Aufgabe davor gelöst ist)
+
 ## Station: Titel der Station | kurze Unterzeile
 Animation: einblenden          (optional, direkt nach der Stationszeile: Animation des Stationstitels)
+Aufdecken: schrittweise        (optional, direkt nach der Stationszeile: nur in dieser Station Schritt für Schritt aufdecken)
 Normaler Text. Leerzeile = neuer Absatz. **fett**, *kursiv*, `Code`, Listen mit „- “.
+Indizes und Hochzahlen: v_A, v_{End}, m/s^2, 10^{-3}   (ein Zeichen ohne Klammern, mehrere in { })
 [Überschrift 1] Zwischenüberschrift   (auch [Überschrift 2] und [Überschrift 3]: kleinere Überschriften innerhalb einer Station)
 
 [Merke] Wichtiger Merksatz.          (auch: [Tipp], [Achtung], [Begriff: Wort], [Regel], [Abschluss])
@@ -122,6 +126,7 @@ XP: 20
 Satz mit [[Lücke]] und [[Antwort|andere erlaubte Antwort]].
 Wortbank: ja            (optional: Begriffe zum Ziehen)
 Extra: Ablenker, Ablenker   (optional: falsche Begriffe in der Wortbank)
+Frei: ja                (optional, z. B. für eine Hypothese: jede Wahl zählt; die Wortbank zeigt alle Möglichkeiten aus [[a|b|c]])
 
 ### Zuordnen: Ordne zu
 Begriff -> Erklärung
@@ -171,6 +176,26 @@ Punkte: 2               (in jeder Aufgabe, jedem Quiz, Lückentext, Zuordnen, Ma
 
 ### Aufdecken: Mehr erfahren
 Text, der erst nach Antippen erscheint.
+
+### Widget: Experiment     (nicht in Prüfungen; Schritt für Schritt: Hypothese → Experiment → Auswertung → Schlussfolgerung)
+Frage: Wie hängt Δv von der Kraft ab?
+Hypothese: Wenn stärker geschoben wird, dann [[wird Δv größer|wird Δv kleiner|bleibt Δv gleich]].
+                        (jede Wahl zählt; die erste Möglichkeit ist das, was die Messung zeigt – sie wird nach dem Messen verglichen)
+Größe: Kraft F in N = Isaac 30, Anne 60, Vater 90      (Name, Symbol, Einheit = Werte zum Auswählen, gern mit Namen)
+Größe: Masse m in kg = 30 (leer), 60 (1 Sack) | fest   („| fest“: bleibt in dieser Messreihe gleich – faire Messreihe)
+Größe: Einwirkungsdauer Δt in s = 1, 2, 3 | fest
+Ergebnis: Zusatzgeschwindigkeit Δv in m/s = F · Δt / m   (Rechenvorschrift mit den Symbolen, + − · / und Klammern)
+Animation: Wagen        (optional: Wagen wird angeschoben – braucht Größen in N, kg und s; ohne: Messanzeige)
+Auswertung: Je größer die Kraft, desto [[größer]] ist Δv.   (Lückentext nach dem Messen, mehrere Zeilen möglich)
+Extra: kleiner, halb    (Ablenker für die Auswertung)
+Schlussfolgerung: Δv ist proportional zur Kraft.   (erscheint am Ende als Merksatz)
+XP: 30
+
+### Widget: HTML | Titel    (nicht in Prüfungen; eigene kleine Web-App, läuft geschützt in einem Rahmen und passt ihre Höhe selbst an)
+Erledigt: ja            (optional: zählt als Aufgabe – das HTML ruft pfDone() auf, wenn die Schüler fertig sind)
+```html
+<button onclick="pfDone()">Fertig</button>
+```
 
 ### UML: Klassenname
 - attribut: Typ

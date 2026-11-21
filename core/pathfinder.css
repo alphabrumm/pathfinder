@@ -799,3 +799,52 @@ label.lp-btn { display: inline-flex; align-items: center; justify-content: cente
 .lp-app .lp-app-warn .lp-btn { margin: 6px 0 0; display: inline-block; }
 .lp-app .where { margin-left: auto; margin-right: 8px; color: var(--ink-2); font-size: .85em; font-weight: 600; }
 .lp-app .help { font-size: .85em; color: var(--ink-2); font-weight: 400; }
+
+/* ---------- Schrittweise aufdecken ---------- */
+.lp-lock.step.locked > .lp-lock-body { display: none; }
+.lp-lock.step > .lp-lock-note { text-align: center; padding: 8px; border: 2px dashed var(--line); border-radius: 12px; }
+
+/* ---------- Widget: Experiment ---------- */
+.lp-exp .xq { font-weight: 700; font-size: 1.08em; margin: 4px 0 8px; }
+.lp-exp .xsteps { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 6px 0 10px; counter-reset: xs; }
+.lp-exp .xsteps li { counter-increment: xs; font-size: .82em; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); }
+.lp-exp .xsteps li::before { content: counter(xs) ' · '; }
+.lp-exp .xsteps li.on { background: var(--a1); color: var(--surface); }
+.lp-exp .xsteps li.ok { background: color-mix(in srgb, var(--good) 22%, var(--surface)); color: var(--ink); }
+.lp-exp .xsteps li.ok::before { content: '✓ '; }
+.lp-exp .xph { border-top: 2px dashed var(--line); padding-top: 10px; margin-top: 10px; animation: xin .35s ease; }
+@keyframes xin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.lp-exp .xph h4 { margin: 0 0 6px; font-size: 1em; display: flex; align-items: center; gap: 8px; }
+.lp-exp .xph h4 span { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--a1); color: var(--surface); font-size: .85em; }
+.lp-exp .xph.done h4 span { background: var(--good); }
+.lp-exp .help { font-size: .85em; color: var(--ink-2); margin: 4px 0; }
+.lp-exp .xvars { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; margin: 6px 0; }
+.lp-exp .xvl { font-weight: 700; font-size: .92em; }
+.lp-exp .xvl i { font-style: italic; color: var(--a1); }
+.lp-exp .xseg { display: flex; flex-wrap: wrap; gap: 6px; }
+.lp-exp .xseg button { flex: 1; min-width: 78px; min-height: 48px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 12px; font: inherit; font-weight: 700; font-size: .92em; line-height: 1.15; cursor: pointer; touch-action: manipulation; padding: 4px 6px; }
+.lp-exp .xseg button small { display: block; font-weight: 400; font-size: .78em; color: var(--ink-2); }
+.lp-exp .xseg button.on { border-color: var(--a1); background: var(--a1s); }
+.lp-exp .xseg button.fix { opacity: .4; cursor: default; }
+.lp-exp .xcv { display: block; width: 100%; height: auto; border-radius: 12px; margin: 8px 0; }
+.lp-exp .xmeter { display: flex; align-items: baseline; gap: 10px; justify-content: center; margin: 8px 0; padding: 14px; border-radius: 12px; background: var(--surface-2); font-size: 1.05em; }
+.lp-exp .xmeter b { font-size: 2em; font-variant-numeric: tabular-nums; color: var(--good); }
+.lp-exp .xmsg { min-height: 1.4em; margin: 6px 0; font-size: .92em; }
+.lp-exp .xgrid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 10px; align-items: start; }
+@media (max-width: 640px) { .lp-exp .xgrid { grid-template-columns: 1fr; } .lp-exp .xvars { grid-template-columns: 1fr; } }
+.lp-exp .xtab th.z, .lp-exp .xtab td.z { color: var(--bad); font-weight: 700; }
+.lp-exp .xtab td small { color: var(--ink-2); }
+.lp-exp .xtab tr.xoff td { opacity: .45; }
+.lp-exp .xchartw { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.lp-exp .xchart { width: 100%; height: auto; display: block; }
+.lp-exp .xhyp { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.lp-exp .xhyp div { flex: 1; min-width: 200px; padding: 8px 12px; border-radius: 12px; font-size: .92em; }
+.lp-exp .xhyp .ok { background: color-mix(in srgb, var(--good) 16%, var(--surface)); }
+.lp-exp .xhyp .no { background: color-mix(in srgb, var(--bad) 12%, var(--surface)); }
+.lp-exp .xed { margin: 6px 0; font-size: .92em; }
+.lp-exp .xed ul { margin: 2px 0 4px; padding-left: 20px; }
+
+/* ---------- Widget: eigenes HTML (Rahmen liegt über dem Platzhalter) ---------- */
+.pf-wslot { width: 100%; }
+.pf-wlayer { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 5; }
+.pf-wframe { position: absolute; border: 0; background: transparent; color-scheme: normal; }
