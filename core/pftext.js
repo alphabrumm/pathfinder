@@ -377,6 +377,9 @@ export function parseText(src, env) {
       closeSec(); flushPara(); const c = lastCheckable();
       if (!c) H.warn(n, 'Sperre ohne Aufgabe davor in dieser Station – weggelassen.'); else push({ type: 'lock', after: c.id }, n); continue;
     }
+    if ((m = l.match(/^\[\s*(?:ü|ue|u)berschrift\s*([123])?\s*\]\s*(.*)$/i))) { // Absatzstil des Textbausteins
+      closeSec(); flushPara(); if (m[2].trim()) push({ type: 'text', html: inline(m[2].trim()), ps: 'h' + (m[1] || 1) }, n); continue;
+    }
     if ((m = l.match(/^\[\s*([^\]:]+?)\s*(?::\s*([^\]]+))?\]\s*(.*)$/)) && (INFO[norm(m[1])] || norm(m[1]) === 'figur')) {
       closeSec(); flushPara();
       const body = [m[3]]; while (i + 1 < lines.length && lines[i + 1].trim() && !/^(#{1,3}\s|\[|```|-{3,})/.test(lines[i + 1].trim())) body.push(lines[++i]);
@@ -452,7 +455,7 @@ export function docToText(doc, env, out = {}) {
       const key = Object.entries(env.figures).find(([k, F]) => F.src === b.img)?.[0];
       const figName = FIG_NAME[key] || 'Aha';
       switch (b.type) {
-        case 'text': L.push(md(b.html)); break;
+        case 'text': L.push(/^h[123]$/.test(b.ps || '') ? `[Überschrift ${b.ps[1]}] ${md(b.html).replace(/\s*\n+\s*/g, ' ')}` : md(b.html)); break;
         case 'info': L.push(b.kind === 'figur' ? (key || !b.img ? `[Figur: ${figName}] ${md(b.html)}` : `[Figur: ${ref(b.img, 'figur')} | ${b.name || ''}] ${md(b.html)}`) : (K => `[${K}${b.title && md(b.title).toLowerCase() !== K.toLowerCase() ? ': ' + md(b.title) : ''}] ${md(b.html)}`)(b.kind[0].toUpperCase() + b.kind.slice(1))); break;
         case 'image': L.push(`![${b.caption || b.alt || 'Bild'}${b.size === 'klein' ? ' | klein' : ''}](${ref(b.src, 'bild')})`); break;
         case 'table': L.push(...b.rows.map((r, k) => '| ' + r.map(md).join(' | ') + ' |' + (k === 0 && b.head ? '\n|' + r.map(() => ' --- ').join('|') + '|' : ''))); break;
@@ -538,6 +541,7 @@ Seiten: Stationen              (optional: jede Station auf einer eigenen Seite m
 ## Station: Titel der Station | kurze Unterzeile
 Animation: einblenden          (optional, direkt nach der Stationszeile: Animation des Stationstitels)
 Normaler Text. Leerzeile = neuer Absatz. **fett**, *kursiv*, \`Code\`, Listen mit „- “.
+[Überschrift 1] Zwischenüberschrift   (auch [Überschrift 2] und [Überschrift 3]: kleinere Überschriften innerhalb einer Station)
 
 [Merke] Wichtiger Merksatz.          (auch: [Tipp], [Achtung], [Begriff: Wort], [Regel], [Abschluss])
 [Figur: Aha] Eine Figur sagt etwas.  (Figuren: Nachdenken, Aha, Achtung – davor optional „Smiley“ oder „Pixel“ für einen anderen Stil – und Ente)

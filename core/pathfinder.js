@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-21d';
+const PF_BUILD = '2026-11-21e';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -107,6 +107,8 @@ const CORE = {
   lock: { n: 'Sperre', ic: '🔒', g: 'Ablauf', h: 'Ab hier erst frei, wenn … gelöst', make: () => ({ after: '' }) },
   page: { n: 'Nächste Seite', ic: '📄', g: 'Ablauf', h: 'Ab hier eine neue Seite mit „Weiter“ und „Zurück“', make: () => ({}) },
 };
+/** Absatzstile des Bausteins „Text“ (ohne Angabe: normaler Text) */
+const PS = { h1: 'Überschrift 1', h2: 'Überschrift 2', h3: 'Überschrift 3' };
 const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order', 'app']);
 const APP_INFO = { jpad: ['JPad', '☕', 'java'], qpad: ['QPad', '🗄', 'sql'], flowpad: ['FlowPad', '🔀', 'text'] };
 const appN = a => (APP_INFO[a] || APP_INFO.jpad)[0], appIc = a => (APP_INFO[a] || APP_INFO.jpad)[1], appLang = a => (APP_INFO[a] || APP_INFO.jpad)[2];
@@ -645,7 +647,7 @@ export function startPathFinder(opts = {}) {
   function tools(b) {
     const t = def(b);
     const form = b.type === 'info' || (t && (t.form || FORMS[b.type]));
-    return `<div class="ed-tools" contenteditable="false"><button class="grip" data-bact="grip" title="Ziehen zum Verschieben" aria-label="Verschieben">⠿</button><span class="lbl">${esc(b.type === 'info' ? (INFO_KINDS[b.kind]?.[1] || 'Infokasten') : t?.n || b.type)}</span>`
+    return `<div class="ed-tools" contenteditable="false"><button class="grip" data-bact="grip" title="Ziehen zum Verschieben" aria-label="Verschieben">⠿</button><span class="lbl">${esc(b.type === 'info' ? (INFO_KINDS[b.kind]?.[1] || 'Infokasten') : b.type === 'text' && PS[b.ps] && !doc.skin ? PS[b.ps] : t?.n || b.type)}</span>`
       + `<button data-bact="up" title="Nach oben (⌥↑)">↑</button><button data-bact="down" title="Nach unten (⌥↓)">↓</button>`
       + `<button data-bact="dup" title="Verdoppeln">⧉</button>${form ? '<button data-bact="cfg" title="Einstellungen">⚙</button>' : ''}<button class="del" data-bact="del" title="Löschen">🗑</button></div>`;
   }
@@ -692,7 +694,7 @@ export function startPathFinder(opts = {}) {
     if (b.type === 'task' && EXAMF() && E()) return wrap(b, taskCard(b, { buttons: `<span class="lp-answer"><input disabled placeholder="${esc(b.answerPh || 'Ergebnis')}"></span>`, hint: `Wird automatisch bewertet. Richtig ist: <b>${esc(b.answer.split('|').join(' oder '))}</b>` }));
     const ok = !!prog.solved[b.id], t = def(b);
     switch (b.type) {
-      case 'text': return wrap(b, ce('html', b.html, 'Text schreiben … ( / für Bausteine)', { rich: true, cls: 'lp-text', anim: b.anim, key: b.id }));
+      case 'text': return wrap(b, ce('html', b.html, PS[b.ps] ? PS[b.ps] + ' schreiben …' : 'Text schreiben … ( / für Bausteine)', { rich: true, cls: 'lp-text' + (PS[b.ps] ? ' lp-ps lp-ps-' + b.ps : ''), anim: b.anim, key: b.id }));
       case 'info': {
         const [ic, dn] = INFO_KINDS[b.kind] || INFO_KINDS.merke;
         if (b.kind === 'figur') return wrap(b, `<div class="lp-figur">${b.img ? `<img src="${b.img}" alt="">` : `<span class="noimg">${E() ? '🖼' : '🙂'}</span>`}<div class="bubble">${ce('name', b.name, 'Name der Figur', { tag: 'b', cls: 'who' })}${ce('html', b.html, 'Was sagt die Figur?', { rich: true, anim: b.anim, key: b.id })}</div></div>`);
@@ -1311,7 +1313,7 @@ export function startPathFinder(opts = {}) {
   /* ---------- Einstellungen (⚙) ---------- */
   const XP = { k: 'xp', l: 'XP (Challenge)', t: 'number', show: () => doc.form === 'challenge' };
   const FORMS = {
-    text: [{ k: 'tag', l: 'Art', t: 'select', o: [['p', 'Absatz'], ['h3', 'Zwischenüberschrift'], ['ul', 'Liste'], ['ol', 'nummerierte Liste']], show: () => !!doc.skin }, { k: 'anim', l: 'Textanimation', t: 'select', o: ANIM_OPTS, help: 'Läuft einmal, sobald der Text ins Bild scrollt (nur in Vorschau und für Schüler).', show: () => !doc.skin }],
+    text: [{ k: 'ps', l: 'Absatzstil', t: 'select', o: [['', 'Text'], ...Object.entries(PS)], show: () => !doc.skin }, { k: 'tag', l: 'Art', t: 'select', o: [['p', 'Absatz'], ['h3', 'Zwischenüberschrift'], ['ul', 'Liste'], ['ol', 'nummerierte Liste']], show: () => !!doc.skin }, { k: 'anim', l: 'Textanimation', t: 'select', o: ANIM_OPTS, help: 'Läuft einmal, sobald der Text ins Bild scrollt (nur in Vorschau und für Schüler).', show: () => !doc.skin }],
     info: [{ k: 'kind', l: 'Art', t: 'select', o: Object.entries(INFO_KINDS).map(([k, v]) => [k, v[0] + ' ' + v[1]]) }, { k: 'title', l: 'Überschrift', t: 'text', help: 'leer = Name der Art', show: b => b.kind !== 'figur' }, { k: 'img', l: 'Figur', t: 'figure', show: b => b.kind === 'figur' }, { k: 'name', l: 'Name der Figur', t: 'text', show: b => b.kind === 'figur' }, { k: 'img', l: 'Eigenes Bild', t: 'image', show: b => b.kind === 'figur' || b.kind === 'abschluss' }, { k: 'anim', l: 'Textanimation', t: 'select', o: ANIM_OPTS }],
     image: [{ k: 'src', l: 'Bild oder GIF', t: 'image' }, { k: 'caption', l: 'Bildunterschrift', t: 'text' }, { k: 'alt', l: 'Alternativtext (für Vorlese-Programme)', t: 'text' }, { k: 'size', l: 'Größe', t: 'select', o: [['voll', 'volle Breite'], ['klein', 'klein']] }],
     table: [{ k: 'head', l: 'Erste Zeile ist Kopfzeile', t: 'check' }, { k: 'rows', l: 'Größe', t: 'grid' }],

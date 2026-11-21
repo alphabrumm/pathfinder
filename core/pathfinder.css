@@ -153,6 +153,11 @@ button { font: inherit; color: inherit; }
 .lp-lock.locked > .lp-lock-body { opacity: .4; pointer-events: none; filter: grayscale(.6); }
 .lp-lock-note { font-size: .9em; color: var(--ink-2); margin: 4px 0; }
 /* Seiten: „Nächste Seite“ im Editor als Trennlinie, für Schüler Weiter/Zurück unten */
+/* Absatzstile des Textbausteins */
+.lp-ps { font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: var(--display-ls); line-height: 1.25; margin: .7em 0 .25em; color: var(--ink); }
+.lp-ps-h1 { font-size: 1.5em; color: var(--a1); }
+.lp-ps-h2 { font-size: 1.25em; }
+.lp-ps-h3 { font-size: 1.08em; }
 .lp-pagebreak { display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-size: .85em; font-weight: 700; margin: 6px 0; }
 .lp-pagebreak::before, .lp-pagebreak::after { content: ""; flex: 1; border-top: 2px dashed var(--line, currentColor); opacity: .6; }
 .lp-pager { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; margin: 26px 0 8px; }
@@ -181,8 +186,9 @@ button { font: inherit; color: inherit; }
 .editing .blk:hover { box-shadow: 0 0 0 1px color-mix(in srgb, var(--ed-sel) 35%, transparent); }
 .editing .blk.sel { box-shadow: 0 0 0 2px var(--ed-sel); }
 .editing .blk.drag-ghost { opacity: .35; }
-.ed-tools { position: absolute; z-index: 25; top: -20px; right: 8px; display: none; gap: 2px; background: var(--ed-bg); border-radius: 10px; padding: 3px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.ed-tools { position: absolute; z-index: 25; bottom: calc(100% + 3px); right: 8px; display: none; gap: 2px; background: var(--ed-bg); border-radius: 10px; padding: 3px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 .editing .blk.sel > .ed-tools { display: flex; }
+.editing .blk.sel { margin-top: 18px; } /* Platz für die Werkzeugleiste über dem Baustein – sie verdeckt so nie den Text */
 .ed-tools button { width: 36px; height: 34px; border: 0; background: transparent; color: var(--ed-ink); border-radius: 7px; cursor: pointer; font-size: 16px; display: grid; place-items: center; }
 .ed-tools button:hover { background: var(--ed-mid); }
 .ed-tools .grip { cursor: grab; touch-action: none; }
