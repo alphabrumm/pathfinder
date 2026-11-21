@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-21a';
+const PF_BUILD = '2026-11-21b';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -2052,23 +2052,24 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   }
 
   /**
-   * Probe (nur Prüfungen): den KI-Dialog als Assistenten in vier Schritten zeigen – 1 Klasse, Fach und Lernbereich,
-   * 2 Aufgaben (Anforderungsbereiche, Aufgabenstile), 3 Hinweise, Material und Prompt, 4 Antwort der KI einfügen.
-   * Es bleiben dieselben Felder mit derselben Logik; sie werden nur auf Seiten verteilt. Der API-Key steht im Menü „KI-Tools“.
+   * KI-Dialog als Assistent in vier Schritten – 1 Art, Klasse, Fach und Lernbereich, 2 Aufgaben (Anforderungsbereiche,
+   * Aufgabenstile), 3 Hinweise, Material und Prompt, 4 Antwort der KI einfügen. Es bleiben dieselben Felder mit derselben
+   * Logik; sie werden nur auf Seiten verteilt. Der API-Key steht im Menü „KI-Tools“. EX1: nur Prüfungen (in Probe).
    * Gibt go(n) zurück.
    */
-  function kiWizard(el) {
+  function kiWizard(el, EX1) {
     const form = $('.ed-form', el), q = sel => $(sel, el), up = (x, sel) => x && x.closest(sel), lab = sel => up(q(sel), 'label');
     const P = [
-      ['Klasse & Thema', 'Für welche Klasse und welches Thema? Wähle Jahrgangsstufe, Fach und Lernbereich – oder beschreibe ein eigenes Thema.',
+      [EX1 ? 'Klasse & Thema' : 'Art, Klasse & Thema', EX1 ? 'Für welche Klasse und welches Thema? Wähle Jahrgangsstufe, Fach und Lernbereich – oder beschreibe ein eigenes Thema.' : 'Was soll entstehen und für wen? Wähle die Art, Jahrgangsstufe, Fach und Lernbereich – oder beschreibe ein eigenes Thema.',
         [lab('[data-k="art"]'), q('#kiBasis'), up(q('[data-k="jg"]'), '.row'), q('#kiFrei'), lab('#kiLb'), q('#kiLpHint'), q('#kiInh'), lab('[data-k="thema"]'), up(q('[data-k="min"]'), '.row')]],
-      ['Aufgaben', 'Wie anspruchsvoll, welche Aufgaben? Lege den Anteil der Anforderungsbereiche fest und wähle die Aufgabenstile.', [q('#kiMix'), q('#kiTypes')]],
-      ['Hinweise & Prompt', 'Was soll die KI noch wissen? Ergänze Hinweise und Material. Dann den Prompt erstellen – er wird kopiert – und in deiner KI (z. B. ByLKI oder Claude) einfügen und abschicken.',
+      ['Aufgaben', EX1 ? 'Wie anspruchsvoll, welche Aufgaben? Lege den Anteil der Anforderungsbereiche fest und wähle die Aufgabenstile.' : 'Wie anspruchsvoll, welche Aufgaben? Lege den Anteil der Schwierigkeitsstufen fest und wähle die Aufgabenstile.',
+        [q('#kiMix'), q('#kiTypes'), Object.assign(document.createElement('p'), { className: 'ed-hint', id: 'kiWizNo2', textContent: 'Bei einem Lernpfad wählt die KI Erklärungen, Beispiele und Übungen passend zum Thema – hier gibt es nichts einzustellen. Weiter mit Schritt 3.' })]],
+      ['Hinweise & Prompt', 'Was soll die KI noch wissen? Ergänze Hinweise und Material. Dann den Prompt erstellen – er wird kopiert – und in deiner KI (z. B. ByLKI oder Claude) einfügen und abschicken.' + (EX1 ? '' : ' Mit hinterlegtem API-Key geht es auch direkt.'),
         [lab('[data-k="extra"]'), q('#kiMat'), up(q('[data-copy="prompt"]'), '.ki-btns'), q('#kiDirRow'), q('#kiLive')]],
       ['Antwort einfügen', 'Füge hier die komplette Antwort der KI ein – oder lade ihre Datei. Fehler im Format zeigt PathFinder sofort an.',
         [q('#kiIn'), up(q('#kiFiles'), '.ki-btns'), q('#kiFileList'), q('#kiRes'), up(q('#kiOpen'), '.ki-btns')]],
     ];
-    const art = lab('[data-k="art"]'); if (art) art.hidden = true; // nur „Digitale Prüfung“ möglich
+    const art = lab('[data-k="art"]'); if (art && EX1) art.hidden = true; // nur „Digitale Prüfung“ möglich
     $$('.ki-step', el).forEach(x => { x.hidden = true; });
     const api = q('#kiApi'); if (api) api.hidden = true;
     const bar = document.createElement('div'); bar.className = 'ki-wiz';
@@ -2085,6 +2086,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     });
     const man = q('#kiManual'); if (man) man.hidden = true; // leer: alles ist jetzt auf den Seiten
     const go = n => {
+      const no2 = q('#kiWizNo2'); if (no2) { no2.hidden = !q('#kiMix').hidden || !q('#kiTypes').hidden; pages[1].querySelector('.ki-wintro').hidden = !no2.hidden; } // Lernpfad: Schritt 2 leer
       pages.forEach(p => { p.hidden = +p.dataset.wpage !== n; });
       $$('.ki-wstep', bar).forEach(b => { const k = +b.dataset.wgo; b.classList.toggle('on', k === n); b.classList.toggle('done', k < n); });
       el.scrollTop = 0; if (n === 4) setTimeout(() => q('#kiIn')?.focus(), 50);
@@ -2154,7 +2156,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         <div class="ki-btns"><button class="lp-btn" id="kiOpen" disabled>＋ Als ${W.neu} öffnen</button></div>
         </details>
       </div>`;
-    const goto = EX1 ? kiWizard(el) : null; // in Probe: Assistent in vier Schritten
+    const goto = kiWizard(el, EX1); // Assistent in vier Schritten
     const res = $('#kiRes', el), openB = $('#kiOpen', el);
     let imgCheck = Promise.resolve();
     let direct = false;
@@ -2854,7 +2856,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       ${ONLY_EXAM ? `<button data-k="ki"><b>${KI_ICON} Prüfung generieren</b><span>eine digitale Prüfung Schritt für Schritt von einer KI erstellen lassen</span></button>`
         : `<button data-k="ki"><b>${KI_ICON} Lernpfad, Challenge oder Prüfung erstellen</b><span>einen neuen Lernpfad, eine Challenge oder eine digitale Prüfung von einer KI schreiben lassen</span></button>`}
       <button data-k="exam"><b>${KI_ICON} Fragensammlung für ByCS generieren</b><span>aus dem offenen Lernpfad: Fragen für Moodle/ByCS (Moodle-XML)</span></button></div>`;
-    if (ONLY_EXAM) pop.insertAdjacentHTML('beforeend', '<button class="ki-menu-link" data-k="api">KI API Key verwenden</button>');
+    pop.insertAdjacentHTML('beforeend', '<button class="ki-menu-link" data-k="api">KI API Key verwenden</button>');
     document.body.appendChild(pop); placePop(e.currentTarget);
     pop.onclick = ev => { const k = ev.target.closest('[data-k]')?.dataset.k; if (!k) return; closePop(); if (k === 'ki') openKI(); else if (k === 'api') apiSettings(); else openExam(); };
   };
