@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-22a';
+const PF_BUILD = '2026-11-22b';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -561,7 +561,13 @@ export function startPathFinder(opts = {}) {
       h += `<section class="lp-station${s.id === curSid ? ' cur' : ''}${sg.first ? '' : ' lp-cont'}" id="st-${s.id}" data-sid="${s.id}">`;
       h += `<div class="lp-sh"><span class="lp-nr">${esc(s.nr || si + 1)}</span><div style="flex:1;min-width:0">${ce('$st.sub', s.sub, 'Untertitel der Station', { tag: 'small' })}${ce('$st.title', s.title, 'Titel der Station', { tag: 'h2', anim: s.anim, key: 'st:' + s.id })}</div>`
         + `<span class="ed-station-tools"><button data-sact="cfg" title="Station einstellen">⚙</button><button data-sact="up" title="Station nach oben">↑</button><button data-sact="down" title="Station nach unten">↓</button><button data-sact="del" title="Station löschen">🗑</button></span></div>`;
-      let open = false;
+      let open = false, stepHidden = false;
+      // Schrittweise aufdecken: eine Station wird erst frei, wenn die Station davor geschafft ist
+      const prevSt = si > 0 ? doc.stations[si - 1] : null;
+      if (s.step && prevSt?.step && !E() && !EXAMF() && !stationDone(prevSt)) {
+        h += `<div class="lp-lock step locked"><div class="lp-lock-note">🔒 Diese Station wird frei, sobald du Station ${esc(prevSt.nr || si)} geschafft hast.</div></div></section>`;
+        return;
+      }
       if (!sg.first && !EXAMF()) { // Fortsetzung auf neuer Seite: liegt eine Sperre davor, gilt sie hier weiter
         const k = s.blocks.indexOf(sg.blocks[0]), lk = s.blocks.slice(0, k).reverse().find(x => x.type === 'lock');
         if (lk) { const ref = findBlock(lk.after), isLocked = !!ref && isCheck(ref.b) && !prog.solved[lk.after]; h += `<div class="lp-lock${isLocked ? ' locked' : ''}"><div class="lp-lock-note">🔒 Geht weiter, sobald ${ref ? esc(blockLabel(ref.b)) : 'die Aufgabe'} gelöst ist.</div><div class="lp-lock-body">`; open = true; }
@@ -577,10 +583,11 @@ export function startPathFinder(opts = {}) {
           open = true; return;
         }
         h += blockHtml(b);
-        // Schrittweise aufdecken: nach jeder Aufgabe geht es erst weiter, wenn sie gelöst ist
-        if (s.step && !E() && !EXAMF() && isCheck(b) && sg.blocks.slice(i + 1).some(x => x.type !== 'page')) {
+        // Schrittweise aufdecken: nach jeder Aufgabe geht es erst weiter, wenn sie gelöst ist (ab der ersten offenen Aufgabe bleibt alles verborgen)
+        if (s.step && !E() && !EXAMF() && isCheck(b) && !stepHidden && sg.blocks.slice(i + 1).some(x => x.type !== 'page')) {
           if (open) h += '</div></div>';
-          h += `<div class="lp-lock step${prog.solved[b.id] ? '' : ' locked'}"><div class="lp-lock-note">⬇ Weiter geht es, sobald du ${esc(blockLabel(b))} gelöst hast.</div><div class="lp-lock-body">`;
+          const lk = !prog.solved[b.id]; if (lk) stepHidden = true;
+          h += `<div class="lp-lock step${lk ? ' locked' : ''}"><div class="lp-lock-note">⬇ Weiter geht es, sobald du die Aufgabe darüber gelöst hast.</div><div class="lp-lock-body">`;
           open = true;
         }
       });

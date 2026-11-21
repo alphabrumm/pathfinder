@@ -214,13 +214,14 @@ const CORE_SECTIONS = {
     qs.forEach(x => { if (x.opts.length < 2) H.err(S.line, `Frage „${x.q.slice(0, 30)}“ braucht mindestens zwei Antworten.`); else if (!x.opts.some(o => o.ok)) H.err(S.line, `Frage „${x.q.slice(0, 30)}“: keine Antwort mit [x] als richtig markiert.`); });
     return { type: 'quiz', qs, xp: S.num('xp', 10) };
   } },
-  lueckentext: { n: 'Lückentext', keys: ['wortbank', 'extra', 'frei', 'xp', 'punkte'], make(S, H) {
+  lueckentext: { n: 'Lückentext', keys: ['wortbank', 'extra', 'frei', 'hefteintrag', 'xp', 'punkte'], make(S, H) {
     const html = H.md(S.body); if (!/\[\[[^\]]+\]\]/.test(html)) H.err(S.line, 'Lückentext ohne Lücke – schreibe Lücken als [[Antwort]].');
     // Frei: ja → jede Wahl zählt (z. B. Hypothese); die Wortbank zeigt alle Möglichkeiten aus [[a|b|c]]
     const free = /^(ja|yes|true|an)$/i.test(S.one('frei') || '');
     const bank = free || /^(ja|yes|true|an)$/i.test(S.one('wortbank') || '') || !!S.one('extra');
     const b = { type: 'gap', title: S.title, sub: '', html, bank, extra: (S.one('extra') || '').split(/\s*[,;]\s*/).filter(Boolean), heft: false, xp: S.num('xp', 10) };
     if (free) b.free = true;
+    if (/^(ja|yes|true|an)$/i.test(S.one('hefteintrag') || '')) b.heft = true; // gestaltet wie eine Heftseite, Titel als Überschrift
     return b;
   } },
   zuordnen: { n: 'Zuordnen', keys: ['xp', 'punkte'], make(S, H) {
@@ -275,12 +276,12 @@ const CORE_SECTIONS = {
   experiment: { n: 'Experiment', keys: ['frage', 'hypothese', 'groesse', 'ergebnis', 'animation', 'untersuche', 'auswertung', 'extra', 'schlussfolgerung', 'xp', 'punkte'], make: (S, H) => parseExperiment(S, H, S.title) },
   // Widget: ### Widget: Experiment (wie oben) oder ### Widget: HTML mit eigenem ```html … ``` (läuft geschützt in einem Rahmen)
   widget: { n: 'Widget', fences: true, keys: ['frage', 'hypothese', 'groesse', 'ergebnis', 'animation', 'untersuche', 'auswertung', 'extra', 'schlussfolgerung', 'erledigt', 'hoehe', 'xp', 'punkte'], make(S, H) {
-    const [kind, ...rest] = String(S.title || '').split(/\s*[|–-]\s+|\s*:\s*/); const k = norm(kind);
+    const tm = String(S.title || '').trim().match(/^([^|:–]+?)(?:\s*[|:–]\s*(.*))?$/) || [], kind = (tm[1] || '').trim(), rest = [tm[2] || '']; const k = norm(kind);
     if (k === 'experiment' || k === 'versuch') return parseExperiment(S, H, rest.join(' ').trim());
     if (k === 'html' || k === 'eigenes' || k === 'eigen' || !k) {
       const code = (S.code.find(c => /^html?$/.test(c.lang)) || S.code[0] || {}).code || '';
       if (!code.trim()) H.err(S.line, 'Widget „HTML“ ohne Inhalt – schreibe das HTML in einen Block ```html … ```.');
-      const b = { type: 'widget', kind: 'html', title: rest.join(' ').trim(), html: H.md(S.body), code, h: Math.max(80, Math.min(2000, parseInt(S.one('hoehe')) || 0)) || 0, xp: S.num('xp', 10) };
+      const b = { type: 'widget', kind: 'html', title: rest.join(' ').trim(), html: H.md(S.body), code, h: parseInt(S.one('hoehe')) > 0 ? Math.max(80, Math.min(2000, parseInt(S.one('hoehe')))) : 0, xp: S.num('xp', 10) };
       if (/^(ja|yes|true|an)$/i.test(S.one('erledigt') || '')) b.check = true;
       return b;
     }
@@ -553,7 +554,7 @@ export function docToText(doc, env, out = {}) {
         case 'task': L.push(`### Aufgabe: ${md(b.title)}`, md(b.html)); if (b.answer) L.push(`Antwort: ${b.answer}`); if (b.img) L.push(`Bild: ${ref(b.img, 'bild')}`); (b.tips || []).forEach((t, i) => L.push(`Tipp${b.tipsHide?.[i] ? ' (verborgen)' : ''}: ${md(t)}`)); if (b.solution) L.push(`Lösung${b.solHide ? ' (verborgen)' : ''}: ${md(b.solution).replace(/\n+/g, ' ')}`); if (doc.form !== 'pruefung') L.push(`XP: ${b.xp}`); break;
         case 'essay': L.push(`### Freitext: ${md(b.title)}`, md(b.html)); if (b.img) L.push(`Bild: ${ref(b.img, 'bild')}`); (b.rubric || []).forEach(r => L.push(`Erwartung: ${r.t} (${String(r.p).replace('.', ',')})`)); if ((b.lines || 6) !== 6) L.push(`Zeilen: ${b.lines}`); break;
         case 'quiz': L.push('### Quiz'); b.qs.forEach(q => { L.push(`? ${md(q.q)}`); q.opts.forEach(o => L.push(`[${o.ok ? 'x' : ' '}] ${md(o.t)}${o.fb ? ' // ' + md(o.fb) : ''}`)); }); break;
-        case 'gap': L.push(`### Lückentext${b.title ? ': ' + md(b.title) : ''}`, md(b.html)); if (b.free) L.push('Frei: ja'); else if (b.bank) L.push('Wortbank: ja'); if (b.extra?.length) L.push(`Extra: ${b.extra.join(', ')}`); break;
+        case 'gap': L.push(`### Lückentext${b.title ? ': ' + md(b.title) : ''}`, md(b.html)); if (b.free) L.push('Frei: ja'); else if (b.bank) L.push('Wortbank: ja'); if (b.heft) L.push('Hefteintrag: ja'); if (b.extra?.length) L.push(`Extra: ${b.extra.join(', ')}`); break;
         case 'match': L.push(`### Zuordnen: ${md(b.title)}`, ...b.pairs.map(p => `${p.a} -> ${p.b}`)); break;
         case 'mark': L.push(`### Markieren: ${md(b.title)}`, md(b.html)); break;
         case 'sort': L.push(`### Sortieren: ${md(b.title)}`, ...(b.groups || []).map(g => `${g.name}: ${(g.items || []).join(', ')}`)); break;
@@ -685,6 +686,7 @@ XP: 20
 Satz mit [[Lücke]] und [[Antwort|andere erlaubte Antwort]].
 Wortbank: ja            (optional: Begriffe zum Ziehen)
 Extra: Ablenker, Ablenker   (optional: falsche Begriffe in der Wortbank)
+Hefteintrag: ja         (optional: gestaltet wie eine Heftseite mit dem Titel als Überschrift – gut für einen Screenshot ins Heft)
 Frei: ja                (optional, z. B. für eine Hypothese: jede Wahl zählt; die Wortbank zeigt alle Möglichkeiten aus [[a|b|c]])
 
 ### Zuordnen: Ordne zu

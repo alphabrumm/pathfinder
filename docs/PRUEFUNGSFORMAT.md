@@ -1,6 +1,6 @@
 # Prüfungsformat für Probe
 
-> Automatisch erzeugt mit `node tools/doku.mjs` aus `core/pftext.js` (PathFinder 2026-11-22a). Nicht von Hand ändern.
+> Automatisch erzeugt mit `node tools/doku.mjs` aus `core/pftext.js` (PathFinder 2026-11-22b). Nicht von Hand ändern.
 
 Prüfungen für [Probe](https://github.com/alphabrumm/probe) sind Texte im **PathFinder-Textformat** mit `Art: Prüfung`.
 Jede KI kann sie schreiben; Probe liest sie ohne Nacharbeit ein. Der Claude-Skill „probe-pruefung“
@@ -129,6 +129,7 @@ XP: 20
 Satz mit [[Lücke]] und [[Antwort|andere erlaubte Antwort]].
 Wortbank: ja            (optional: Begriffe zum Ziehen)
 Extra: Ablenker, Ablenker   (optional: falsche Begriffe in der Wortbank)
+Hefteintrag: ja         (optional: gestaltet wie eine Heftseite mit dem Titel als Überschrift – gut für einen Screenshot ins Heft)
 Frei: ja                (optional, z. B. für eine Hypothese: jede Wahl zählt; die Wortbank zeigt alle Möglichkeiten aus [[a|b|c]])
 
 ### Zuordnen: Ordne zu

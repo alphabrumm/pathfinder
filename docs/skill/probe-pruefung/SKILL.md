@@ -5,7 +5,7 @@ description: Digitale Prüfungen für Probe (probe.pandapy.de) im PathFinder-Tex
 
 # Probe-Prüfungen
 
-Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-22a). Die Spezifikation unten ist dieselbe, die Probe
+Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-22b). Die Spezifikation unten ist dieselbe, die Probe
 als „Prompt für externe KI“ anzeigt. Weicht etwas vom aktuellen Probe-Verhalten ab, gilt der Code in alphabrumm/pathfinder
 (`core/pftext.js`, `core/pfsplit.js`).
 
@@ -127,6 +127,7 @@ XP: 20
 Satz mit [[Lücke]] und [[Antwort|andere erlaubte Antwort]].
 Wortbank: ja            (optional: Begriffe zum Ziehen)
 Extra: Ablenker, Ablenker   (optional: falsche Begriffe in der Wortbank)
+Hefteintrag: ja         (optional: gestaltet wie eine Heftseite mit dem Titel als Überschrift – gut für einen Screenshot ins Heft)
 Frei: ja                (optional, z. B. für eine Hypothese: jede Wahl zählt; die Wortbank zeigt alle Möglichkeiten aus [[a|b|c]])
 
 ### Zuordnen: Ordne zu
