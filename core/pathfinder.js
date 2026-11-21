@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-21b';
+const PF_BUILD = '2026-11-21c';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -62,6 +62,9 @@ const PAL_ICONS = {
 /* Stil „Hack“ (intern 'grid'; wie die FlowPad-Challenges des Informatik-9-Kurses): immer dunkel, Raster-Kopf mit grün
    leuchtendem Pixel-Totenkopf (Standard-Kopfbild), Aufgabenkarten mit farbiger Kante und Pixel-Schild „#1 · FORMEL“.
    Ersetzt Farbpalette und Hell/Dunkel. */
+/** Bild-Adresse für CSS url(…) ohne Anführungszeichen: Klammern, Anführungszeichen, Leerzeichen und \ prozent-kodieren –
+ *  SVGs der KI enthalten fast immer „url(#verlauf)“, „translate(…)“ o. Ä., die sonst die CSS-Angabe vorzeitig beenden. */
+const cssUrl = s => String(s).replace(/[()'"\s\\]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
 const HACK_SKULL = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges"><path fill="#5fe08a" d="M4 2h8v1h1v1h1v5h-1v2h-2v2H5v-2H3V9H2V4h1V3h1zM5 6v2h2V6zm4 0v2h2V6zM7 9v1h2V9zM6 12h1v1H6zm3 0h1v1H9z"/></svg>');
 export const GRID_THEME = {
   hell: { bg: '#f5f3fb', surface: '#fff', 'surface-2': '#efebf8', ink: '#1d1a2e', 'ink-2': '#625c78', line: '#e2dcef', a1: '#3b63c4', a1s: '#c9d6f5', a2: '#c2477f', a2s: '#f5cfe0', a3: '#f6cf45', a3d: '#c99a06', a3s: '#fdf3c8', a3ink: '#2b2300', g1: '#15122a', g2: '#15122a', g3: '#15122a', heroink: '#eef', good: '#1f8f55', bad: '#c23b3b' },
@@ -482,7 +485,7 @@ export function startPathFinder(opts = {}) {
     const logo = (ownImg ? `<img src="${d.heroImg}" alt="">` : hackImg ? `<img src="${HACK_SKULL}" alt="">` : appLogo) + (d.hero === 'gross' && lines.length ? `<div class="lp-typing">${E() ? esc(lines.join('\n')) : ''}</div>` : '');
     let h = `<div class="fontsize"><button data-fz="-" aria-label="Schrift kleiner">A−</button><button data-fz="+" aria-label="Schrift größer">A+</button></div>`;
     const goals = doc.goals || [];
-    h += `<header class="lp-hero${d.hero === 'hintergrund' && d.heroImg ? ' has-bg' : ''}${d.hero === 'gross' && d.heroImg ? ' big' : ''}"${d.hero === 'hintergrund' && d.heroImg ? ` style="background-image:url(${d.heroImg})"` : ''}>`
+    h += `<header class="lp-hero${d.hero === 'hintergrund' && d.heroImg ? ' has-bg' : ''}${d.hero === 'gross' && d.heroImg ? ' big' : ''}"${d.hero === 'hintergrund' && d.heroImg ? ` style="background-image:url(${cssUrl(d.heroImg)})"` : ''}>`
       + (d.hero !== 'hintergrund' ? `<div class="lp-logo${d.hero === 'logo' && opts.logo && !hackImg ? ' applogo' : ''}${(d.hero !== 'logo' && d.heroImg) || hackImg ? ' own' : ''}"${E() ? ' title="Antippen: eigenes Bild oder GIF setzen"' : ''}>${logo}</div>` : '')
       + `<div class="lp-herotxt" style="min-width:0">${ce('$kicker', doc.kicker, 'Kopfzeile, z. B. Fach · Jahrgangsstufe', { tag: 'small' })}${ce('$title', doc.title, EXAMF() ? 'Titel der Prüfung' : 'Titel des Lernpfads', { tag: 'h1', anim: doc.anim?.title })}${ce('$subtitle', doc.subtitle, 'Untertitel', { tag: 'p', rich: true, anim: doc.anim?.subtitle })}`
       + (goals.length ? `<ul class="lp-goals">${goals.map((g, i) => ce('$goals.' + i, g, 'Lernziel', { tag: 'li', rich: true })).join('')}</ul>` : '')
