@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-21e';
+const PF_BUILD = '2026-11-21f';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1306,7 +1306,7 @@ export function startPathFinder(opts = {}) {
     if (single) return;
     const top = scroller.getBoundingClientRect().top + ($('.lp-trail, .pf-skin.editing .trail', lp)?.offsetHeight || 0) + 40;
     let cur = null; for (const s of $$('.lp-station', lp)) { if (s.getBoundingClientRect().top <= top) cur = s.dataset.sid; }
-    cur = cur || doc.stations[0]?.id;
+    cur = cur || $('.lp-station', lp)?.dataset.sid || doc.stations[0]?.id; // ganz oben: erste Station dieser Seite
     if (cur && cur !== curSid) { curSid = cur; if (mode === 'preview') prog.visited[cur] = 1; $$('.lp-station', lp).forEach(s => s.classList.toggle('cur', s.dataset.sid === cur)); $$('#stops a', lp).forEach(a => a.classList.toggle('cur', a.dataset.sid === cur)); $('#stops a.cur', lp)?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
   }, { passive: true });
 
