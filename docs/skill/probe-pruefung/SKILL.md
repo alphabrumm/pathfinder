@@ -5,7 +5,7 @@ description: Digitale Prüfungen für Probe (probe.pandapy.de) im PathFinder-Tex
 
 # Probe-Prüfungen
 
-Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-21c). Die Spezifikation unten ist dieselbe, die Probe
+Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-21d). Die Spezifikation unten ist dieselbe, die Probe
 als „Prompt für externe KI“ anzeigt. Weicht etwas vom aktuellen Probe-Verhalten ab, gilt der Code in alphabrumm/pathfinder
 (`core/pftext.js`, `core/pfsplit.js`).
 
@@ -89,6 +89,7 @@ Ziele:
 Kopfbild: anhang:logo          (optional, Bild aus dem Anhang)
 Kopfbild-Art: klein | groß | Hintergrund
 Titel-Animation: tippen | einblenden | glitch | leuchten   (optional, ebenso Untertitel-Animation)
+Seiten: Stationen              (optional: jede Station auf einer eigenen Seite mit „Weiter“ und „Zurück“)
 
 ## Station: Titel der Station | kurze Unterzeile
 Animation: einblenden          (optional, direkt nach der Stationszeile: Animation des Stationstitels)
@@ -184,6 +185,7 @@ Programmcode (Sprache nach den drei Backticks)
 | Zelle | Zelle |
 
 --- Sperre ---          (alles danach in der Station erst frei, wenn die Aufgabe davor gelöst ist)
+--- Seite ---           (Seitenumbruch: ab hier eine neue Seite mit „Weiter“ und „Zurück“; Kopf und Stationstitel stehen auf jeder Seite)
 
 ## Anhang               (immer ganz am Ende, im selben Textblock: Bilder, auf die oben mit anhang:name verwiesen wird)
 diagramm: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 160">

@@ -1,7 +1,7 @@
 # PathFinder – Lernpfade bauen
 
 PathFinder ist ein Editor für interaktive Lernpfade: Stationen mit Texten, Infokästen, Bildern, Aufgaben,
-Quiz, Lückentexten, Zuordnungen, Sperren und Zertifikat – direkt im Browser bearbeitet, so wie die Schüler
+Quiz, Lückentexten, Zuordnungen, Sperren, Seiten (Weiter/Zurück) und Zertifikat – direkt im Browser bearbeitet, so wie die Schüler
 die Seite später sehen. Gebaut für das iPad (mit oder ohne Tastatur).
 
 * **Alles lokal:** kein Login, kein Server, keine Daten an Dritte. Lernpfade werden im Browser gespeichert.

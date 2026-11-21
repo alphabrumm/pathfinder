@@ -157,7 +157,7 @@ export function splitExam(doc) {
   const d = ensureKeys(clone(doc)), warnings = [], tasks = [];
   const student = {
     v: d.v, id: d.id, form: 'pruefung', design: d.design, kicker: d.kicker || '', title: d.title || '', subtitle: d.subtitle || '',
-    goals: [], rank: '', anim: d.anim || {}, typeLines: d.typeLines || [], pointsOn: true,
+    goals: [], rank: '', anim: d.anim || {}, typeLines: d.typeLines || [], pointsOn: true, ...(d.pages === 'stationen' ? { pages: 'stationen' } : {}),
     cert: { ...(d.cert || {}), on: false }, exam: { student: true }, stations: []
   };
   for (const s of d.stations || []) {
@@ -210,6 +210,8 @@ export function splitExam(doc) {
         if (appMode(t) === 'free') warnings.push(`${title}: ohne erwartete Ausgabe, Pflicht-Code oder Erwartungshorizont – du bewertest sie nach der Abgabe von Hand.`);
       } else if (SAFE_TYPES.has(b.type) || b.type === 'heading') {
         const c = clone(b); delete c.anim; out.blocks.push(c);
+      } else if (b.type === 'page') {
+        out.blocks.push({ id: b.id, type: 'page' }); // Seitenumbruch
       } else if (b.type === 'lock') {
         // Sperren gibt es in Prüfungen nicht
       } else warnings.push(`Baustein „${b.type}“ wird in Prüfungen nicht unterstützt und fehlt in der Schülerfassung.`);

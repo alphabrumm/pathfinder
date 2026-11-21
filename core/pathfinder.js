@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-21c';
+const PF_BUILD = '2026-11-21d';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -105,6 +105,7 @@ const CORE = {
   essay: { n: 'Freitext', ic: '✍', g: 'Aufgaben', h: 'offene Antwort mit Erwartungshorizont – nur in Prüfungen', exam: true, make: () => ({ title: '', html: '', img: '', lines: 6, rubric: [], pts: 4 }) },
   app: { n: 'Programmieren in JPad', ic: '☕', g: 'Aufgaben', h: 'Schüler programmieren in JPad; Ausgabe und Pflicht-Code werden geprüft – nur in Prüfungen', exam: true, make: () => ({ app: 'jpad', title: '', html: '', img: '', files: [{ name: 'Hauptprogramm', text: '' }], expect: '', compare: 'enthaelt', needs: [], rubric: [], solution: '', pts: 4 }) },
   lock: { n: 'Sperre', ic: '🔒', g: 'Ablauf', h: 'Ab hier erst frei, wenn … gelöst', make: () => ({ after: '' }) },
+  page: { n: 'Nächste Seite', ic: '📄', g: 'Ablauf', h: 'Ab hier eine neue Seite mit „Weiter“ und „Zurück“', make: () => ({}) },
 };
 const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order', 'app']);
 const APP_INFO = { jpad: ['JPad', '☕', 'java'], qpad: ['QPad', '🗄', 'sql'], flowpad: ['FlowPad', '🔀', 'text'] };
@@ -329,7 +330,25 @@ export function startPathFinder(opts = {}) {
     if (!doc) doc = migrate(sample());
   }
   if (!PLAYER && !formOk(doc.form)) { startHere = true; doc = migrate(emptyDoc(FORMS_OK[0])); }
-  let mode = PLAYER ? 'preview' : 'edit', selId = null, curSid = null, single = false, fz = 1;
+  let mode = PLAYER ? 'preview' : 'edit', selId = null, curSid = null, single = false, fz = 1, pageNo = null;
+  /** Seiten für Schüler und Vorschau: Liste von Seiten, jede eine Liste von Stationsteilen { s, blocks, first, last }.
+   *  Neue Seite bei jedem Baustein „Nächste Seite“ und – mit „Stationen auf eigene Seiten“ – bei jeder Station. null = alles auf einer Seite (und immer im Bearbeitungsmodus). */
+  function pagesNow() {
+    if (E() || doc.skin) return null;
+    const byS = doc.pages === 'stationen', pages = [[]]; let brk = false, cur = null;
+    const newPage = () => { if (pages[pages.length - 1].length) pages.push([]); };
+    doc.stations.forEach((s, si) => {
+      if (si > 0 && (byS || brk)) newPage(); brk = false;
+      cur = { s, blocks: [], first: true, last: true }; pages[pages.length - 1].push(cur);
+      for (const b of s.blocks) {
+        if (b.type === 'page') { if (cur.blocks.length) brk = true; continue; } // leere Seiten gibt es nicht
+        if (brk) { newPage(); cur.last = false; cur = { s, blocks: [], first: false, last: true }; pages[pages.length - 1].push(cur); brk = false; }
+        cur.blocks.push(b);
+      }
+    });
+    return pages.length > 1 ? pages : null;
+  }
+  const pageOfSid = (PG, sid) => PG.findIndex(p => p.some(sg => sg.s.id === sid));
   let aiEl = null, aiLog = [], aiDraft = '', aiSt = '', aiBk = ''; // KI-Assistent (schwebendes Fenster): gewählte Station ('*' = alles) und Baustein ('*' = ganze Station)
   let hist = [JSON.stringify(doc)], fut = [], pending = null;
   const freshProg = () => ({ solved: {}, quiz: {}, tips: {}, sol: {}, visited: {}, tries: {}, ans: {}, start: Date.now(), active: 0 });
@@ -376,7 +395,7 @@ export function startPathFinder(opts = {}) {
   function undo() { if (pending) commit(); if (hist.length < 2) return; fut.push(hist.pop()); doc = JSON.parse(hist[hist.length - 1]); save(); render(); updUndo(); drawPanel?.(); aiSync(); }
   function redo() { if (!fut.length) return; const s = fut.pop(); hist.push(s); doc = JSON.parse(s); save(); render(); updUndo(); drawPanel?.(); }
   function updUndo() { if (!$('#bUndo')) return; $('#bUndo').disabled = hist.length < 2; $('#bRedo').disabled = !fut.length; }
-  function openDoc(d) { if (!PLAYER && d.form !== 'pruefung' && (convertNext || (!formOk(d.form) && formOk('pruefung')))) { const r = toExam(d); d = r.d; setTimeout(() => toast(examTakenMsg(r), 5000), 60); } convertNext = false; if (pending) commit(); if (panelOpen) { panelWhat = 'design'; hidePanel(); } doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); selId = null; curSid = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; drawPanel(); aiSync(); }
+  function openDoc(d) { if (!PLAYER && d.form !== 'pruefung' && (convertNext || (!formOk(d.form) && formOk('pruefung')))) { const r = toExam(d); d = r.d; setTimeout(() => toast(examTakenMsg(r), 5000), 60); } convertNext = false; if (pending) commit(); if (panelOpen) { panelWhat = 'design'; hidePanel(); } doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); selId = null; curSid = null; pageNo = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; drawPanel(); aiSync(); }
 
   function findBlock(id) {
     for (const st of doc.stations) { const i = st.blocks.findIndex(b => b.id === id); if (i >= 0) return { st, i, b: st.blocks[i] }; }
@@ -479,6 +498,10 @@ export function startPathFinder(opts = {}) {
     lp.classList.toggle('exam-done', EXAM_DONE() && !E());
     lp.classList.toggle('single-station', single);
     if (!curSid || !doc.stations.some(s => s.id === curSid)) curSid = doc.stations[0]?.id;
+    const PG = pagesNow();
+    if (PG) { const k = pageOfSid(PG, curSid); if (pageNo == null || pageNo >= PG.length || (k >= 0 && !PG[pageNo].some(sg => sg.s.id === curSid))) pageNo = Math.max(0, k); }
+    const lastPage = !PG || pageNo === PG.length - 1;
+    lp.classList.toggle('paged', !!PG);
     const d = doc.design, lines = doc.typeLines || [];
     const appLogo = opts.logo ? `<img src="${opts.logo}" alt="">` : esc(appName[0]);
     const ownImg = (d.hero === 'bild' || d.hero === 'gross') && d.heroImg, hackImg = d.theme === 'grid' && !ownImg && d.hero !== 'hintergrund';
@@ -496,13 +519,19 @@ export function startPathFinder(opts = {}) {
     gridNo = null; if (d.theme === 'grid') { gridNo = new Map(); let n = 0; for (const st of doc.stations) for (const b of st.blocks) if (isCheck(b)) gridNo.set(b.id, ++n); }
     h += `<main class="lp-main">`;
     if (doc.form === 'challenge') { const x = xpNow(), mx = xpMax() || 1; h += `<div class="lp-hud"><span>⚡ ${x} XP</span><span class="bar"><i style="width:${Math.round(100 * x / mx)}%"></i></span><span>von ${mx}</span></div>`; }
-    doc.stations.forEach((s, si) => {
-      h += `<section class="lp-station${s.id === curSid ? ' cur' : ''}" id="st-${s.id}" data-sid="${s.id}">`;
+    (PG ? PG[pageNo] : doc.stations.map(s => ({ s, blocks: s.blocks, first: true, last: true }))).forEach(sg => {
+      const s = sg.s, si = doc.stations.indexOf(s);
+      h += `<section class="lp-station${s.id === curSid ? ' cur' : ''}${sg.first ? '' : ' lp-cont'}" id="st-${s.id}" data-sid="${s.id}">`;
       h += `<div class="lp-sh"><span class="lp-nr">${esc(s.nr || si + 1)}</span><div style="flex:1;min-width:0">${ce('$st.sub', s.sub, 'Untertitel der Station', { tag: 'small' })}${ce('$st.title', s.title, 'Titel der Station', { tag: 'h2', anim: s.anim, key: 'st:' + s.id })}</div>`
         + `<span class="ed-station-tools"><button data-sact="cfg" title="Station einstellen">⚙</button><button data-sact="up" title="Station nach oben">↑</button><button data-sact="down" title="Station nach unten">↓</button><button data-sact="del" title="Station löschen">🗑</button></span></div>`;
       let open = false;
-      s.blocks.forEach((b, i) => {
+      if (!sg.first && !EXAMF()) { // Fortsetzung auf neuer Seite: liegt eine Sperre davor, gilt sie hier weiter
+        const k = s.blocks.indexOf(sg.blocks[0]), lk = s.blocks.slice(0, k).reverse().find(x => x.type === 'lock');
+        if (lk) { const ref = findBlock(lk.after), isLocked = !!ref && isCheck(ref.b) && !prog.solved[lk.after]; h += `<div class="lp-lock${isLocked ? ' locked' : ''}"><div class="lp-lock-note">🔒 Geht weiter, sobald ${ref ? esc(blockLabel(ref.b)) : 'die Aufgabe'} gelöst ist.</div><div class="lp-lock-body">`; open = true; }
+      }
+      sg.blocks.forEach((b, i) => {
         if (E()) h += plus(s.id, i);
+        if (b.type === 'page' && !E()) return;
         if (b.type === 'lock' && EXAMF()) { if (E()) h += blockHtml(b); return; } // Sperren gibt es in Prüfungen nicht
         if (b.type === 'lock' && !E()) {
           if (open) h += '</div></div>';
@@ -514,12 +543,13 @@ export function startPathFinder(opts = {}) {
       });
       if (open) h += '</div></div>';
       if (E()) h += plus(s.id, s.blocks.length);
-      if (s.check && !EXAMF()) { const ok = !!prog.solved['st:' + s.id]; h += `<label class="lp-done${ok ? ' ok' : ''}"><input type="checkbox" data-sdone="${s.id}"${ok ? ' checked' : ''}${E() ? ' disabled' : ''}> Station erledigt</label>`; }
+      if (s.check && !EXAMF() && sg.last) { const ok = !!prog.solved['st:' + s.id]; h += `<label class="lp-done${ok ? ' ok' : ''}"><input type="checkbox" data-sdone="${s.id}"${ok ? ' checked' : ''}${E() ? ' disabled' : ''}> Station erledigt</label>`; }
       h += `</section>`;
     });
     if (E()) h += `<button class="ed-add-station" data-act="addStation">＋ Neue Station</button>`;
-    if (EXAMF()) h += examFootHtml();
-    else if (doc.cert.on || E()) h += certHtml();
+    if (lastPage && EXAMF()) h += examFootHtml();
+    else if (lastPage && (doc.cert.on || E())) h += certHtml();
+    if (PG) h += `<nav class="lp-pager">${pageNo > 0 ? '<button class="lp-btn alt" data-pg="-1">‹ Zurück</button>' : '<span></span>'}<span class="lp-pgno">Seite ${pageNo + 1} von ${PG.length}</span>${lastPage ? '<span></span>' : '<button class="lp-btn" data-pg="1">Weiter ›</button>'}</nav>`;
     h += `</main><footer class="lp-foot">${doc.form === 'challenge' ? 'Challenge' : EXAMF() ? 'Digitale Prüfung' : 'Lernpfad'} · läuft komplett im Browser${scorm?.ok ? ' · Fortschritt wird in der Lernplattform gespeichert' : ''}</footer>`;
     lp.innerHTML = h;
     runAnims();
@@ -732,6 +762,7 @@ export function startPathFinder(opts = {}) {
         return wrap(b, sortCard(b, false));
       case 'order': if (E()) return wrap(b, `<div class="lp-card lp-order ${b.words ? 'words' : 'paras'}">${ce('title', b.title, b.words ? 'Satzpuzzle' : 'Reihenfolge', { tag: 'b', cls: 'lp-ctitle' })}${xpTag(b)}<div class="oarea">${(b.items || []).map((t, i) => `<span class="gchip ochip${b.words ? '' : ' para'}">${b.words ? esc(t) : `<i>${i + 1}</i>${t}`}</span>`).join('')}</div><div class="ed-hint">Richtige Reihenfolge – Schüler sehen die Teile gemischt.${(b.alts || []).length ? ` ${b.alts.length} weitere richtige Reihenfolge${b.alts.length > 1 ? 'n' : ''}.` : ''} Teile über ⚙.</div></div>`);
         return wrap(b, orderCard(b, false));
+      case 'page': return wrap(b, `<div class="lp-pagebreak"><span>📄 Nächste Seite</span></div>`);
       case 'lock': { const ref = findBlock(b.after); return wrap(b, `<div class="lp-card" style="border-style:dashed;text-align:center;color:var(--ink-2)">🔒 <b>Sperre</b> – alles darunter in dieser Station wird erst frei, wenn <b>${ref ? esc(blockLabel(ref.b)) : '<i>(noch keine Aufgabe gewählt – ⚙)</i>'}</b> gelöst ist.</div>`); }
       case 'code': return wrap(b, `<div class="lp-card lp-code"><b class="lp-ctitle">${esc(b.file || 'Code')}</b> ${b.file ? '' : `<span style="color:var(--ink-2);font-size:.85em">${esc(b.lang)}</span>`}${E() ? `<pre contenteditable="true" data-f="code" data-ph="Code …" spellcheck="false">${esc(b.code)}</pre>` : `<pre class="hl">${highlightCode(b.code || '', b.lang)}</pre>`}${b.nocopy ? (E() ? '<div class="ed-hint">ohne Knopf – nur zum Anschauen (⚙)</div>' : '') : `<button class="lp-btn alt" data-run="copy">⧉ ${esc(host.copyLabel || 'Kopieren')}</button>`}</div>`);
       case 'uml': return wrap(b, `<div class="lp-uml">${ce('name', b.name, 'Klassenname', { tag: 'div', cls: 'un' })}<div class="us">${(b.attrs || []).map(a => `<div>${esc(a)}</div>`).join('') || '<div>&nbsp;</div>'}</div><div class="us">${(b.methods || []).map(a => `<div>${esc(a)}</div>`).join('') || '<div>&nbsp;</div>'}</div></div>${E() ? '<div class="ed-hint">Attribute und Methoden über ⚙</div>' : ''}`);
@@ -989,7 +1020,8 @@ export function startPathFinder(opts = {}) {
     if (E() && t.closest('.lp-logo, .lp-hero.has-bg') && !t.closest('[data-f]')) { openDesign(); return; }
     const skst = t.closest('[data-skst]'); if (skst) { goStation(skst.dataset.skst, true); return; }
     const fzb = t.closest('[data-fz]'); if (fzb) { fz = Math.min(1.5, Math.max(.8, +(fz + (fzb.dataset.fz === '+' ? .1 : -.1)).toFixed(2))); lp.style.setProperty('--fz', fz); return; }
-    const stop = t.closest('#stops a'); if (stop) { if (stop.dataset.sid === 'cert') { $('#st-cert')?.scrollIntoView({ behavior: 'smooth' }); return; } goStation(stop.dataset.sid, true); return; }
+    const pgb = t.closest('[data-pg]'); if (pgb && !E()) { const PG = pagesNow(); if (PG) { pageNo = Math.min(PG.length - 1, Math.max(0, (pageNo || 0) + +pgb.dataset.pg)); curSid = PG[pageNo][0].s.id; if (mode === 'preview') prog.visited[curSid] = 1; render(); scroller.scrollTop = 0; } return; }
+    const stop = t.closest('#stops a'); if (stop) { if (stop.dataset.sid === 'cert') { const PG = pagesNow(); if (PG && pageNo !== PG.length - 1) { pageNo = PG.length - 1; curSid = PG[pageNo][0].s.id; render(); } $('#st-cert')?.scrollIntoView({ behavior: 'smooth' }); return; } goStation(stop.dataset.sid, true); return; }
     const sd = t.closest('[data-sdone]'); if (sd && !E()) { prog.solved['st:' + sd.dataset.sdone] = sd.checked; render(); return; }
     const act = t.closest('[data-act]');
     if (act) {
@@ -1263,6 +1295,7 @@ export function startPathFinder(opts = {}) {
   function goStation(sid, smooth) {
     curSid = sid;
     if (single) { render(); scroller.scrollTop = 0; return; }
+    const PG = pagesNow(); if (PG) { const k = pageOfSid(PG, sid); if (k >= 0 && k !== pageNo) { pageNo = k; render(); if (PG[k][0].s.id === sid) { scroller.scrollTop = 0; return; } } }
     $$('.lp-station', lp).forEach(s => s.classList.toggle('cur', s.dataset.sid === sid));
     $$('#stops a', lp).forEach(a => a.classList.toggle('cur', a.dataset.sid === sid));
     const el = $(`#st-${sid}`, lp); if (el) scroller.scrollTo({ top: el.offsetTop - ($('.lp-trail, .pf-skin.editing .trail', lp)?.offsetHeight || 0) - 4, behavior: smooth ? 'smooth' : 'auto' });
@@ -1494,6 +1527,7 @@ export function startPathFinder(opts = {}) {
         ${seg('form', [['lernpfad', 'Lernpfad'], ['challenge', 'Challenge'], ['pruefung', 'Digitale Prüfung']].filter(([v]) => formOk(v)), doc.form)}
         <span class="help">${doc.form === 'challenge' ? 'Challenge: mit XP-Leiste und Rang – spielerisch.' : EXAMF() ? 'Digitale Prüfung: Punkte für jede Aufgabe, keine Tipps, Lösungen oder Sperren. Schüler sehen keine Rückmeldung; bewertet wird nach der Abgabe. Aufgaben ohne Ergebnis und Freitexte bewertest du selbst.' : 'Lernpfad: Stationen der Reihe nach, ruhig und übersichtlich.'}</span>
         ${EXAMF() ? '' : `<label class="chk"><input type="checkbox" id="ptsIn"${doc.pointsOn ? ' checked' : ''}>Punkte für Aufgaben vergeben</label><span class="help">Die Punkte stehen links neben jeder Aufgabe, lassen sich dort anpassen und zählen im SCORM-Lernpaket.</span>`}
+        <label class="chk"><input type="checkbox" id="pagesIn"${doc.pages === 'stationen' ? ' checked' : ''}>Stationen auf eigene Seiten</label><span class="help">Schüler sehen jede Station auf einer eigenen Seite und blättern mit „Weiter“ und „Zurück“. Weitere Seitenumbrüche: Baustein „Nächste Seite“ (＋ unter einem Baustein).</span>
         </fieldset>
         <fieldset><legend>Aussehen</legend>
         <label>Farbpalette <span class="help">${d.theme === 'grid' ? 'Hack · immer dunkel' : esc(PALETTES[d.pal].n) + ' · ' + (scheme() === 'dunkel' ? 'dunkler' : 'heller') + ' Modus'}</span></label><div class="ed-sw">${PALETTES.map((p, i) => { const c = scheme() === 'dunkel' ? p.d || p.l : p.l, on = d.theme !== 'grid' && i === d.pal; return PAL_ICONS[p.fx] ? `<button class="ic" data-pal="${i}" title="${esc(p.n)}" aria-pressed="${on}">${PAL_ICONS[p.fx]}</button>` : `<button data-pal="${i}" title="${esc(p.n)}" aria-pressed="${on}" style="background:${c.bg}"><span style="background:${c.a1}"></span><span style="background:${c.a2}"></span><span style="background:${c.a3}"></span></button>`; }).join('')}<button class="ic" data-hack="1" title="Hack (immer dunkel)" aria-pressed="${d.theme === 'grid'}">${PAL_ICONS.hack}</button></div>
@@ -1538,6 +1572,7 @@ ${d.theme === 'grid' ? `<span class="help">„Hack“: immer dunkel, Raster-Kopf
       if (t.id === 'linesIn') { doc.typeLines = t.value.split('\n').filter(x => x.trim()); animDone.delete('$lines'); render(); }
       if (t.id === 'patIn') { if (t.value.trim()) { doc.design.pattern = t.value.trim(); render(); $$('[data-pat]', el).forEach(x => x.setAttribute('aria-pressed', 'false')); } }
       if (t.id === 'ptsIn') { doc.pointsOn = t.checked; render(); }
+      if (t.id === 'pagesIn') { if (t.checked) doc.pages = 'stationen'; else delete doc.pages; render(); }
       if (t.id === 'patK') { doc.design.patDensity = +t.value; applyDesign(); }
       if (t.id === 'divColIn') { doc.design.divColor = t.value; applyDesign(); $$('[data-divpal]', el).forEach(x => x.setAttribute('aria-pressed', 'false')); t.closest('.ed-color')?.setAttribute('aria-pressed', 'true'); }
       if (t.id === 'patO') { doc.design.patOpacity = +t.value; applyDesign(); }
@@ -1709,7 +1744,7 @@ ${d.theme === 'grid' ? `<span class="help">„Hack“: immer dunkel, Raster-Kopf
   const aiStOpts = () => opt2('', '–', aiSt) + opt2('*', 'Ganzer Lernpfad (teuer!)', aiSt)
     + doc.stations.map((st, i) => opt2(st.id, `Station ${i + 1}: ${esc(plain(st.title).slice(0, 40))}`, aiSt)).join('');
   const blkLabel = b => { const t = plain(b.type === 'quiz' ? b.qs?.[0]?.q || '' : ['match', 'task', 'mark', 'sort', 'order'].includes(b.type) || b.type === 'gap' && b.title ? b.title || '' : b.html || b.caption || b.summary || '').replace(/\s+/g, ' ').trim(); return blkName(b) + (t && !blkName(b).includes(t.slice(0, 10)) ? ': ' + t.slice(0, 34) + (t.length > 34 ? '…' : '') : ''); };
-  const aiBkOpts = () => { const st = doc.stations.find(x => x.id === aiSt); return opt2('', '–', aiBk) + opt2('*', 'Ganze Station', aiBk) + (st ? st.blocks.filter(b => b.type !== 'lock').map((b, i) => opt2(b.id, `${i + 1}. ${esc(blkLabel(b))}`, aiBk)).join('') : ''); };
+  const aiBkOpts = () => { const st = doc.stations.find(x => x.id === aiSt); return opt2('', '–', aiBk) + opt2('*', 'Ganze Station', aiBk) + (st ? st.blocks.filter(b => b.type !== 'lock' && b.type !== 'page').map((b, i) => opt2(b.id, `${i + 1}. ${esc(blkLabel(b))}`, aiBk)).join('') : ''); };
   /** Auswahl prüfen und Fenster auffrischen (nach Änderungen am Lernpfad) */
   function aiSync() {
     if (!aiEl || aiEl.dataset.busy) return;
@@ -1720,7 +1755,7 @@ ${d.theme === 'grid' ? `<span class="help">„Hack“: immer dunkel, Raster-Kopf
   }
   /** Wird im Lernpfad ein Baustein angetippt, wählt das Fenster Station und Baustein dazu aus */
   function aiPick() {
-    if (!aiEl || aiEl.dataset.busy || !selId) return; const r = findBlock(selId); if (!r || r.b.type === 'lock') return;
+    if (!aiEl || aiEl.dataset.busy || !selId) return; const r = findBlock(selId); if (!r || r.b.type === 'lock' || r.b.type === 'page') return;
     if (aiSt === r.st.id && aiBk === r.b.id) return;
     aiSt = r.st.id; aiBk = r.b.id; aiDraw();
   }

@@ -1,6 +1,6 @@
 # Prüfungsformat für Probe
 
-> Automatisch erzeugt mit `node tools/doku.mjs` aus `core/pftext.js` (PathFinder 2026-11-21c). Nicht von Hand ändern.
+> Automatisch erzeugt mit `node tools/doku.mjs` aus `core/pftext.js` (PathFinder 2026-11-21d). Nicht von Hand ändern.
 
 Prüfungen für [Probe](https://github.com/alphabrumm/probe) sind Texte im **PathFinder-Textformat** mit `Art: Prüfung`.
 Jede KI kann sie schreiben; Probe liest sie ohne Nacharbeit ein. Der Claude-Skill „probe-pruefung“
@@ -90,6 +90,7 @@ Ziele:
 Kopfbild: anhang:logo          (optional, Bild aus dem Anhang)
 Kopfbild-Art: klein | groß | Hintergrund
 Titel-Animation: tippen | einblenden | glitch | leuchten   (optional, ebenso Untertitel-Animation)
+Seiten: Stationen              (optional: jede Station auf einer eigenen Seite mit „Weiter“ und „Zurück“)
 
 ## Station: Titel der Station | kurze Unterzeile
 Animation: einblenden          (optional, direkt nach der Stationszeile: Animation des Stationstitels)
@@ -185,6 +186,7 @@ Programmcode (Sprache nach den drei Backticks)
 | Zelle | Zelle |
 
 --- Sperre ---          (alles danach in der Station erst frei, wenn die Aufgabe davor gelöst ist)
+--- Seite ---           (Seitenumbruch: ab hier eine neue Seite mit „Weiter“ und „Zurück“; Kopf und Stationstitel stehen auf jeder Seite)
 
 ## Anhang               (immer ganz am Ende, im selben Textblock: Bilder, auf die oben mit anhang:name verwiesen wird)
 diagramm: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 160">

@@ -349,6 +349,7 @@ export function parseText(src, env) {
       if (k === 'untertitel') { doc.subtitle = v; continue; }
       if (k === 'art') { doc.form = /challenge/i.test(v) ? 'challenge' : /pr(ü|ue|u)fung|klausur|schulaufgabe|test/i.test(v) ? 'pruefung' : 'lernpfad'; if (doc.form === 'pruefung') { doc.pointsOn = true; doc.cert.on = false; } else doc.kicker = doc.kicker.replace(/Lernpfad|Challenge/, doc.form === 'challenge' ? 'Challenge' : 'Lernpfad'); continue; }
       if (k === 'kopfzeile') { doc.kicker = v; continue; }
+      if (k === 'seiten') { if (/station/i.test(v)) doc.pages = 'stationen'; else if (!/^(nein|aus|keine|eine)$/i.test(v.trim())) H.warn(n, 'Seiten: „Stationen“ (jede Station auf einer eigenen Seite) oder weglassen.'); continue; }
       if (k === 'farbe' || k === 'farben') { const p = env.palettes.findIndex(x => norm(x.n) === norm(v)); if (p >= 0) doc.design.pal = p; else H.warn(n, `Farbe „${v}“ gibt es nicht. Möglich: ${env.palettes.map(x => x.n).join(', ')}.`); continue; }
       if (k === 'schrift') { const f = FONTS[norm(v)]; if (f) doc.design.font = f; else H.warn(n, 'Schrift: Pixel, schlicht, elegant oder Handwriting.'); continue; }
       if (k === 'kopfbild') { const src = H.img(v, n); if (src) { doc.design.heroImg = src; doc.design.hero = doc.design.hero === 'logo' ? 'bild' : doc.design.hero; } continue; }
@@ -368,6 +369,9 @@ export function parseText(src, env) {
       const [h, ...rest] = m[1].split(':'); const kind = ALIAS[norm(h)];
       if (!kind) { H.warn(n, `Unbekannter Abschnitt „### ${h.trim()}“ – als Text übernommen. Möglich: ${Object.keys(SECS).map(k => SECS[k].n || k).join(', ')}.`); para.push([`**${rest.join(':').trim() || h.trim()}**`, n]); continue; }
       sec = { kind, head: h.trim(), title: rest.join(':').trim(), line: n, lines: [], table: [], code: [] }; continue;
+    }
+    if (/^-{3,}\s*(n(ä|ae)chste\s+)?seite\s*-{0,}$/i.test(l) || /^\[\s*(n(ä|ae)chste\s+)?seite\s*\]$/i.test(l)) { // Seitenumbruch: ab hier eine neue Seite
+      closeSec(); flushPara(); push({ type: 'page' }, n); continue;
     }
     if (/^-{3,}\s*sperre\s*-{0,}$/i.test(l) || /^\[\s*sperre\s*\]$/i.test(l)) {
       closeSec(); flushPara(); const c = lastCheckable();
@@ -430,6 +434,7 @@ export function docToText(doc, env, out = {}) {
   if (doc.subtitle) L.push(`Untertitel: ${md(doc.subtitle)}`);
   L.push(`Art: ${doc.form === 'challenge' ? 'Challenge' : doc.form === 'pruefung' ? 'Prüfung' : 'Lernpfad'}`);
   if (doc.kicker) L.push(`Kopfzeile: ${md(doc.kicker)}`);
+  if (doc.pages === 'stationen') L.push('Seiten: Stationen');
   L.push(`Farbe: ${env.palettes[doc.design.pal]?.n || 'Pastell'}`, `Schrift: ${doc.design.font}`);
   if (doc.goals?.length) { L.push('Ziele:'); doc.goals.forEach(g => L.push('- ' + md(g))); }
   if (doc.rank) L.push(`Rang: ${md(doc.rank)}`);
@@ -479,6 +484,7 @@ export function docToText(doc, env, out = {}) {
           break;
         }
         case 'lock': L.push('--- Sperre ---'); break;
+        case 'page': L.push('--- Seite ---'); break;
         case 'file': L.push(`%% Datei „${b.name}“ (nur im Editor)`); break;
         default: { const t = plug[b.type]; L.push(t?.toText ? t.toText(b, { md }) : `%% Baustein „${b.type}“ – im Textformat nicht darstellbar`); }
       }
@@ -527,6 +533,7 @@ Ziele:
 Kopfbild: anhang:logo          (optional, Bild aus dem Anhang)
 Kopfbild-Art: klein | groß | Hintergrund
 Titel-Animation: tippen | einblenden | glitch | leuchten   (optional, ebenso Untertitel-Animation)
+Seiten: Stationen              (optional: jede Station auf einer eigenen Seite mit „Weiter“ und „Zurück“)
 
 ## Station: Titel der Station | kurze Unterzeile
 Animation: einblenden          (optional, direkt nach der Stationszeile: Animation des Stationstitels)
@@ -622,6 +629,7 @@ Programmcode (Sprache nach den drei Backticks)
 | Zelle | Zelle |
 
 --- Sperre ---          (alles danach in der Station erst frei, wenn die Aufgabe davor gelöst ist)
+--- Seite ---           (Seitenumbruch: ab hier eine neue Seite mit „Weiter“ und „Zurück“; Kopf und Stationstitel stehen auf jeder Seite)
 
 ## Anhang               (immer ganz am Ende, im selben Textblock: Bilder, auf die oben mit anhang:name verwiesen wird)
 diagramm: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 160">
