@@ -403,6 +403,13 @@ export function startPathFinder(opts = {}) {
     if (saved) prog = { ...freshProg(), ...saved };
     if (opts.answers) prog.ans = clone(opts.answers); // Prüfung: Antworten kommen von der Plattform (z. B. nach dem Neuladen)
   }
+  /* Editor: Vorschau-Fortschritt je Lernpfad im Browser merken (die gelöste Vorschau wird nie gespeichert) */
+  const PREVKEY = () => 'pathfinder.vorschau.' + doc.id;
+  const prevLoad = () => { let x = null; if (!PLAYER) try { x = JSON.parse(LS.get(PREVKEY()) || 'null'); } catch (e) { } return x ? { ...freshProg(), ...x } : freshProg(); };
+  let prevT = 0;
+  const prevSave = () => { if (PLAYER) return; clearTimeout(prevT); prevT = setTimeout(() => { const P = solvedView ? progReal : prog; if (P) LS.set(PREVKEY(), JSON.stringify(P)); }, 250); };
+  if (!PLAYER) prog = prevLoad();
+  addEventListener('pagehide', () => { if (prevT) { clearTimeout(prevT); const P = solvedView ? progReal : prog; if (!PLAYER && P) LS.set(PREVKEY(), JSON.stringify(P)); } });
   function progSave() {
     if (!PLAYER) return;
     const keep = { solved: prog.solved, tips: prog.tips, sol: prog.sol, visited: prog.visited, start: prog.start, active: prog.active, sent: prog.sent, quiz: prog.quiz, ...(EXAMF() ? { ans: prog.ans } : {}) };
@@ -432,7 +439,7 @@ export function startPathFinder(opts = {}) {
   function undo() { if (pending) commit(); if (hist.length < 2) return; fut.push(hist.pop()); doc = JSON.parse(hist[hist.length - 1]); save(); render(); updUndo(); drawPanel?.(); aiSync(); }
   function redo() { if (!fut.length) return; const s = fut.pop(); hist.push(s); doc = JSON.parse(s); save(); render(); updUndo(); drawPanel?.(); }
   function updUndo() { if (!$('#bUndo')) return; $('#bUndo').disabled = hist.length < 2; $('#bRedo').disabled = !fut.length; }
-  function openDoc(d) { if (!PLAYER && d.form !== 'pruefung' && (convertNext || (!formOk(d.form) && formOk('pruefung')))) { const r = toExam(d); d = r.d; setTimeout(() => toast(examTakenMsg(r), 5000), 60); } convertNext = false; if (pending) commit(); if (panelOpen) { panelWhat = 'design'; hidePanel(); } doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = freshProg(); if (solvedView) { solvedView = false; progReal = null; mode = 'preview'; modeBtns(); } selId = null; curSid = null; pageNo = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; drawPanel(); aiSync(); }
+  function openDoc(d) { if (!PLAYER && d.form !== 'pruefung' && (convertNext || (!formOk(d.form) && formOk('pruefung')))) { const r = toExam(d); d = r.d; setTimeout(() => toast(examTakenMsg(r), 5000), 60); } convertNext = false; if (pending) commit(); if (panelOpen) { panelWhat = 'design'; hidePanel(); } doc = migrate(d); hist = [JSON.stringify(doc)]; fut = []; prog = prevLoad(); if (solvedView) { solvedView = false; progReal = null; mode = 'preview'; modeBtns(); } selId = null; curSid = null; pageNo = null; host.reset?.(); save(); render(); updUndo(); scroller.scrollTop = 0; drawPanel(); aiSync(); }
 
   function findBlock(id) {
     for (const st of doc.stations) { const i = st.blocks.findIndex(b => b.id === id); if (i >= 0) return { st, i, b: st.blocks[i] }; }
@@ -605,7 +612,7 @@ export function startPathFinder(opts = {}) {
     runAnims();
     xDrawAll(); wPlace();
     { const sb = $('#modeSeg [data-mode="solved"]'); if (sb) sb.hidden = EXAMF(); }
-    if (PLAYER) progSave();
+    if (PLAYER) progSave(); else prevSave();
     scroller.scrollTop = sc;
     if (selId && !findBlock(selId)) selId = null;
     markSel();
@@ -3198,9 +3205,9 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
 
   /* ---------- Gelöste Vorschau: alle Aufgaben richtig gelöst, Sperren offen – zum schnellen Durchsehen ---------- */
   let solvedView = false, progReal = null;
-  function solvedProg() {
-    const P = freshProg(), first = a => String(a || '').split('|')[0].trim();
-    for (const st of doc.stations) {
+  function solvedProg(upto) {
+    const P = freshProg(), first = a => String(a || '').split('|')[0].trim(), ui = doc.stations.findIndex(x => x.id === upto);
+    for (const st of ui < 0 ? doc.stations : doc.stations.slice(0, ui + 1)) {
       P.visited[st.id] = 1; if (st.check) P.solved['st:' + st.id] = true;
       for (const b of st.blocks) {
         if (isCheck(b)) P.solved[b.id] = true;
@@ -3222,21 +3229,33 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     }
     return P;
   }
+  const SOLVEDKEY = () => 'pathfinder.geloestBis.' + doc.id;
+  const solvedTo = upto => { const i = doc.stations.findIndex(x => x.id === upto); return i < 0 || i === doc.stations.length - 1 ? '✓ Alles gelöst' : `✓ Gelöst bis Station ${doc.stations[i].nr || i + 1}`; };
+  /** „Gelöst“ antippen: kurz fragen, bis zu welcher Station – die letzte Wahl ist vorausgewählt */
+  function askSolved(anchor) {
+    if (pending) commit();
+    closePop(); pop = document.createElement('div'); pop.className = 'ed-pop';
+    const last = LS.get(SOLVEDKEY()) || '*', n = doc.stations.length;
+    pop.innerHTML = `<h3>Gelöst bis …</h3><div style="font-size:12px;color:#776d88;margin:-4px 0 8px">Spätere Stationen sind wie neu – zum Ausprobieren.</div><div class="ed-pal">${doc.stations.map((st, i) => i === n - 1 ? '' : `<button data-upto="${st.id}"${st.id === last ? ' class="hi"' : ''}><b>bis Station ${esc(st.nr || i + 1)}</b><span>${esc(plain(st.title || '').slice(0, 60))}</span></button>`).join('')}<button data-upto="*"${last === '*' || !doc.stations.some(st => st.id === last) ? ' class="hi"' : ''}><b>Alles</b><span>alle ${n} Stationen gelöst</span></button></div>`;
+    document.body.appendChild(pop); placePop(anchor);
+    $('button.hi', pop)?.focus();
+    pop.onclick = ev => { const u = ev.target.closest('[data-upto]')?.dataset.upto; if (!u) return; closePop(); LS.set(SOLVEDKEY(), u); setMode('solved', u === '*' ? null : u); };
+  }
   const modeBtns = () => $$('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === (solvedView ? 'solved' : mode))));
   /* ---------- Leiste oben ---------- */
-  function setMode(m) {
+  function setMode(m, upto) {
     if (pending) commit();
-    if (m === 'solved') { if (!solvedView) { progReal = prog; prog = solvedProg(); solvedView = true; } m = 'preview'; }
+    if (m === 'solved') { if (!solvedView) progReal = prog; prog = solvedProg(upto); solvedView = true; m = 'preview'; }
     else if (solvedView) { prog = progReal || freshProg(); progReal = null; solvedView = false; }
     mode = m; selId = null; closePop();
     modeBtns();
     if (m === 'preview') { prog.visited[curSid] = 1; animDone.clear(); panelBack = panelOpen; hidePanel(); }
     else if (panelBack && panelFits()) showPanel();
     render();
-    toast(solvedView ? '✓ Gelöste Vorschau – alle Aufgaben sind richtig gelöst, Sperren sind offen. Dein Fortschritt aus der Vorschau bleibt erhalten.' : m === 'preview' ? (EXAMF() ? '▶ Vorschau – so sehen es die Schüler, ohne Rückmeldung. „Abgeben“ zeigt eine Probe-Auswertung.' : '▶ Vorschau – so sehen es die Schüler. Fortschritt wird hier nur probeweise gezählt.') : RO ? (EXAMF() ? '👁 Mit Lösungen' : '👁 Ansicht') : '✎ Bearbeiten');
+    toast(solvedView ? (solvedTo(upto) + ' – richtig gelöst, Sperren dort offen. Dein Vorschau-Fortschritt bleibt erhalten.') : m === 'preview' ? (EXAMF() ? '▶ Vorschau – so sehen es die Schüler, ohne Rückmeldung. „Abgeben“ zeigt eine Probe-Auswertung.' : '▶ Vorschau – so sehen es die Schüler. Dein Fortschritt bleibt auch nach dem Neuladen; zurücksetzen über ⋯') : RO ? (EXAMF() ? '👁 Mit Lösungen' : '👁 Ansicht') : '✎ Bearbeiten');
   }
   if (!PLAYER) {
-  $('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
+  $('#modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.mode === 'solved') { e.stopPropagation(); askSolved(b); } else setMode(b.dataset.mode); });
   if ($('#modeSeg') && !$('#modeSeg [data-mode="solved"]')) { const sb = document.createElement('button'); sb.dataset.mode = 'solved'; sb.setAttribute('aria-pressed', 'false'); sb.title = 'Gelöste Vorschau: alle Aufgaben richtig gelöst, Sperren offen – zum schnellen Durchsehen'; sb.textContent = '✓ Gelöst'; $('#modeSeg').appendChild(sb); }
   $('#bUndo').onclick = undo; $('#bRedo').onclick = redo;
   const setSingle = v => { single = v; const b = $('#bSingle'); if (b) { b.classList.toggle('on', single); b.setAttribute('aria-pressed', String(single)); } document.querySelectorAll('#viewSeg button').forEach(x => x.setAttribute('aria-pressed', String((x.dataset.view === 'one') === single))); render(); scroller.scrollTop = 0; };
@@ -3287,7 +3306,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       const m = ev.target.closest('[data-m]')?.dataset.m; if (!m) return; closePop();
       if (m === 'export') { openExport(); return; }
       if (m === 'keep') { if (pending) commit(); const d = clone(doc); delete d.exam; download(new Blob([JSON.stringify(d, null, 1)], { type: 'application/json' }), fileName('.probe.json')); toast('💾 Prüfung als Datei gesichert – mit den Lösungen, also nicht an Schüler weitergeben. Wieder öffnen: Neue Prüfung → Fertige Prüfung laden.', 6000); return; }
-      if (m === 'reset') { prog = freshProg(); host.reset?.(); render(); toast('Fortschritt zurückgesetzt'); }
+      if (m === 'reset') { if (solvedView) progReal = freshProg(); else prog = freshProg(); host.reset?.(); render(); toast(solvedView ? 'Vorschau-Fortschritt zurückgesetzt – die gelöste Vorschau bleibt, bis du sie verlässt' : 'Fortschritt zurückgesetzt'); }
       if (m === 'del') { if (!confirm('„' + (doc.title || 'ohne Titel') + '“ in diesem Browser löschen?')) return; LS.del(DOCKEY(doc.id)); saveDocList(docList().filter(x => x.id !== doc.id)); const next = docList()[0]; openDoc(next ? loadDoc(next.id) : sample()); }
       if (m === 'json') infoDlg('{ } Dokument', `<pre style="margin:0;padding:12px;font:12px/1.4 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all">${esc(JSON.stringify(doc, (k, v) => typeof v === 'string' && v.length > 200 && /^(data:|[A-Za-z0-9+/=]{200})/.test(v) ? v.slice(0, 40) + '…' : v, 2))}</pre>`);
       if (m === 'certcheck') { certCheck(); return; }
