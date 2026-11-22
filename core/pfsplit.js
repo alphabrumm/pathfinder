@@ -171,7 +171,7 @@ export function splitExam(doc) {
         tasks.push({ id: b.id, type: 'quiz', pts, title, qs: (b.qs || []).map(q => ({ q: q.q || '', ok: (q.opts || []).filter(o => o.ok).map(o => o.k), opts: (q.opts || []).map(o => ({ k: o.k, t: o.t || '', ok: !!o.ok, fb: o.fb || '' })) })) });
         if ((b.qs || []).some(q => !(q.opts || []).some(o => o.ok))) warnings.push(`Quiz „${title}“: eine Frage hat keine richtige Antwort.`);
       } else if (b.type === 'gap') {
-        const gaps = gapAnswers(b.html), x = { id: b.id, type: 'gap', pts, title: b.title || '', sub: b.sub || '', heft: !!b.heft, bank: !!b.bank, html: String(b.html || '').replace(GAP_RE, '[[…]]') };
+        const gaps = gapAnswers(b.html), x = { id: b.id, type: 'gap', pts, title: b.title || '', sub: b.sub || '', heft: !!b.heft, heftBg: b.heftBg || '', heftFont: b.heftFont || '', bank: !!b.bank, html: String(b.html || '').replace(GAP_RE, '[[…]]') };
         if (b.bank) x.words = shuffle(gaps.map(g => g[0]).concat(b.extra || []));
         out.blocks.push(x);
         tasks.push({ id: b.id, type: 'gap', pts, title, bank: !!b.bank, html: b.html || '', gaps });

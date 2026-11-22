@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-22c';
+const PF_BUILD = '2026-11-22d';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -77,6 +77,10 @@ const FONTS = {
   elegant: { n: 'Elegant', d: '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif', w: 600, ls: '.005em' },
   hand: { n: 'Handwriting', d: '"Caveat", "Bradley Hand", "Segoe Print", cursive', w: 700, ls: '0' },
 };
+/** Hefteintrag (Lückentext): Hintergrund und Schrift */
+const HEFT_BG = [['', 'liniert'], ['kariert', 'kariert'], ['blanko', 'ohne Linien']];
+const HEFT_FONT = [['', 'wie bisher (Titel in der Lernpfad-Schrift)'], ['pixel', 'Pixel'], ['schlicht', 'Standard'], ['elegant', 'Elegant'], ['hand', 'Handschrift']];
+const heftCls = b => b.heft ? ' heft' + (b.heftBg ? ' heft-' + b.heftBg : '') + (b.heftFont && FONTS[b.heftFont] ? ' heft-f-' + b.heftFont : '') : '';
 const INFO_KINDS = { merke: ['💡', 'Merke'], tipp: ['👉', 'Tipp'], achtung: ['⚠️', 'Achtung'], begriff: ['📘', 'Begriff'], regel: ['📏', 'Regel'], figur: ['🗨', 'Figur sagt'], abschluss: ['🏁', 'Abschluss'] };
 const ANIMS = { tippen: 'Schreibmaschine', einblenden: 'Einblenden', glitch: 'Glitch', leuchten: 'Leuchten' };
 const ANIM_OPTS = [['', 'keine'], ...Object.entries(ANIMS)];
@@ -823,15 +827,15 @@ export function startPathFinder(opts = {}) {
       }
       case 'gap': {
         const head = b.heft ? `<div class="heft-title">${ce('title', b.title, 'Titel des Hefteintrags', { tag: 'span' })}</div><div class="heft-sub">${ce('sub', b.sub, 'Unterzeile', { tag: 'span' })}</div>` : `<b class="lp-ctitle">${b.title ? esc(plain(b.title)) : 'Lückentext'}</b>`;
-        if (E()) return wrap(b, `<div class="lp-card lp-gap${b.heft ? ' heft' : ''}">${head}${xpTag(b)}${ce('html', b.html, 'Text mit [[Lücke]] …', { rich: true })}<div class="ed-hint">Lücken als <b>[[Antwort]]</b>, mehrere richtige mit | trennen: [[mal|*]]${b.bank ? ` · Begriffe zum Ziehen${b.extra.length ? ` + ${b.extra.length} Ablenker` : ''}` : ''} · ⚙ für Begriffe und Hefteintrag</div></div>`);
+        if (E()) return wrap(b, `<div class="lp-card lp-gap${heftCls(b)}">${head}${xpTag(b)}${ce('html', b.html, 'Text mit [[Lücke]] …', { rich: true })}<div class="ed-hint">Lücken als <b>[[Antwort]]</b>, mehrere richtige mit | trennen: [[mal|*]]${b.bank ? ` · Begriffe zum Ziehen${b.extra.length ? ` + ${b.extra.length} Ablenker` : ''}` : ''} · ⚙ für Begriffe und Hefteintrag</div></div>`);
         const got = prog.quiz[b.id] || {}; let n = 0;
         if (b.bank) {
           const words = shuffled(gapWords(b), b.id), used = Object.values(got), seen = {};
           const html = (b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const i = n++; const v = got[i]; const st = prog.quiz[b.id + ':chk'] ? (v != null && isGapOk(b, i, v, got) ? ' ok' : ' no') : ''; return `<span class="gapslot${v != null ? ' filled' : ''}${st}" data-gslot="${i}" role="button" tabindex="0">${v != null ? esc(v) : ''}</span>`; });
-          return wrap(b, `<div class="lp-card lp-gap${b.heft ? ' heft' : ''}">${head}${xpTag(b)}<div>${html}</div><div class="bank"><span class="bl">Begriffe · ziehen oder erst Begriff, dann Lücke antippen</span>${words.map(w => { const k = seen[w] = (seen[w] || 0) + 1; return `<span class="gchip${used.filter(x => x === w).length >= k ? ' used' : ''}" data-gchip="${esc(w)}">${esc(w)}</span>`; }).join('')}</div><div><button class="lp-btn" data-run="gapcheck">${b.free ? 'Festhalten' : 'Prüfen'}</button><span class="lp-state" style="margin-left:8px">${ok ? (b.free ? '✓ notiert' : '✓ alles richtig') : ''}</span></div></div>`);
+          return wrap(b, `<div class="lp-card lp-gap${heftCls(b)}">${head}${xpTag(b)}<div>${html}</div><div class="bank"><span class="bl">Begriffe · ziehen oder erst Begriff, dann Lücke antippen</span>${words.map(w => { const k = seen[w] = (seen[w] || 0) + 1; return `<span class="gchip${used.filter(x => x === w).length >= k ? ' used' : ''}" data-gchip="${esc(w)}">${esc(w)}</span>`; }).join('')}</div><div><button class="lp-btn" data-run="gapcheck">${b.free ? 'Festhalten' : 'Prüfen'}</button><span class="lp-state" style="margin-left:8px">${ok ? (b.free ? '✓ notiert' : '✓ alles richtig') : ''}</span></div></div>`);
         }
         const html = (b.html || '').replace(/\[\[(.+?)\]\]/g, () => `<input data-gap="${n}" value="${esc(got[n] || '')}" autocomplete="off" autocapitalize="off" spellcheck="false" data-n="${n++}">`);
-        return wrap(b, `<div class="lp-card lp-gap${b.heft ? ' heft' : ''}">${head}${xpTag(b)}<div>${html}</div><div class="lp-state" style="margin-top:6px">${ok ? '✓ alles richtig' : ''}</div></div>`);
+        return wrap(b, `<div class="lp-card lp-gap${heftCls(b)}">${head}${xpTag(b)}<div>${html}</div><div class="lp-state" style="margin-top:6px">${ok ? '✓ alles richtig' : ''}</div></div>`);
       }
       case 'match': {
         if (E()) return wrap(b, `<div class="lp-card lp-match">${ce('title', b.title, 'Ordne zu', { tag: 'b', cls: 'lp-ctitle' })}${xpTag(b)}<div class="grid">${b.pairs.map((p, i) => `<div class="chip" style="cursor:text">${ce(`pairs.${i}.a`, p.a, 'Karte', { tag: 'span' })}</div><div class="slot">${ce(`pairs.${i}.b`, p.b, 'passt zu …', { tag: 'span' })}</div>`).join('')}</div><div class="ed-hint">Links die Karten, rechts das Passende – in der Vorschau werden die Karten gemischt. Paare über ⚙.</div></div>`);
@@ -1251,10 +1255,10 @@ export function startPathFinder(opts = {}) {
       if (b.bank) {
         const words = bankWords(b), used = Object.values(a || {}), seen = {};
         const html = String(b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const i = n++, v = a?.[i]; return `<span class="gapslot${v != null ? ' filled' : ''}" data-gslot="${i}" role="button" tabindex="0">${v != null ? esc(v) : ''}</span>`; });
-        return wrap(b, `<div class="lp-card lp-gap lp-exam${b.heft ? ' heft' : ''}">${head}<div>${html}</div><div class="bank"><span class="bl">Begriffe · ziehen oder erst Begriff, dann Lücke antippen · Lücke antippen zum Leeren</span>${words.map(w => { const k = seen[w] = (seen[w] || 0) + 1; return `<span class="gchip${used.filter(x => x === w).length >= k ? ' used' : ''}" data-gchip="${esc(w)}">${esc(w)}</span>`; }).join('')}</div>${examState(b)}</div>`);
+        return wrap(b, `<div class="lp-card lp-gap lp-exam${heftCls(b)}">${head}<div>${html}</div><div class="bank"><span class="bl">Begriffe · ziehen oder erst Begriff, dann Lücke antippen · Lücke antippen zum Leeren</span>${words.map(w => { const k = seen[w] = (seen[w] || 0) + 1; return `<span class="gchip${used.filter(x => x === w).length >= k ? ' used' : ''}" data-gchip="${esc(w)}">${esc(w)}</span>`; }).join('')}</div>${examState(b)}</div>`);
       }
       const html = String(b.html || '').replace(/\[\[(.+?)\]\]/g, () => { const i = n++; return `<input data-xgap="${i}" value="${esc(a?.[i] ?? '')}" ${NOCORR} aria-label="Lücke ${i + 1}">`; });
-      return wrap(b, `<div class="lp-card lp-gap lp-exam${b.heft ? ' heft' : ''}">${head}<div>${html}</div>${examState(b)}</div>`);
+      return wrap(b, `<div class="lp-card lp-gap lp-exam${heftCls(b)}">${head}<div>${html}</div>${examState(b)}</div>`);
     }
     if (b.type === 'app') {
       const N = appN(b.app), run = a?.run, done = EXAM_DONE();
@@ -1725,7 +1729,8 @@ export function startPathFinder(opts = {}) {
     html: [{ k: 'html', l: 'HTML', t: 'code', help: 'Wird für Schüler so angezeigt. Skripte laufen erst im exportierten Lernpfad.' }],
     task: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'answer', l: 'Ergebnis zur Selbstkontrolle (optional)', t: 'text', help: 'Leer = Schüler hakt „Erledigt“ ab. Sonst tippen sie das Ergebnis ein; mehrere richtige mit | trennen. Zahlen werden mit Komma oder Punkt erkannt.', show: () => !doc.skin && !EXAMF() }, { k: 'answer', l: 'Ergebnis (wird automatisch bewertet)', t: 'text', help: 'Leer = Schüler schreiben eine freie Antwort, die du bewertest. Mehrere richtige mit | trennen; Zahlen werden mit Komma oder Punkt erkannt.', show: () => EXAMF() }, { k: 'tips', l: 'Tipps (werden nacheinander aufgedeckt)', t: 'list', ph: 'Tipp', vis: 'tipsHide', show: () => !EXAMF() }, { k: 'solution', l: 'Lösung zum Aufdecken (leer = keine)', t: 'text', show: () => !EXAMF() }, { k: 'solution', l: 'Musterlösung (nur für dich bei der Korrektur)', t: 'text', show: () => EXAMF() }, { k: 'solHide', l: 'Lösung für Schüler sichtbar', t: 'shown', show: b => !!b.solution && !EXAMF() }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }, XP],
     quiz: [{ k: 'qs', l: 'Fragen', t: 'qs' }, XP],
-    gap: [{ k: 'title', l: 'Überschrift / Arbeitsauftrag (optional)', t: 'text' }, { k: 'bank', l: 'Begriffe zum Ziehen anbieten (statt Tippen)', t: 'check' }, { k: 'free', l: 'Frei (z. B. Hypothese): jede Wahl zählt, die Wortbank zeigt alle Möglichkeiten aus [[a|b|c]]', t: 'check' }, { k: 'extra', l: 'Zusätzliche falsche Begriffe (Ablenker)', t: 'list', ph: 'Begriff', show: b => b.bank }, { k: 'heft', l: 'Als Hefteintrag gestalten (mit Titel)', t: 'check' }, XP],
+    gap: [{ k: 'title', l: 'Überschrift / Arbeitsauftrag (optional)', t: 'text' }, { k: 'bank', l: 'Begriffe zum Ziehen anbieten (statt Tippen)', t: 'check' }, { k: 'free', l: 'Frei (z. B. Hypothese): jede Wahl zählt, die Wortbank zeigt alle Möglichkeiten aus [[a|b|c]]', t: 'check' }, { k: 'extra', l: 'Zusätzliche falsche Begriffe (Ablenker)', t: 'list', ph: 'Begriff', show: b => b.bank }, { k: 'heft', l: 'Als Hefteintrag gestalten (mit Titel)', t: 'check' },
+      { k: 'heftBg', l: 'Hintergrund des Hefteintrags', t: 'select', o: HEFT_BG, show: b => b.heft }, { k: 'heftFont', l: 'Schrift des Hefteintrags', t: 'select', o: HEFT_FONT, show: b => b.heft }, XP],
     match: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'pairs', l: 'Paare', t: 'pairs' }, XP],
     mark: [{ k: 'title', l: 'Arbeitsauftrag', t: 'text' }, XP],
     sort: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'groups', l: 'Gruppen und Begriffe', t: 'lines', rows: 6, help: 'Je Zeile eine Gruppe: „Gruppe: Begriff, Begriff, Begriff“',
@@ -3325,17 +3330,19 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   }
   /** Bearbeiten → Vorschau: alles vor dem Baustein (bzw. vor der Station) als erledigt markieren, den Baustein selbst frisch machen */
   function prepareAt(bid, sid, keep) {
-    const si = doc.stations.findIndex(x => x.id === sid); if (si < 0) return;
+    const si = doc.stations.findIndex(x => x.id === sid); if (si < 0) return 0;
+    let n = 0;
     doc.stations.forEach((st, i) => {
       if (i > si) return;
       prog.visited[st.id] = 1;
-      if (i < si && st.check) prog.solved['st:' + st.id] = true;
+      if (i < si && st.check && !prog.solved['st:' + st.id]) { prog.solved['st:' + st.id] = true; n++; }
       for (const b of st.blocks) {
         if (i === si && (!bid || b.id === bid)) break;
-        if (isCheck(b) && !prog.solved[b.id]) solveInto(prog, b);
+        if (isCheck(b) && !prog.solved[b.id]) { solveInto(prog, b); n++; }
       }
     });
     if (bid && !keep) { delete prog.solved[bid]; delete prog.quiz[bid]; delete prog.quiz[bid + ':chk']; delete prog.tries[bid]; delete prog.sol[bid]; delete prog.tips[bid]; }
+    return n;
   }
   /** zum Baustein (oder zur Station) springen, ohne dass die Stationsleiste ihn verdeckt */
   function jumpToBlock(bid, sid) {
@@ -3385,10 +3392,10 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     if (m === 'preview') { prog.visited[curSid] = 1; animDone.clear(); panelBack = panelOpen; hidePanel(); }
     else if (panelBack && panelFits()) showPanel();
     const prep = fromEdit && !solvedView && !EXAMF() && tSid && (tBid || aBid || tSid !== doc.stations[0]?.id);
-    if (prep) prepareAt(tBid || aBid, tSid, !tBid);
+    const nPrep = prep ? prepareAt(tBid || aBid, tSid, !tBid) : 0;
     render();
     if (tBid) jumpToBlock(tBid, tSid); else toAnchor(anchor);
-    if (prep) { toast(tBid ? '▶ Vorschau bei deinem Baustein – alles davor ist als erledigt markiert, der Baustein selbst ist frisch.' : '▶ Vorschau an dieser Stelle – alles davor ist als erledigt markiert.', 4500); return; }
+    if (prep && (tBid || nPrep)) { toast(tBid ? (nPrep ? '▶ Vorschau bei deinem Baustein – alles davor ist als erledigt markiert, der Baustein selbst ist frisch.' : '▶ Vorschau bei deinem Baustein – frisch zum Ausprobieren.') : '▶ Vorschau an dieser Stelle – alles davor ist als erledigt markiert.', 4500); return; }
     toast(solvedView ? (solvedTo(upto) + ' – richtig gelöst, Sperren dort offen. Dein Vorschau-Fortschritt bleibt erhalten.') : m === 'preview' ? (EXAMF() ? '▶ Vorschau – so sehen es die Schüler, ohne Rückmeldung. „Abgeben“ zeigt eine Probe-Auswertung.' : '▶ Vorschau – so sehen es die Schüler. Dein Fortschritt bleibt auch nach dem Neuladen; zurücksetzen über ⋯') : RO ? (EXAMF() ? '👁 Mit Lösungen' : '👁 Ansicht') : '✎ Bearbeiten');
   }
   if (!PLAYER) {
@@ -3520,7 +3527,7 @@ ${SC}`;
       return SK.pageHtml(d, { json: JSON.stringify(keep).replace(/</g, '\\u003c') });
     }
     let css = await fetchText('pathfinder.css');
-    if (d.design?.font !== 'hand') css = css.replace(/@font-face \{ font-family: "Caveat";[^}]*\}\n?/, '');
+    if (d.design?.font !== 'hand' && !(d.stations || []).some(st => st.blocks.some(b => b.heft && b.heftFont === 'hand'))) css = css.replace(/@font-face \{ font-family: "Caveat";[^}]*\}\n?/, '');
     const fonts = {}; for (const m of css.matchAll(/url\(\.\.\/fonts\/([^)]+)\)/g)) fonts[m[1]] = fonts[m[1]] || await fetchData('../fonts/' + m[1], 'font/ttf');
     css = css.replace(/url\(\.\.\/fonts\/([^)]+)\)/g, (m, f) => `url(${fonts[f]})`);
     css += plugins.map(p => p.css || '').join('\n');

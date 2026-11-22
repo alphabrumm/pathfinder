@@ -310,6 +310,15 @@ button { font: inherit; color: inherit; }
 .lp-gap .gapslot.no { background: color-mix(in srgb, var(--bad) 12%, var(--surface)); border-color: var(--bad); }
 .lp-gap .gapslot.hover { outline: 2px solid var(--a1); }
 .lp-gap.heft { background: repeating-linear-gradient(var(--surface) 0 27px, color-mix(in srgb, var(--a1s) 50%, var(--surface)) 27px 28px); border-style: dashed; }
+.lp-gap.heft { color: color-mix(in srgb, var(--ink) 80%, var(--surface)); } /* Heftschrift: dunkelgrau statt schwarz */
+.lp-gap.heft.heft-kariert { background-color: var(--surface); background-image: linear-gradient(color-mix(in srgb, var(--a1s) 38%, var(--surface)) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--a1s) 38%, var(--surface)) 1px, transparent 1px); background-size: 14px 14px; background-position: -1px -1px; }
+.lp-gap.heft.heft-blanko { background: var(--surface); }
+.lp-gap.heft-f-pixel { font-family: "Pixelify Sans", "Courier New", monospace; }
+.lp-gap.heft-f-schlicht { font-family: "Atkinson Hyperlegible", -apple-system, system-ui, sans-serif; }
+.lp-gap.heft-f-elegant { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; }
+.lp-gap.heft-f-hand { font-family: "Caveat", "Bradley Hand", "Segoe Print", cursive; }
+.lp-gap[class*="heft-f-"] .heft-title, .lp-gap[class*="heft-f-"] input, .lp-gap[class*="heft-f-"] .gapslot { font-family: inherit; }
+.lp-gap[class*="heft-f-"] .bank, .lp-gap[class*="heft-f-"] .ed-hint, .lp-gap[class*="heft-f-"] .lp-state, .lp-gap[class*="heft-f-"] .xp { font-family: var(--font-body, "Atkinson Hyperlegible", system-ui, sans-serif); }
 .lp-gap .heft-title { font: var(--display-weight) calc(19px * var(--fz)) var(--font-display); color: var(--a1); }
 .lp-gap .heft-sub { font-size: .8em; letter-spacing: .1em; color: var(--ink-2); margin-bottom: 6px; }
 .lp-task .where { font-size: .82em; color: var(--ink-2); background: var(--surface-2); border-radius: 6px; padding: 1px 7px; margin-left: 6px; }
