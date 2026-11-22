@@ -1,6 +1,6 @@
 # Prüfungsformat für Probe
 
-> Automatisch erzeugt mit `node tools/doku.mjs` aus `core/pftext.js` (PathFinder 2026-11-22b). Nicht von Hand ändern.
+> Automatisch erzeugt mit `node tools/doku.mjs` aus `core/pftext.js` (PathFinder 2026-11-22c). Nicht von Hand ändern.
 
 Prüfungen für [Probe](https://github.com/alphabrumm/probe) sind Texte im **PathFinder-Textformat** mit `Art: Prüfung`.
 Jede KI kann sie schreiben; Probe liest sie ohne Nacharbeit ein. Der Claude-Skill „probe-pruefung“
@@ -100,6 +100,7 @@ Aufdecken: schrittweise        (optional, nicht in Prüfungen: in allen Statione
 Animation: einblenden          (optional, direkt nach der Stationszeile: Animation des Stationstitels)
 Aufdecken: schrittweise        (optional, direkt nach der Stationszeile: nur in dieser Station Schritt für Schritt aufdecken)
 Normaler Text. Leerzeile = neuer Absatz. **fett**, *kursiv*, `Code`, Listen mit „- “.
+Sparsam hervorheben: [Text]{rot} (auch orange, grün, blau, lila, grau), [Text]{markiert} (auch markiert-grün, -blau, -rosa), [Text]{groß} (auch klein, sehr-groß), [Text]{unterstrichen} – kombinierbar: [Text]{rot groß}.
 Indizes und Hochzahlen: v_A, v_{End}, m/s^2, 10^{-3}   (ein Zeichen ohne Klammern, mehrere in { })
 [Überschrift 1] Zwischenüberschrift   (auch [Überschrift 2] und [Überschrift 3]: kleinere Überschriften innerhalb einer Station)
 

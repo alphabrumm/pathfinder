@@ -849,3 +849,24 @@ label.lp-btn { display: inline-flex; align-items: center; justify-content: cente
 .pf-wslot { width: 100%; }
 .pf-wlayer { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 5; }
 .pf-wframe { position: absolute; border: 0; background: transparent; color-scheme: normal; }
+
+/* Formatierungsleiste (links über dem Baustein, Gegenstück zur Werkzeugleiste rechts) */
+.pf-fmt { position: absolute; z-index: 26; bottom: calc(100% + 3px); left: 8px; display: flex; align-items: center; gap: 1px; background: var(--ed-bg, #2b2340); border-radius: 10px; padding: 3px; box-shadow: 0 4px 14px rgba(0,0,0,.25); user-select: none; -webkit-user-select: none; }
+.pf-fmt[hidden] { display: none; }
+.pf-fmt.stuck { position: fixed; bottom: auto; }
+.pf-fmt button { min-width: 32px; height: 32px; padding: 0 5px; border: 0; background: transparent; color: var(--ed-ink, #fff); border-radius: 7px; cursor: pointer; font: 600 14px/1 system-ui, sans-serif; display: grid; place-items: center; }
+.pf-fmt button:hover { background: var(--ed-mid, #463b63); }
+.pf-fmt button.on { background: #8a72e0; color: #fff; }
+.pf-fmt .sep { width: 1px; height: 20px; background: rgba(255,255,255,.18); margin: 0 3px; }
+.pf-fmt .fc { border-bottom: 3px solid #d1343b; line-height: 1; padding: 0 2px; }
+.pf-fmt .fh { background: #fff0a0; color: #2b2340; border-radius: 3px; padding: 1px 4px; }
+.pf-fmt-menu { position: absolute; top: calc(100% + 4px); display: flex; gap: 3px; background: #fff; border: 1px solid #e3dceb; border-radius: 10px; padding: 5px; box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+.pf-fmt-menu button { min-width: 34px; height: 34px; border: 1px solid #e3dceb; border-radius: 8px; background: #fff; cursor: pointer; font: 700 16px/1 system-ui, sans-serif; color: #2b2340; padding: 0 8px; white-space: nowrap; }
+.pf-fmt-menu button.std { color: #2b2340; font-weight: 400; }
+.pf-fmt-menu button:hover { border-color: #8a72e0; }
+
+/* gespeicherte Hervorhebungen (feste Palette) */
+.pf-c-rot { color: #d1343b; } .pf-c-orange { color: #d9730d; } .pf-c-gruen { color: #2e8b57; } .pf-c-blau { color: #2f6fdb; } .pf-c-lila { color: #8a4fd1; } .pf-c-grau { color: #77757f; }
+.pf-h-gelb { background: #fff0a0; } .pf-h-gruen { background: #c8f0cf; } .pf-h-blau { background: #cfe5ff; } .pf-h-rosa { background: #ffd5e5; }
+[class*="pf-h-"] { border-radius: 3px; padding: 0 2px; -webkit-box-decoration-break: clone; box-decoration-break: clone; color: #2b2340; }
+.pf-fs-klein { font-size: .82em; } .pf-fs-gross { font-size: 1.25em; } .pf-fs-xgross { font-size: 1.55em; line-height: 1.25; }

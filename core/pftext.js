@@ -26,13 +26,24 @@ export function subSup(s) {
     .replace(/([\p{L}\p{N})\]])\^\{([^{}]{1,24})\}/gu, '$1<sup>$2</sup>')
     .replace(/([\p{L}\p{N})])\^(-?\p{N}+|\p{L})(?![\p{L}\p{N}])/gu, '$1<sup>$2</sup>');
 }
+/** Farben, Markierungen, Schriftgrad, Unterstreichen: [Text]{rot}, [Text]{markiert}, [Text]{groß unterstrichen} */
+export const FMT_TOK = { rot: 'c-rot', orange: 'c-orange', 'grün': 'c-gruen', gruen: 'c-gruen', blau: 'c-blau', lila: 'c-lila', grau: 'c-grau',
+  markiert: 'h-gelb', 'markiert-gelb': 'h-gelb', 'markiert-grün': 'h-gruen', 'markiert-gruen': 'h-gruen', 'markiert-blau': 'h-blau', 'markiert-rosa': 'h-rosa',
+  klein: 'fs-klein', 'groß': 'fs-gross', gross: 'fs-gross', 'sehr-groß': 'fs-xgross', 'sehr-gross': 'fs-xgross', unterstrichen: 'u' };
+const FMT_NAME = { 'c-rot': 'rot', 'c-orange': 'orange', 'c-gruen': 'grün', 'c-blau': 'blau', 'c-lila': 'lila', 'c-grau': 'grau', 'h-gelb': 'markiert', 'h-gruen': 'markiert-grün', 'h-blau': 'markiert-blau', 'h-rosa': 'markiert-rosa', 'fs-klein': 'klein', 'fs-gross': 'groß', 'fs-xgross': 'sehr-groß' };
+const fmtSpan = (txt, toks) => {
+  const ks = String(toks).toLowerCase().split(/[\s,]+/).map(t => FMT_TOK[t]).filter(Boolean); if (!ks.length) return null;
+  let h = txt; if (ks.includes('u')) h = `<u>${h}</u>`;
+  const cl = ks.filter(k => k !== 'u'); return cl.length ? `<span class="${cl.map(k => 'pf-' + k).join(' ')}">${h}</span>` : h;
+};
 export function inline(s) {
   const codes = []; s = String(s).replace(/`([^`]+)`/g, (m, c) => `\u0000${codes.push(c) - 1}\u0000`);
   const gaps = []; s = s.replace(/\[\[[^\]]*\]\]/g, m => `\u0001${gaps.push(m) - 1}\u0001`);
   const links = []; s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (m, t, u) => `\u0002${links.push([t, u]) - 1}\u0002`);
   s = subSup(escH(s)
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
-    .replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<i>$2</i>'));
+    .replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<i>$2</i>')
+    .replace(/\[([^\[\]]+)\]\{([^{}]+)\}/g, (m, t, k) => fmtSpan(t, k) ?? m));
   return s.replace(/\u0002(\d+)\u0002/g, (m, i) => `<a href="${escH(links[i][1])}" target="_blank" rel="noopener">${escH(links[i][0])}</a>`)
     .replace(/\u0001(\d+)\u0001/g, (m, i) => escH(gaps[i])).replace(/\u0000(\d+)\u0000/g, (m, i) => `<code>${escH(codes[i])}</code>`);
 }
@@ -57,6 +68,12 @@ export function htmlToMd(html) {
     if (t === 'b' || t === 'strong') return `**${inner().trim()}**`;
     if (t === 'i' || t === 'em') return `*${inner().trim()}*`;
     if (t === 'code') return '`' + n.textContent + '`';
+    if (t === 'u' || t === 'span') {
+      const ks = t === 'u' ? ['unterstrichen'] : [...n.classList].map(c => FMT_NAME[c.replace(/^pf-/, '')]).filter(Boolean);
+      let x = inner(); if (!ks.length || !x.trim()) return x;
+      const m = x.match(/^\[([^\[\]]+)\]\{([^{}]+)\}$/); if (m) return `[${m[1]}]{${ks.join(' ')} ${m[2]}}`; // verschachtelt → zusammenfassen
+      return `[${x}]{${ks.join(' ')}}`;
+    }
     if (t === 'sub' || t === 'sup') { const x = inner().trim(), c = t === 'sub' ? '_' : '^'; return x ? (/^[\p{L}\p{N}]$/u.test(x) || (t === 'sup' && /^-?\d+$/.test(x)) ? c + x : c + '{' + x + '}') : ''; }
     if (t === 'a') return `[${inner()}](${n.getAttribute('href') || ''})`;
     if (t === 'br') return '\n';
@@ -657,6 +674,7 @@ Aufdecken: schrittweise        (optional, nicht in Prüfungen: in allen Statione
 Animation: einblenden          (optional, direkt nach der Stationszeile: Animation des Stationstitels)
 Aufdecken: schrittweise        (optional, direkt nach der Stationszeile: nur in dieser Station Schritt für Schritt aufdecken)
 Normaler Text. Leerzeile = neuer Absatz. **fett**, *kursiv*, \`Code\`, Listen mit „- “.
+Sparsam hervorheben: [Text]{rot} (auch orange, grün, blau, lila, grau), [Text]{markiert} (auch markiert-grün, -blau, -rosa), [Text]{groß} (auch klein, sehr-groß), [Text]{unterstrichen} – kombinierbar: [Text]{rot groß}.
 Indizes und Hochzahlen: v_A, v_{End}, m/s^2, 10^{-3}   (ein Zeichen ohne Klammern, mehrere in { })
 [Überschrift 1] Zwischenüberschrift   (auch [Überschrift 2] und [Überschrift 3]: kleinere Überschriften innerhalb einer Station)
 

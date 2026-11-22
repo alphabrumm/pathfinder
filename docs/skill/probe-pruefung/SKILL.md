@@ -5,7 +5,7 @@ description: Digitale Prüfungen für Probe (probe.pandapy.de) im PathFinder-Tex
 
 # Probe-Prüfungen
 
-Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-22b). Die Spezifikation unten ist dieselbe, die Probe
+Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-22c). Die Spezifikation unten ist dieselbe, die Probe
 als „Prompt für externe KI“ anzeigt. Weicht etwas vom aktuellen Probe-Verhalten ab, gilt der Code in alphabrumm/pathfinder
 (`core/pftext.js`, `core/pfsplit.js`).
 
@@ -98,6 +98,7 @@ Aufdecken: schrittweise        (optional, nicht in Prüfungen: in allen Statione
 Animation: einblenden          (optional, direkt nach der Stationszeile: Animation des Stationstitels)
 Aufdecken: schrittweise        (optional, direkt nach der Stationszeile: nur in dieser Station Schritt für Schritt aufdecken)
 Normaler Text. Leerzeile = neuer Absatz. **fett**, *kursiv*, `Code`, Listen mit „- “.
+Sparsam hervorheben: [Text]{rot} (auch orange, grün, blau, lila, grau), [Text]{markiert} (auch markiert-grün, -blau, -rosa), [Text]{groß} (auch klein, sehr-groß), [Text]{unterstrichen} – kombinierbar: [Text]{rot groß}.
 Indizes und Hochzahlen: v_A, v_{End}, m/s^2, 10^{-3}   (ein Zeichen ohne Klammern, mehrere in { })
 [Überschrift 1] Zwischenüberschrift   (auch [Überschrift 2] und [Überschrift 3]: kleinere Überschriften innerhalb einer Station)
 

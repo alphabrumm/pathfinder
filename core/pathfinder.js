@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-22b';
+const PF_BUILD = '2026-11-22c';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -448,7 +448,19 @@ export function startPathFinder(opts = {}) {
   function toast(msg, ms = 2400) { $$('.ed-toast').forEach(x => x.remove()); const t = document.createElement('div'); t.className = 'ed-toast'; t.innerHTML = msg; document.body.appendChild(t); setTimeout(() => t.remove(), ms); }
 
   /* ---------- Text säubern ---------- */
-  const OK_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'CODE', 'A', 'BR', 'UL', 'OL', 'LI', 'SUB', 'SUP', 'KBD']);
+  const OK_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'CODE', 'A', 'BR', 'UL', 'OL', 'LI', 'SUB', 'SUP', 'KBD']);
+  /* Formatierungsleiste: feste Paletten – gespeichert werden nur Klassen (pf-c-…, pf-h-…, pf-fs-…), nie freie Farben */
+  const FMT_C = [['rot', '#d1343b'], ['orange', '#d9730d'], ['gruen', '#2e8b57'], ['blau', '#2f6fdb'], ['lila', '#8a4fd1'], ['grau', '#77757f']];
+  const FMT_H = [['gelb', '#fff0a0'], ['gruen', '#c8f0cf'], ['blau', '#cfe5ff'], ['rosa', '#ffd5e5']];
+  const FMT_FS = { 2: 'klein', 5: 'gross', 6: 'xgross' };
+  const toHex = c => { c = String(c || '').trim().toLowerCase(); const m = c.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/); if (m) return m[4] === '0' ? '' : '#' + [m[1], m[2], m[3]].map(x => (+x).toString(16).padStart(2, '0')).join(''); return /^#[0-9a-f]{6}$/.test(c) ? c : ''; };
+  const fmtClasses = el => {
+    const cl = [...(el.classList || [])].filter(c => /^pf-(c|h|fs)-[a-z]+$/.test(c));
+    const col = toHex(el.getAttribute('color') || el.style?.color), bg = toHex(el.style?.backgroundColor), fs = el.getAttribute('size');
+    const c = FMT_C.find(x => x[1] === col), h = FMT_H.find(x => x[1] === bg);
+    if (c) cl.push('pf-c-' + c[0]); if (h) cl.push('pf-h-' + h[0]); if (fs && FMT_FS[fs]) cl.push('pf-fs-' + FMT_FS[fs]);
+    const last = {}; for (const k of cl) last[k.split('-')[1]] = k; return Object.values(last); // je Art nur eine Klasse
+  };
   function clean(html) {
     if (doc?.skin && SK) return SK.cleanRich(html); // Originaldesign: Auszeichnung der Vorlage behalten
     const d =new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html').body.firstChild;
@@ -458,6 +470,15 @@ export function startPathFinder(opts = {}) {
         if (c.nodeType !== 1) { c.remove(); continue; }
         walk(c);
         if (c.tagName === 'DIV' || c.tagName === 'P') { c.before(document.createElement('br')); c.replaceWith(...c.childNodes); continue; }
+        if (c.tagName === 'FONT' || c.tagName === 'SPAN') {
+          const cl = fmtClasses(c); if (!cl.length || !c.textContent) { c.replaceWith(...c.childNodes); continue; }
+          let sp = c; if (c.tagName === 'FONT') { sp = document.createElement('span'); sp.append(...c.childNodes); c.replaceWith(sp); }
+          [...sp.attributes].forEach(a => sp.removeAttribute(a.name));
+          const only = sp.childNodes.length === 1 && sp.firstChild.nodeName === 'SPAN' ? sp.firstChild : null; // verschachtelt → zusammenfassen
+          if (only) { const all = [...only.classList, ...cl].reduce((o, k) => (o[k.split('-')[1]] = o[k.split('-')[1]] || k, o), {}); sp.replaceChildren(...only.childNodes); sp.className = Object.values(all).join(' '); }
+          else sp.className = cl.join(' ');
+          continue;
+        }
         if (!OK_TAGS.has(c.tagName)) { c.replaceWith(...c.childNodes); continue; }
         for (const a of [...c.attributes]) if (!(c.tagName === 'A' && a.name === 'href')) c.removeAttribute(a.name);
         if (c.tagName === 'A') { if (!/^https?:\/\//i.test(c.getAttribute('href') || '')) c.removeAttribute('href'); c.setAttribute('class', 'link'); c.setAttribute('target', '_blank'); }
@@ -1517,7 +1538,8 @@ export function startPathFinder(opts = {}) {
     if (!E()) return;
     if (ed && mod && e.key.toLowerCase() === 'e') { e.preventDefault(); wrapSel('code'); return; }
     if (ed && mod && e.key.toLowerCase() === 'k') { e.preventDefault(); const url = prompt('Link-Adresse (https://…)'); if (url && /^https?:\/\//.test(url)) document.execCommand('createLink', false, url); return; }
-    if (ed && mod && (e.key.toLowerCase() === 'b' || e.key.toLowerCase() === 'i') && !ed.dataset.rich) { e.preventDefault(); return; }
+    if (ed && mod && !e.altKey && /^[biu]$/i.test(e.key) && !e.shiftKey) { e.preventDefault(); if (ed.dataset.rich) fmtCmd({ b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()]); return; }
+    if (ed && ed.dataset.rich && mod && e.shiftKey && (e.code === 'Digit7' || e.code === 'Digit8')) { e.preventDefault(); fmtCmd(e.code === 'Digit7' ? 'insertOrderedList' : 'insertUnorderedList'); return; }
     if (mod && e.key === 'Enter') { e.preventDefault(); const r = selId && findBlock(selId); const st = r ? r.st : doc.stations.find(s => s.id === curSid); insertBlock('text', st.id, r ? r.i + 1 : st.blocks.length); return; }
     if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && selId) { e.preventDefault(); if (pending) commit(); moveBlock(selId, e.key === 'ArrowUp' ? -1 : 1); return; }
     if (e.key === '/' && ed && ed.dataset.f === 'html' && ed.textContent.trim() === '') {
@@ -1527,6 +1549,58 @@ export function startPathFinder(opts = {}) {
     }
     if (e.key === 'Escape') { selId = null; markSel(); document.activeElement?.blur(); }
   });
+  /* ---------- Formatierungsleiste: links über dem Baustein, nur solange ein Textfeld mit Formatierung den Fokus hat ---------- */
+  let fmtBar = null, fmtEl = null, fmtMenu = null;
+  function fmtCmd(cmd, val) {
+    if (!fmtEl && !document.activeElement?.closest?.('[data-rich]')) return;
+    if (cmd === 'hiliteColor') document.execCommand('styleWithCSS', false, true);
+    document.execCommand(cmd, false, val ?? null);
+    if (cmd === 'hiliteColor') document.execCommand('styleWithCSS', false, false);
+    fmtState();
+  }
+  const FMT_BTNS = [['bold', '<b>B</b>', 'Fett (⌘/Strg+B)'], ['italic', '<i>I</i>', 'Kursiv (⌘/Strg+I)'], ['underline', '<u>U</u>', 'Unterstrichen (⌘/Strg+U)'], ['|'],
+    ['insertUnorderedList', '•≡', 'Stichpunkte (⌘/Strg+⇧+8)'], ['insertOrderedList', '1.≡', 'Aufzählung (⌘/Strg+⇧+7)'], ['|'],
+    ['m:c', '<span class="fc">A</span>', 'Textfarbe'], ['m:h', '<span class="fh">A</span>', 'Hervorheben'], ['m:s', 'aA', 'Schriftgrad'], ['|'], ['removeFormat', '⌫', 'Formatierung entfernen']];
+  function fmtShow(el) {
+    if (doc.skin || !E()) return fmtHide();
+    fmtEl = el; const host = el.closest('.blk') || el.parentElement;
+    if (!fmtBar) {
+      fmtBar = document.createElement('div'); fmtBar.className = 'pf-fmt'; fmtBar.contentEditable = 'false';
+      fmtBar.innerHTML = FMT_BTNS.map(([c, l, t]) => c === '|' ? '<i class="sep"></i>' : `<button type="button" data-fmt="${c}" title="${t}" aria-label="${t}">${l}</button>`).join('');
+      fmtBar.addEventListener('pointerdown', e => e.preventDefault()); // Fokus und Markierung im Text behalten
+      fmtBar.addEventListener('click', e => {
+        const b = e.target.closest('[data-fmt]'); if (!b) return; e.stopPropagation(); const c = b.dataset.fmt;
+        if (c.startsWith('m:')) fmtOpen(b, c.slice(2)); else { fmtClose(); fmtCmd(c); }
+      });
+    }
+    if (fmtBar.parentElement !== host) { if (getComputedStyle(host).position === 'static') host.style.position = 'relative'; host.prepend(fmtBar); }
+    fmtBar.hidden = false; fmtState(); fmtStick();
+  }
+  function fmtHide() { fmtClose(); if (fmtBar) fmtBar.hidden = true; fmtEl = null; }
+  function fmtOpen(btn, kind) {
+    fmtClose(); fmtMenu = document.createElement('div'); fmtMenu.className = 'pf-fmt-menu';
+    fmtMenu.innerHTML = kind === 'c' ? FMT_C.map(([n, c]) => `<button data-v="${c}" title="${n}" style="color:${c}">A</button>`).join('') + `<button data-v="#010203" title="Standardfarbe" class="std">A</button>`
+      : kind === 'h' ? FMT_H.map(([n, c]) => `<button data-v="${c}" title="markiert ${n}" style="background:${c}">A</button>`).join('') + `<button data-v="transparent" title="ohne Hervorhebung" class="std">∅</button>`
+      : `<button data-v="2" style="font-size:12px">klein</button><button data-v="3" style="font-size:15px">normal</button><button data-v="5" style="font-size:19px">groß</button><button data-v="6" style="font-size:23px">sehr groß</button>`;
+    fmtMenu.addEventListener('pointerdown', e => e.preventDefault());
+    fmtMenu.addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; e.stopPropagation(); const v = b.dataset.v; fmtClose(); fmtCmd(kind === 'c' ? 'foreColor' : kind === 'h' ? 'hiliteColor' : 'fontSize', v); });
+    btn.after(fmtMenu); fmtMenu.style.left = btn.offsetLeft + 'px';
+  }
+  function fmtClose() { fmtMenu?.remove(); fmtMenu = null; }
+  function fmtState() { if (!fmtBar) return; $$('[data-fmt]', fmtBar).forEach(b => { let on = false; try { on = !b.dataset.fmt.startsWith('m:') && b.dataset.fmt !== 'removeFormat' && document.queryCommandState(b.dataset.fmt); } catch (e) { } b.classList.toggle('on', on); }); }
+  /** Bei langen Bausteinen bleibt die Leiste unter der Stationsleiste sichtbar */
+  function fmtStick() {
+    if (!fmtBar || fmtBar.hidden || !fmtEl) return; const host = fmtBar.parentElement; if (!host) return;
+    const top = ($('.lp-trail', lp)?.getBoundingClientRect().bottom ?? scroller.getBoundingClientRect().top) + 6, r = host.getBoundingClientRect();
+    const stick = r.top - 40 < top && r.bottom > top + 60;
+    fmtBar.classList.toggle('stuck', stick);
+    if (stick) { fmtBar.style.top = top + 'px'; fmtBar.style.left = (r.left + 8) + 'px'; } else { fmtBar.style.top = ''; fmtBar.style.left = ''; }
+  }
+  lp.addEventListener('focusin', e => { const el = e.target.closest?.('[data-rich][contenteditable="true"]'); if (el) fmtShow(el); });
+  lp.addEventListener('focusout', e => { if (!e.target.closest?.('[data-rich]')) return; setTimeout(() => { if (!document.activeElement?.closest?.('[data-rich]')) fmtHide(); }, 0); });
+  document.addEventListener('selectionchange', () => { if (fmtEl) fmtState(); });
+  scroller.addEventListener('scroll', fmtStick, { passive: true });
+
   function wrapSel(tag) {
     const s = getSelection(); if (!s.rangeCount) return; const r = s.getRangeAt(0); if (r.collapsed) return;
     const el = document.createElement(tag); el.appendChild(r.extractContents()); r.insertNode(el);
