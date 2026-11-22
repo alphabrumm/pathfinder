@@ -805,7 +805,7 @@ export function startPathFinder(opts = {}) {
         const got = prog.quiz[b.id] || {}, order = shuffled(b.pairs.map((_, i) => i), b.id), used = new Set(Object.values(got));
         return wrap(b, `<div class="lp-card lp-match"><b class="lp-ctitle">${esc(b.title)}</b>${xpTag(b)}<div class="grid">`
           + b.pairs.map((p, i) => { const ci = order[i], g = got[i]; return `<div class="chip${used.has(ci) ? ' used' : ''}" data-chip="${ci}">${esc(b.pairs[ci].a)}</div><div class="slot${g != null ? (g === i ? ' ok' : ' no') : ''}" data-slot="${i}"><span>${esc(p.b)}</span>${g != null ? `<span class="got">${esc(b.pairs[g].a)}</span>` : ''}</div>`; }).join('')
-          + `</div><div class="lp-state" style="margin-top:6px">${ok ? '✓ alles richtig zugeordnet' : 'Karte antippen, dann das Passende – oder ziehen.'}</div></div>`);
+          + `</div><div class="lp-state" style="margin-top:6px">${ok ? '✓ alles richtig zugeordnet' : Object.keys(got).some(k => got[k] !== +k) ? 'Rotes Feld antippen – die Karte kommt zurück.' : 'Karte antippen, dann das Passende – oder ziehen.'}</div></div>`);
       }
       case 'mark': if (E()) return wrap(b, `<div class="lp-card lp-mark">${ce('title', b.title, 'Arbeitsauftrag, z. B. Markiere alle Verben', { tag: 'b', cls: 'lp-ctitle' })}${xpTag(b)}${ce('html', b.html, 'Text mit {{Zielwort}} …', { rich: true })}<div class="ed-hint">Richtige Wörter in <b>{{…}}</b> setzen, z. B. Yesterday I {{went}} home. Mehrere Wörter: {{has been}}. Schüler sehen die Klammern nicht.</div></div>`);
         return wrap(b, markCard(b, false));
@@ -1377,7 +1377,7 @@ export function startPathFinder(opts = {}) {
     if (chip && !chip.classList.contains('used')) { $$('.picked', lp).forEach(c => c !== chip && c.classList.remove('picked')); chip.classList.toggle('picked'); return; }
     const slot = t.closest('[data-slot]');
     if (slot && EXAM() && !$('.chip.picked', slot.closest('.blk'))) { const id = slot.closest('.blk').dataset.id, r = findBlock(id), k = matchSides(r.b).R[+slot.dataset.slot]?.k, a = ansOf(id); if (k && a[k] != null) { delete a[k]; render(); examChanged(id); } return; }
-    if (slot) { const pick = $('.chip.picked', slot.closest('.blk')); if (pick) placeChip(slot.closest('.blk').dataset.id, +pick.dataset.chip, +slot.dataset.slot); return; }
+    if (slot) { const pick = $('.chip.picked', slot.closest('.blk')), id = slot.closest('.blk').dataset.id; if (pick) placeChip(id, +pick.dataset.chip, +slot.dataset.slot); else if (slot.classList.contains('no')) { delete prog.quiz[id]?.[+slot.dataset.slot]; render(); } return; }
     const gs = t.closest('[data-gslot]');
     if (gs) { const id = gs.closest('.blk').dataset.id, pick = $('.gchip.picked', gs.closest('.blk')); placeGap(id, slotK(gs.dataset.gslot), pick ? pick.dataset.gchip : null); }
   });

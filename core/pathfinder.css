@@ -148,7 +148,7 @@ button { font: inherit; color: inherit; }
 .lp-match .slot { min-height: 44px; border: 2px dashed var(--line); border-radius: 9px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; color: var(--ink-2); }
 .lp-match .slot .got { font-weight: 700; color: var(--ink); }
 .lp-match .slot.ok { border-color: var(--good); border-style: solid; }
-.lp-match .slot.no { border-color: var(--bad); border-style: solid; }
+.lp-match .slot.no { border-color: var(--bad); border-style: solid; cursor: pointer; }
 .lp-match .slot.hover { background: var(--a3s); }
 .lp-lock.locked > .lp-lock-body { opacity: .4; pointer-events: none; filter: grayscale(.6); }
 .lp-lock-note { font-size: .9em; color: var(--ink-2); margin: 4px 0; }
