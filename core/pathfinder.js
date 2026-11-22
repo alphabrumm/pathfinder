@@ -140,10 +140,15 @@ function expFormulaCore(f, vars) {
   FCACHE.set(key, fn); return fn;
 }
 /** einfache Formatierung für Formularfelder: **fett**, *kursiv*, v_A, m^2 – Lücken [[…]] bleiben stehen */
+/* [Text]{rot groß} ⇄ <span class="pf-c-rot pf-fs-gross"> (wie im Textformat) */
+const LITE_TOK = { rot: 'c-rot', orange: 'c-orange', 'grün': 'c-gruen', gruen: 'c-gruen', blau: 'c-blau', lila: 'c-lila', grau: 'c-grau', markiert: 'h-gelb', 'markiert-grün': 'h-gruen', 'markiert-gruen': 'h-gruen', 'markiert-blau': 'h-blau', 'markiert-rosa': 'h-rosa', klein: 'fs-klein', 'groß': 'fs-gross', gross: 'fs-gross', 'sehr-groß': 'fs-xgross', unterstrichen: 'u' };
+const LITE_NAME = Object.fromEntries(Object.entries(LITE_TOK).filter(([k]) => !/gruen$|^gross$/.test(k)).map(([k, v]) => [v, k]));
+const liteSpan = (m, x, k) => { const ks = k.toLowerCase().split(/[\s,]+/).map(t => LITE_TOK[t]).filter(Boolean); if (!ks.length) return m; const cl = ks.filter(c => c !== 'u'), h = ks.includes('u') ? `<u>${x}</u>` : x; return cl.length ? `<span class="${cl.map(c => 'pf-' + c).join(' ')}">${h}</span>` : h; };
 const mdLite = t => String(t || '').split(/\n+/).map(x => x.trim()).filter(Boolean).map(x => esc(x).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<i>$2</i>')
   .replace(/([\p{L}\p{N})\]])_\{([^{}]{1,24})\}/gu, '$1<sub>$2</sub>').replace(/([\p{L}\p{N})])_([\p{L}\p{N}])(?![\p{L}\p{N}])/gu, '$1<sub>$2</sub>')
-  .replace(/([\p{L}\p{N})\]])\^\{([^{}]{1,24})\}/gu, '$1<sup>$2</sup>').replace(/([\p{L}\p{N})])\^(-?\p{N}+|\p{L})(?![\p{L}\p{N}])/gu, '$1<sup>$2</sup>')).join('<br>');
+  .replace(/([\p{L}\p{N})\]])\^\{([^{}]{1,24})\}/gu, '$1<sup>$2</sup>').replace(/([\p{L}\p{N})])\^(-?\p{N}+|\p{L})(?![\p{L}\p{N}])/gu, '$1<sup>$2</sup>').replace(/\[([^\[\]]+)\]\{([^{}]+)\}/g, liteSpan)).join('<br>');
 const unLite = h => String(h || '').replace(/<br\s*\/?>|<\/p>\s*<p>/gi, '\n').replace(/<sub>([^<]*)<\/sub>/gi, (m, x) => x.length === 1 ? '_' + x : `_{${x}}`).replace(/<sup>([^<]*)<\/sup>/gi, (m, x) => x.length === 1 || /^-?\d+$/.test(x) ? '^' + x : `^{${x}}`)
+  .replace(/<span class="([^"]*)">(?:<u>)?([^<]*)(<\/u>)?<\/span>/gi, (m, c, x, u) => { const ks = c.split(/\s+/).map(k => LITE_NAME[k.replace(/^pf-/, '')]).filter(Boolean); if (u) ks.push('unterstrichen'); return ks.length ? `[${x}]{${ks.join(' ')}}` : x; }).replace(/<u>([^<]*)<\/u>/gi, '[$1]{unterstrichen}')
   .replace(/<\/?b>/gi, '**').replace(/<\/?i>/gi, '*').replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 const APP_INFO = { jpad: ['JPad', '☕', 'java'], qpad: ['QPad', '🗄', 'sql'], flowpad: ['FlowPad', '🔀', 'text'] };
 const appN = a => (APP_INFO[a] || APP_INFO.jpad)[0], appIc = a => (APP_INFO[a] || APP_INFO.jpad)[1], appLang = a => (APP_INFO[a] || APP_INFO.jpad)[2];
@@ -883,14 +888,16 @@ export function startPathFinder(opts = {}) {
   function widgetHtml(b) {
     if (b.kind !== 'experiment') {
       const ok = !!prog.solved[b.id];
-      return `<div class="lp-card lp-widget${ok ? ' ok' : ''}">${b.title || b.check ? `<div class="hd"><b class="lp-ctitle">${esc(plain(b.title || 'Widget'))}</b>${xpTag(b)}<span class="lp-state">${ok ? '✓ geschafft' : ''}</span></div>` : ''}${b.html ? `<div>${b.html}</div>` : ''}`
+      return `<div class="lp-card lp-widget${ok ? ' ok' : ''}">`
+        + (E() ? `<div class="hd">${ce('title', plain(b.title || ''), 'Überschrift (optional)', { tag: 'b', cls: 'lp-ctitle' })}${xpTag(b)}</div>${ce('html', b.html, 'Einleitungstext (optional)', { rich: true })}`
+          : `${b.title || b.check ? `<div class="hd"><b class="lp-ctitle">${esc(plain(b.title || 'Widget'))}</b>${xpTag(b)}<span class="lp-state">${ok ? '✓ geschafft' : ''}</span></div>` : ''}${b.html ? `<div>${b.html}</div>` : ''}`)
         + `<div class="pf-wslot" data-wslot="${b.id}" style="height:${(b.h || wHeights[b.id] || 160)}px"></div>`
         + (E() ? `<div class="ed-hint">Eigenes HTML läuft geschützt in einem Rahmen${b.check ? ' · zählt als Aufgabe, sobald das HTML <b>pfDone()</b> aufruft' : ''} · HTML über ⚙</div>` : '') + '</div>';
     }
     const st = xSt(b), ok = !!prog.solved[b.id], hasH = /\[\[/.test(b.hyp || ''), hasE = /\[\[/.test(b.evalHtml || '');
     if (E()) {
       const V = (b.vars || []).map(v => `<li><b>${esc(v.name)} ${esc(v.sym)}</b>${v.unit ? ` in ${esc(v.unit)}` : ''}: ${v.opts.map(o => esc((o.l ? o.l + ' ' : '') + xFmt(o.v))).join(', ')}${v.fixed ? ' <span class="help">🔒 fest</span>' : ''}</li>`).join('');
-      return `<div class="lp-card lp-exp"><div class="hd"><b class="lp-ctitle">🔬 Experiment</b>${xpTag(b)}</div><div class="xq">${b.title || '<i>Forschungsfrage über ⚙</i>'}</div>${b.intro || ''}`
+      return `<div class="lp-card lp-exp"><div class="hd"><b class="lp-ctitle">🔬 Experiment</b>${xpTag(b)}</div><div class="xq">${b.title || '<i>Forschungsfrage über ⚙</i>'}</div>${ce('intro', b.intro, 'Einleitungstext (optional)', { rich: true })}`
         + (b.hyp ? `<div class="xed"><b>Hypothese:</b> ${b.hyp}</div>` : '') + `<div class="xed"><b>Größen:</b><ul>${V}</ul><b>Ergebnis:</b> ${esc(b.res?.name || '')} ${esc(b.res?.sym || '')} = ${esc(b.res?.f || '')}${b.res?.unit ? ` (${esc(b.res.unit)})` : ''}${b.anim === 'wagen' ? ' · Animation: Wagen' : ''}</div>`
         + (b.evalHtml ? `<div class="xed"><b>Auswertung:</b> ${b.evalHtml}</div>` : '') + (b.concl ? `<div class="xed"><b>Schlussfolgerung:</b> ${b.concl}</div>` : '')
         + (EXAMF() ? `<div class="ed-hint">In der Prüfung: alles auf einmal, ohne Rückmeldung und ohne Schlussfolgerung. Bewertet werden die Messreihe (verschiedene Werte für ${esc(b.vars?.[xMain(b)]?.name || 'die untersuchte Größe')} · fair: nur diese Größe verändert) und die Auswertung je Lücke${/\[\[/.test(b.hyp || '') ? '; die Hypothese wird nur festgehalten (ohne Punkte)' : ''}. Größen ohne „fest“ lassen – das Planen ist Teil der Leistung.</div>` : `<div class="ed-hint">Schüler gehen Schritt für Schritt vor: Hypothese → Experiment → Auswertung → Schlussfolgerung · alles über ⚙</div>`) + '</div>';
@@ -1741,6 +1748,8 @@ export function startPathFinder(opts = {}) {
       { k: 'solution', l: 'Musterlösung (nur für dich bei der Korrektur)', t: 'code' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }],
     widget: [
       { k: 'title', l: 'Forschungsfrage', t: 'text', show: b => b.kind === 'experiment' }, { k: 'title', l: 'Überschrift (optional)', t: 'text', show: b => b.kind !== 'experiment' },
+      { k: 'html', l: 'Einleitungstext (optional) – auch direkt im Baustein änderbar', t: 'lines', rows: 3, show: b => b.kind !== 'experiment', get: b => unLite(b.html), set: (b, v) => { b.html = mdLite(v); } },
+      { k: 'intro', l: 'Einleitungstext (optional) – auch direkt im Baustein änderbar', t: 'lines', rows: 3, show: b => b.kind === 'experiment', get: b => unLite(b.intro), set: (b, v) => { b.intro = mdLite(v); } },
       { k: 'hyp', l: 'Hypothese (Lücken als [[erwartet|andere Möglichkeit|…]] – jede Wahl zählt, die erste Möglichkeit zeigt die Messung)', t: 'lines', rows: 3, show: b => b.kind === 'experiment', get: b => unLite(b.hyp), set: (b, v) => { b.hyp = mdLite(v); } },
       { k: 'vars', l: 'Größen – je Zeile eine', t: 'lines', rows: 4, show: b => b.kind === 'experiment', help: 'Name Symbol in Einheit = Werte, z. B. „Kraft F in N = Isaac 30, Anne 60, Vater 90“; mit „| fest“ bleibt die Größe gleich (faire Messreihe).',
         get: b => (b.vars || []).map(varToTextCore).join('\n'), set: (b, v) => { const V = v.split('\n').map(parseVarCore).filter(x => x && x.opts.length); if (V.length) b.vars = V; } },
@@ -1792,7 +1801,7 @@ export function startPathFinder(opts = {}) {
     } else {
       const r = findBlock(id); b = live ? r.b : clone(r.b); const t = def(b);
       fields = t?.form || FORMS[b.type] || [];
-      title = b.type === 'info' ? (INFO_KINDS[b.kind]?.[0] + ' ' + INFO_KINDS[b.kind]?.[1]) : (t?.ic || '') + ' ' + (t?.n || b.type);
+      title = b.type === 'info' ? (INFO_KINDS[b.kind]?.[0] + ' ' + INFO_KINDS[b.kind]?.[1]) : b.type === 'widget' && b.kind !== 'experiment' ? '🧩 Eigenes Widget' : (t?.ic || '') + ' ' + (t?.n || b.type);
       apply = () => { const rr = findBlock(id); if (rr) rr.st.blocks[rr.i] = b; commit(); render(); };
     }
     if (live) apply = () => { softCommit(); render(); };
