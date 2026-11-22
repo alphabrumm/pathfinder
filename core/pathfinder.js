@@ -1612,8 +1612,11 @@ export function startPathFinder(opts = {}) {
   }
 
   /* ---------- Stationen: springen, aktuelle merken ---------- */
+  /* Die Stationsleiste nur waagrecht mitführen – scrollIntoView würde auch den Lernpfad bewegen und einen laufenden Sprung abbrechen */
+  const stopIntoView = a => { if (!a) return; let c = a.parentElement; while (c && c !== lp && !(c.scrollWidth > c.clientWidth + 1)) c = c.parentElement; if (!c || c === lp) return; const ar = a.getBoundingClientRect(), cr = c.getBoundingClientRect(); if (ar.left < cr.left + 8) c.scrollLeft -= cr.left + 8 - ar.left; else if (ar.right > cr.right - 8) c.scrollLeft += ar.right - cr.right + 8; };
+  let jumpUntil = 0;
   function goStation(sid, smooth) {
-    curSid = sid;
+    curSid = sid; jumpUntil = Date.now() + (smooth ? 1200 : 150); stopIntoView($(`#stops a[data-sid="${sid}"]`, lp));
     if (single) { render(); scroller.scrollTop = 0; return; }
     const PG = pagesNow(); if (PG) { const k = pageOfSid(PG, sid); if (k >= 0 && k !== pageNo) { pageNo = k; render(); if (PG[k][0].s.id === sid) { scroller.scrollTop = 0; return; } } }
     $$('.lp-station', lp).forEach(s => s.classList.toggle('cur', s.dataset.sid === sid));
@@ -1625,7 +1628,8 @@ export function startPathFinder(opts = {}) {
     const top = scroller.getBoundingClientRect().top + ($('.lp-trail, .pf-skin.editing .trail', lp)?.offsetHeight || 0) + 40;
     let cur = null; for (const s of $$('.lp-station', lp)) { if (s.getBoundingClientRect().top <= top) cur = s.dataset.sid; }
     cur = cur || $('.lp-station', lp)?.dataset.sid || doc.stations[0]?.id; // ganz oben: erste Station dieser Seite
-    if (cur && cur !== curSid) { curSid = cur; if (mode === 'preview') prog.visited[cur] = 1; $$('.lp-station', lp).forEach(s => s.classList.toggle('cur', s.dataset.sid === cur)); $$('#stops a', lp).forEach(a => a.classList.toggle('cur', a.dataset.sid === cur)); $('#stops a.cur', lp)?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
+    if (Date.now() < jumpUntil) return; // während eines Sprungs nicht dazwischenfunken
+    if (cur && cur !== curSid) { curSid = cur; if (mode === 'preview') prog.visited[cur] = 1; $$('.lp-station', lp).forEach(s => s.classList.toggle('cur', s.dataset.sid === cur)); $$('#stops a', lp).forEach(a => a.classList.toggle('cur', a.dataset.sid === cur)); stopIntoView($('#stops a.cur', lp)); }
   }, { passive: true });
 
   /* ---------- Einstellungen (⚙) ---------- */
@@ -3206,10 +3210,18 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   /* ---------- Gelöste Vorschau: alle Aufgaben richtig gelöst, Sperren offen – zum schnellen Durchsehen ---------- */
   let solvedView = false, progReal = null;
   function solvedProg(upto) {
-    const P = freshProg(), first = a => String(a || '').split('|')[0].trim(), ui = doc.stations.findIndex(x => x.id === upto);
+    const P = freshProg(), ui = doc.stations.findIndex(x => x.id === upto);
     for (const st of ui < 0 ? doc.stations : doc.stations.slice(0, ui + 1)) {
       P.visited[st.id] = 1; if (st.check) P.solved['st:' + st.id] = true;
-      for (const b of st.blocks) {
+      for (const b of st.blocks) solveInto(P, b);
+    }
+    return P;
+  }
+  /** Einen Baustein im Fortschritt P richtig lösen */
+  function solveInto(P, b) {
+    const first = a => String(a || '').split('|')[0].trim();
+    {
+      {
         if (isCheck(b)) P.solved[b.id] = true;
         if (b.type === 'quiz') P.quiz[b.id] = Object.fromEntries((b.qs || []).map((q, qi) => [qi, Math.max(0, q.opts.findIndex(o => o.ok))]));
         else if (b.type === 'gap') { const G = [...String(b.html || '').matchAll(/\[\[(.+?)\]\]/g)].map(m => first(m[1])); P.quiz[b.id] = Object.fromEntries(G.map((g, i) => [i, g])); P.quiz[b.id + ':chk'] = 1; }
@@ -3227,7 +3239,27 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         }
       }
     }
-    return P;
+  }
+  /** Bearbeiten → Vorschau: alles vor dem Baustein (bzw. vor der Station) als erledigt markieren, den Baustein selbst frisch machen */
+  function prepareAt(bid, sid) {
+    const si = doc.stations.findIndex(x => x.id === sid); if (si < 0) return;
+    doc.stations.forEach((st, i) => {
+      if (i > si) return;
+      prog.visited[st.id] = 1;
+      if (i < si && st.check) prog.solved['st:' + st.id] = true;
+      for (const b of st.blocks) {
+        if (i === si && (!bid || b.id === bid)) break;
+        if (isCheck(b) && !prog.solved[b.id]) solveInto(prog, b);
+      }
+    });
+    if (bid) { delete prog.solved[bid]; delete prog.quiz[bid]; delete prog.quiz[bid + ':chk']; delete prog.tries[bid]; delete prog.sol[bid]; delete prog.tips[bid]; }
+  }
+  /** zum Baustein (oder zur Station) springen, ohne dass die Stationsleiste ihn verdeckt */
+  function jumpToBlock(bid, sid) {
+    if (sid) goStation(sid, false);
+    const el = bid && $(`.blk[data-id="${bid}"]`, lp); if (!el) return;
+    jumpUntil = Date.now() + 300;
+    scroller.scrollTop += el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - ($('.lp-trail, .pf-skin.editing .trail', lp)?.offsetHeight || 0) - 14;
   }
   const SOLVEDKEY = () => 'pathfinder.geloestBis.' + doc.id;
   const solvedTo = upto => { const i = doc.stations.findIndex(x => x.id === upto); return i < 0 || i === doc.stations.length - 1 ? '✓ Alles gelöst' : `✓ Gelöst bis Station ${doc.stations[i].nr || i + 1}`; };
@@ -3245,13 +3277,18 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   /* ---------- Leiste oben ---------- */
   function setMode(m, upto) {
     if (pending) commit();
+    const fromEdit = mode === 'edit' && m !== 'edit', tBid = fromEdit && selId && findBlock(selId) ? selId : null, tSid = tBid ? findBlock(tBid).st.id : curSid;
     if (m === 'solved') { if (!solvedView) progReal = prog; prog = solvedProg(upto); solvedView = true; m = 'preview'; }
     else if (solvedView) { prog = progReal || freshProg(); progReal = null; solvedView = false; }
     mode = m; selId = null; closePop();
     modeBtns();
     if (m === 'preview') { prog.visited[curSid] = 1; animDone.clear(); panelBack = panelOpen; hidePanel(); }
     else if (panelBack && panelFits()) showPanel();
+    const prep = fromEdit && !solvedView && !EXAMF() && tSid && (tBid || tSid !== doc.stations[0]?.id);
+    if (prep) prepareAt(tBid, tSid);
     render();
+    if (fromEdit && tSid) jumpToBlock(tBid, tSid);
+    if (prep) { toast(tBid ? '▶ Vorschau bei deinem Baustein – alles davor ist als erledigt markiert, der Baustein selbst ist frisch.' : '▶ Vorschau ab dieser Station – alles davor ist als erledigt markiert.', 4500); return; }
     toast(solvedView ? (solvedTo(upto) + ' – richtig gelöst, Sperren dort offen. Dein Vorschau-Fortschritt bleibt erhalten.') : m === 'preview' ? (EXAMF() ? '▶ Vorschau – so sehen es die Schüler, ohne Rückmeldung. „Abgeben“ zeigt eine Probe-Auswertung.' : '▶ Vorschau – so sehen es die Schüler. Dein Fortschritt bleibt auch nach dem Neuladen; zurücksetzen über ⋯') : RO ? (EXAMF() ? '👁 Mit Lösungen' : '👁 Ansicht') : '✎ Bearbeiten');
   }
   if (!PLAYER) {
