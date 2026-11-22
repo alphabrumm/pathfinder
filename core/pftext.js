@@ -459,7 +459,7 @@ export function parseText(src, env) {
       if (k === 'farbe' || k === 'farben') { const p = env.palettes.findIndex(x => norm(x.n) === norm(v)); if (p >= 0) doc.design.pal = p; else H.warn(n, `Farbe „${v}“ gibt es nicht. Möglich: ${env.palettes.map(x => x.n).join(', ')}.`); continue; }
       if (k === 'schrift') { const f = FONTS[norm(v)]; if (f) doc.design.font = f; else H.warn(n, 'Schrift: Pixel, schlicht, elegant oder Handwriting.'); continue; }
       if (k === 'kopfbild') { const src = H.img(v, n); if (src) { doc.design.heroImg = src; doc.design.hero = doc.design.hero === 'logo' ? 'bild' : doc.design.hero; } continue; }
-      if (k === 'kopfbild-art' || k === 'kopfbild art') { const a = { klein: 'bild', gross: 'gross', 'groß': 'gross', hintergrund: 'hintergrund' }[norm(v)] || { gross: 'gross' }[norm(v)]; if (a) doc.design.hero = a; else H.warn(n, 'Kopfbild-Art: klein, groß oder Hintergrund.'); continue; }
+      if (k === 'kopfbild-art' || k === 'kopfbild art') { const a = { klein: 'bild', gross: 'gross', 'groß': 'gross', hintergrund: 'hintergrund', kein: 'keins', keins: 'keins', ohne: 'keins', 'kein bild': 'keins' }[norm(v)] || { gross: 'gross' }[norm(v)]; if (a) doc.design.hero = a; else H.warn(n, 'Kopfbild-Art: klein, groß oder Hintergrund.'); continue; }
       if (k === 'titel-animation' || k === 'untertitel-animation') { const a = ANIM[norm(v)]; if (a) doc.anim[k.startsWith('titel') ? 'title' : 'subtitle'] = a; else H.warn(n, 'Animation: tippen, einblenden, glitch oder leuchten.'); continue; }
       if (k === 'zertifikat') { doc.cert.on = doc.form !== 'pruefung' && !/^(nein|aus|no|false)$/i.test(v); continue; }
       if (k === 'rang') { doc.rank = inline(v); continue; }
@@ -551,7 +551,8 @@ export function docToText(doc, env, out = {}) {
   L.push(`Farbe: ${env.palettes[doc.design.pal]?.n || 'Pastell'}`, `Schrift: ${doc.design.font}`);
   if (doc.goals?.length) { L.push('Ziele:'); doc.goals.forEach(g => L.push('- ' + md(g))); }
   if (doc.rank) L.push(`Rang: ${md(doc.rank)}`);
-  if (doc.design.heroImg && doc.design.hero !== 'logo') { L.push(`Kopfbild: ${ref(doc.design.heroImg, 'kopf')}`); L.push(`Kopfbild-Art: ${{ bild: 'klein', gross: 'groß', hintergrund: 'Hintergrund' }[doc.design.hero] || 'klein'}`); }
+  if (doc.design.hero === 'keins') L.push('Kopfbild-Art: kein');
+  else if (doc.design.heroImg && doc.design.hero !== 'logo') { L.push(`Kopfbild: ${ref(doc.design.heroImg, 'kopf')}`); L.push(`Kopfbild-Art: ${{ bild: 'klein', gross: 'groß', hintergrund: 'Hintergrund' }[doc.design.hero] || 'klein'}`); }
   if (doc.anim?.title) L.push(`Titel-Animation: ${doc.anim.title}`);
   if (doc.anim?.subtitle) L.push(`Untertitel-Animation: ${doc.anim.subtitle}`);
   if (doc.pointsOn && doc.form !== 'pruefung') L.push('Punkte: ja');
@@ -670,7 +671,7 @@ Ziele:
 - Lernziel 1
 - Lernziel 2
 Kopfbild: anhang:logo          (optional, Bild aus dem Anhang)
-Kopfbild-Art: klein | groß | Hintergrund
+Kopfbild-Art: klein | groß | Hintergrund | kein
 Titel-Animation: tippen | einblenden | glitch | leuchten   (optional, ebenso Untertitel-Animation)
 Seiten: Stationen              (optional: jede Station auf einer eigenen Seite mit „Weiter“ und „Zurück“)
 

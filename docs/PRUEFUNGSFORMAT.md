@@ -90,7 +90,7 @@ Ziele:
 - Lernziel 1
 - Lernziel 2
 Kopfbild: anhang:logo          (optional, Bild aus dem Anhang)
-Kopfbild-Art: klein | groß | Hintergrund
+Kopfbild-Art: klein | groß | Hintergrund | kein
 Titel-Animation: tippen | einblenden | glitch | leuchten   (optional, ebenso Untertitel-Animation)
 Seiten: Stationen              (optional: jede Station auf einer eigenen Seite mit „Weiter“ und „Zurück“)
 
