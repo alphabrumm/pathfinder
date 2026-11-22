@@ -3324,7 +3324,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     }
   }
   /** Bearbeiten → Vorschau: alles vor dem Baustein (bzw. vor der Station) als erledigt markieren, den Baustein selbst frisch machen */
-  function prepareAt(bid, sid) {
+  function prepareAt(bid, sid, keep) {
     const si = doc.stations.findIndex(x => x.id === sid); if (si < 0) return;
     doc.stations.forEach((st, i) => {
       if (i > si) return;
@@ -3335,7 +3335,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         if (isCheck(b) && !prog.solved[b.id]) solveInto(prog, b);
       }
     });
-    if (bid) { delete prog.solved[bid]; delete prog.quiz[bid]; delete prog.quiz[bid + ':chk']; delete prog.tries[bid]; delete prog.sol[bid]; delete prog.tips[bid]; }
+    if (bid && !keep) { delete prog.solved[bid]; delete prog.quiz[bid]; delete prog.quiz[bid + ':chk']; delete prog.tries[bid]; delete prog.sol[bid]; delete prog.tips[bid]; }
   }
   /** zum Baustein (oder zur Station) springen, ohne dass die Stationsleiste ihn verdeckt */
   function jumpToBlock(bid, sid) {
@@ -3358,20 +3358,37 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   }
   const modeBtns = () => $$('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === (solvedView ? 'solved' : mode))));
   /* ---------- Leiste oben ---------- */
+  /** Welcher Baustein steht gerade oben (unter der Stationsleiste)? – damit ein Moduswechsel an derselben Stelle bleibt */
+  function viewAnchor() {
+    const top = ($('.lp-trail, .pf-skin.editing .trail', lp)?.getBoundingClientRect().bottom ?? scroller.getBoundingClientRect().top);
+    for (const el of $$('.blk[data-id]', lp)) { const r = el.getBoundingClientRect(); if (r.height && r.bottom > top + 20) return { id: el.dataset.id, off: r.top - top }; }
+    return null;
+  }
+  function toAnchor(a) {
+    const f = a && findBlock(a.id); if (!f) return;
+    const PG = pagesNow(); if ((single && curSid !== f.st.id) || (PG && pageOfSid(PG, f.st.id) !== pageNo)) goStation(f.st.id, false);
+    const el = $(`.blk[data-id="${a.id}"]`, lp); if (!el) return;
+    const top = ($('.lp-trail, .pf-skin.editing .trail', lp)?.getBoundingClientRect().bottom ?? scroller.getBoundingClientRect().top);
+    jumpUntil = Date.now() + 300; curSid = f.st.id;
+    scroller.scrollTop += el.getBoundingClientRect().top - top - a.off;
+  }
   function setMode(m, upto) {
     if (pending) commit();
-    const fromEdit = mode === 'edit' && m !== 'edit', tBid = fromEdit && selId && findBlock(selId) ? selId : null, tSid = tBid ? findBlock(tBid).st.id : curSid;
+    const anchor = viewAnchor();
+    const fromEdit = mode === 'edit' && m !== 'edit', tBid = fromEdit && selId && findBlock(selId) ? selId : null;
+    const aBid = fromEdit && !tBid && anchor && findBlock(anchor.id) ? anchor.id : null; // nichts ausgewählt: dort weiter, wo du gerade stehst
+    const tSid = tBid ? findBlock(tBid).st.id : aBid ? findBlock(aBid).st.id : curSid;
     if (m === 'solved') { if (!solvedView) progReal = prog; prog = solvedProg(upto); solvedView = true; m = 'preview'; }
     else if (solvedView) { prog = progReal || freshProg(); progReal = null; solvedView = false; }
     mode = m; selId = null; closePop();
     modeBtns();
     if (m === 'preview') { prog.visited[curSid] = 1; animDone.clear(); panelBack = panelOpen; hidePanel(); }
     else if (panelBack && panelFits()) showPanel();
-    const prep = fromEdit && !solvedView && !EXAMF() && tSid && (tBid || tSid !== doc.stations[0]?.id);
-    if (prep) prepareAt(tBid, tSid);
+    const prep = fromEdit && !solvedView && !EXAMF() && tSid && (tBid || aBid || tSid !== doc.stations[0]?.id);
+    if (prep) prepareAt(tBid || aBid, tSid, !tBid);
     render();
-    if (fromEdit && tSid) jumpToBlock(tBid, tSid);
-    if (prep) { toast(tBid ? '▶ Vorschau bei deinem Baustein – alles davor ist als erledigt markiert, der Baustein selbst ist frisch.' : '▶ Vorschau ab dieser Station – alles davor ist als erledigt markiert.', 4500); return; }
+    if (tBid) jumpToBlock(tBid, tSid); else toAnchor(anchor);
+    if (prep) { toast(tBid ? '▶ Vorschau bei deinem Baustein – alles davor ist als erledigt markiert, der Baustein selbst ist frisch.' : '▶ Vorschau an dieser Stelle – alles davor ist als erledigt markiert.', 4500); return; }
     toast(solvedView ? (solvedTo(upto) + ' – richtig gelöst, Sperren dort offen. Dein Vorschau-Fortschritt bleibt erhalten.') : m === 'preview' ? (EXAMF() ? '▶ Vorschau – so sehen es die Schüler, ohne Rückmeldung. „Abgeben“ zeigt eine Probe-Auswertung.' : '▶ Vorschau – so sehen es die Schüler. Dein Fortschritt bleibt auch nach dem Neuladen; zurücksetzen über ⋯') : RO ? (EXAMF() ? '👁 Mit Lösungen' : '👁 Ansicht') : '✎ Bearbeiten');
   }
   if (!PLAYER) {
