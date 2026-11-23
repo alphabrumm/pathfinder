@@ -879,3 +879,22 @@ label.lp-btn { display: inline-flex; align-items: center; justify-content: cente
 .pf-h-gelb { background: #fff0a0; } .pf-h-gruen { background: #c8f0cf; } .pf-h-blau { background: #cfe5ff; } .pf-h-rosa { background: #ffd5e5; }
 [class*="pf-h-"] { border-radius: 3px; padding: 0 2px; -webkit-box-decoration-break: clone; box-decoration-break: clone; color: #2b2340; }
 .pf-fs-klein { font-size: .82em; } .pf-fs-gross { font-size: 1.25em; } .pf-fs-xgross { font-size: 1.55em; line-height: 1.25; }
+
+/* Ausgeblendete Bausteine: im Editor blass mit durchgestrichenem Auge links, für Schüler gar nicht da */
+.blk.pf-off > :not(.ed-tools):not(.pf-eye):not(.pf-fmt) { opacity: .45; }
+.pf-eye { position: absolute; left: -26px; top: 6px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; color: var(--ink-2); background: var(--surface); box-shadow: 0 0 0 1px var(--line); }
+.lp.with-pts .blk.pf-off .pf-eye { top: 44px; left: -46px; }
+@media (max-width: 560px) { .pf-eye { left: auto; right: 4px; top: 4px; z-index: 2; } .lp.with-pts .blk.pf-off .pf-eye { left: auto; right: 4px; top: 4px; } }
+.pf-eye svg { width: 15px; height: 15px; }
+.pf-fmt button[data-fmt=subscript], .pf-fmt button[data-fmt=superscript] { text-transform: none; white-space: nowrap; }
+.pf-fmt button sub, .pf-fmt button sup { font-size: .68em; line-height: 0; }
+/* Schalter in den Baustein-Einstellungen */
+.pf-sw { display: flex !important; align-items: center; gap: 10px; cursor: pointer; margin-top: 6px; }
+.pf-sw input { position: absolute; opacity: 0; pointer-events: none; }
+.pf-sw i { flex: none; width: 40px; height: 24px; border-radius: 12px; background: #c9cdd6; position: relative; transition: background .15s; }
+.pf-sw i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+.pf-sw input:checked + i { background: var(--a1, #4a6cf7); }
+.pf-sw input:checked + i::after { transform: translateX(16px); }
+.pf-sw input:focus-visible + i { outline: 2px solid var(--a1, #4a6cf7); outline-offset: 2px; }
+.pf-sw span { display: flex; flex-direction: column; line-height: 1.25; }
+.pf-sw small { font-weight: 400; opacity: .75; }

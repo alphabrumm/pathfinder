@@ -5,7 +5,7 @@ description: Digitale Prüfungen für Probe (probe.pandapy.de) im PathFinder-Tex
 
 # Probe-Prüfungen
 
-Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-22d). Die Spezifikation unten ist dieselbe, die Probe
+Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-23a). Die Spezifikation unten ist dieselbe, die Probe
 als „Prompt für externe KI“ anzeigt. Weicht etwas vom aktuellen Probe-Verhalten ab, gilt der Code in alphabrumm/pathfinder
 (`core/pftext.js`, `core/pfsplit.js`).
 
@@ -105,6 +105,7 @@ Indizes und Hochzahlen: v_A, v_{End}, m/s^2, 10^{-3}   (ein Zeichen ohne Klammer
 [Merke] Wichtiger Merksatz.          (auch: [Tipp], [Achtung], [Begriff: Wort], [Regel], [Abschluss])
 [Figur: Aha] Eine Figur sagt etwas.  (Figuren: Nachdenken, Aha, Achtung – davor optional „Smiley“ oder „Pixel“ für einen anderen Stil – und Ente)
 [Figur: anhang:roboter | Robo] Eigene Figur mit Bild aus dem Anhang und Namen.
+{ausgeblendet}           (eigene Zeile vor einem Baustein: Schüler sehen ihn nicht, er zählt nicht)
 {tippen} Text mit Animation (vor einem Absatz oder Infokasten: {tippen}, {einblenden}, {glitch}, {leuchten})
 
 ![Bildunterschrift](anhang:diagramm)        Bild aus dem Anhang (mit „| klein“ nach der Unterschrift kleiner)

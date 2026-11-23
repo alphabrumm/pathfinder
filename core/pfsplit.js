@@ -165,6 +165,7 @@ export function splitExam(doc) {
   for (const s of d.stations || []) {
     const out = { id: s.id, title: s.title || '', sub: s.sub || '', nr: s.nr || '', check: false, anim: s.anim || '', blocks: [] };
     for (const b of s.blocks || []) {
+      if (b.hide) continue; // ausgeblendet: weder für Schüler noch in der Bewertung
       const pts = ptsOf(b), title = taskTitle(b);
       if (b.type === 'quiz') {
         out.blocks.push({ id: b.id, type: 'quiz', pts, qs: (b.qs || []).map(q => ({ q: q.q || '', opts: shuffle((q.opts || []).map(o => ({ k: o.k, t: o.t || '' }))) })) });

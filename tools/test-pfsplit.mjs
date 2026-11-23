@@ -188,6 +188,16 @@ test('Experiment: Schülerfassung ohne Lösung, Messreihe und Auswertung bewerte
   R = gradeExam(ky, {}); assert.equal(R.items[0].pts, 0);
 });
 
+test('Ausgeblendete Bausteine: nicht für Schüler, nicht in der Bewertung', () => {
+  const d = { v: 2, id: 'h', form: 'pruefung', title: 'H', design: {}, cert: {}, stations: [{ id: 's', title: 'A', blocks: [
+    { id: 't1', type: 'text', html: 'sichtbar' }, { id: 't2', type: 'text', html: 'GEHEIM', hide: true },
+    { id: 'a1', type: 'task', title: 'Sichtbar', html: '1+1', answer: '2', pts: 2 }, { id: 'a2', type: 'task', title: 'Versteckt', html: '2+2', answer: '4', pts: 3, hide: true }] }] };
+  const { student: st, key: ky } = splitExam(d), j = JSON.stringify(st);
+  assert.ok(!j.includes('GEHEIM') && !j.includes('Versteckt'));
+  assert.deepEqual(st.stations[0].blocks.map(b => b.id), ['t1', 'a1']);
+  const R = gradeExam(ky, { a1: '2', a2: '4' }); assert.equal(R.items.length, 1); assert.equal(R.max, 2);
+});
+
 test('Zerlegen ändert das Original nicht', () => {
   assert.equal(doc.stations[0].blocks[1].qs[0].opts[0].k, undefined);
   assert.equal(doc.stations[0].blocks[1].qs[0].opts[0].ok, true);

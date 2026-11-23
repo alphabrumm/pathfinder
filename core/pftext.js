@@ -391,10 +391,10 @@ export function parseText(src, env) {
       for (;;) { const t = lines.length ? lines[lines.length - 1].trim() : null; if (t === '') { lines.pop(); continue; } if (t !== null && /^(`{3,}|~{3,})(text|markdown|md|txt)$/i.test(t)) { lines.pop(); continue; } if (t !== null && isF(t) && lines.filter(isF).length % 2 === 1) { lines.pop(); continue; } break; }
     } }
   Object.assign(att, env.files || {}); // mitgelieferte Dateien haben Vorrang
-  let st = null, sec = null, para = [], i = 0, inHead = true, goalsMode = false, pendAnim = '', stepAll = false;
+  let st = null, sec = null, para = [], i = 0, inHead = true, goalsMode = false, pendAnim = '', stepAll = false, pendHide = false;
   const uid = env.uid;
   const station = (n) => { if (!st) { H.warn(n, 'Inhalt vor der ersten Station – eine Station „Start“ wurde angelegt.'); st = { id: uid(), title: 'Start', sub: '', check: false, blocks: [] }; doc.stations.push(st); } return st; };
-  const push = (b, n) => { b.id = b.id || uid(); if (pendAnim && (b.type === 'text' || b.type === 'info')) b.anim = pendAnim; pendAnim = ''; station(n).blocks.push(b); };
+  const push = (b, n) => { b.id = b.id || uid(); if (pendAnim && (b.type === 'text' || b.type === 'info')) b.anim = pendAnim; pendAnim = ''; if (pendHide) b.hide = true; pendHide = false; station(n).blocks.push(b); };
   const flushPara = () => {
     if (!para.length) return; const n = para[0][1]; const L = para.map(x => x[0]); para = [];
     if (!L.join('').trim()) return;
@@ -469,6 +469,7 @@ export function parseText(src, env) {
     if (inHead && goalsMode && (m = l.match(/^[-•*]\s+(.+)$/))) { doc.goals.push(inline(m[1])); continue; }
     if (st && !sec && !st.blocks.length && !para.length && (m = l.match(/^aufdecken:\s*(.+)$/i))) { if (/schritt/i.test(m[1])) st.step = true; else if (!/^(nein|aus|alles|sofort)$/i.test(m[1].trim())) H.warn(n, 'Aufdecken: „schrittweise“ (nächster Baustein erst, wenn die Aufgabe davor gelöst ist) oder weglassen.'); continue; }
     if (st && !sec && !st.blocks.length && !para.length && (m = l.match(/^animation:\s*(.+)$/i))) { const a = ANIM[norm(m[1])]; if (a) st.anim = a; else H.warn(n, 'Animation: tippen, einblenden, glitch oder leuchten.'); continue; }
+    if (/^\{\s*(ausgeblendet|verborgen|versteckt)\s*\}$/i.test(l)) { closeSec(); flushPara(); pendHide = true; continue; } // nächster Baustein für Schüler unsichtbar
     if (!sec && (m = l.match(/^\{\s*(tippen|schreibmaschine|einblenden|glitch|leuchten)\s*\}\s*(.*)$/i))) { flushPara(); pendAnim = ANIM[norm(m[1])]; if (!m[2]) continue; lines[i] = m[2]; i--; continue; }
     if (inHead && l && !st) { if (/^[-•*]\s/.test(l) || /^[A-Za-zÄÖÜäöüß ]{3,20}:/.test(l)) { H.warn(n, `Kopf: „${l.slice(0, 40)}“ nicht erkannt.`); continue; } }
     if ((m = l.match(/^###\s+(.+)$/))) {
@@ -563,6 +564,7 @@ export function docToText(doc, env, out = {}) {
     if (s.step) L.push('Aufdecken: schrittweise');
     for (const b of s.blocks) {
       L.push('');
+      if (b.hide) L.push('{ausgeblendet}');
       if (b.anim && (b.type === 'text' || b.type === 'info')) L.push(`{${b.anim}}`);
       const key = Object.entries(env.figures).find(([k, F]) => F.src === b.img)?.[0];
       const figName = FIG_NAME[key] || 'Aha';
@@ -688,6 +690,7 @@ Indizes und Hochzahlen: v_A, v_{End}, m/s^2, 10^{-3}   (ein Zeichen ohne Klammer
 [Merke] Wichtiger Merksatz.          (auch: [Tipp], [Achtung], [Begriff: Wort], [Regel], [Abschluss])
 [Figur: Aha] Eine Figur sagt etwas.  (Figuren: Nachdenken, Aha, Achtung – davor optional „Smiley“ oder „Pixel“ für einen anderen Stil – und Ente)
 [Figur: anhang:roboter | Robo] Eigene Figur mit Bild aus dem Anhang und Namen.
+{ausgeblendet}           (eigene Zeile vor einem Baustein: Schüler sehen ihn nicht, er zählt nicht)
 {tippen} Text mit Animation (vor einem Absatz oder Infokasten: {tippen}, {einblenden}, {glitch}, {leuchten})
 
 ![Bildunterschrift](anhang:diagramm)        Bild aus dem Anhang (mit „| klein“ nach der Unterschrift kleiner)

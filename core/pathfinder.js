@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-22d';
+const PF_BUILD = '2026-11-23a';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -118,6 +118,7 @@ const CORE = {
   lock: { n: 'Sperre', ic: '🔒', g: 'Ablauf', h: 'Ab hier erst frei, wenn … gelöst', make: () => ({ after: '' }) },
   page: { n: 'Nächste Seite', ic: '📄', g: 'Ablauf', h: 'Ab hier eine neue Seite mit „Weiter“ und „Zurück“', make: () => ({}) },
 };
+const EYE_OFF = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/></svg>';
 /** Absatzstile des Bausteins „Text“ (ohne Angabe: normaler Text) */
 const PS = { h1: 'Überschrift 1', h2: 'Überschrift 2', h3: 'Überschrift 3' };
 const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order', 'app']);
@@ -315,7 +316,7 @@ export function startPathFinder(opts = {}) {
   const T = { ...CORE }, FIELDS = {};
   for (const p of plugins) { Object.assign(T, p.blocks || {}); Object.assign(FIELDS, p.fields || {}); if (p.css) { const st = document.createElement('style'); st.textContent = p.css; document.head.appendChild(st); } }
   const def = b => T[b.type];
-  const isCheck = b => CORE_CHECK.has(b.type) || !!def(b)?.check?.(b);
+  const isCheck = b => !b.hide && (CORE_CHECK.has(b.type) || !!def(b)?.check?.(b)); // ausgeblendete Bausteine zählen nirgends
 
   /* ---------- Beispiel und Umwandlung ---------- */
   const emptyDoc = (form = 'lernpfad') => {
@@ -387,6 +388,7 @@ export function startPathFinder(opts = {}) {
       if (si > 0 && (byS || brk)) newPage(); brk = false;
       cur = { s, blocks: [], first: true, last: true }; pages[pages.length - 1].push(cur);
       for (const b of s.blocks) {
+        if (b.hide) continue;
         if (b.type === 'page') { if (cur.blocks.length) brk = true; continue; } // leere Seiten gibt es nicht
         if (brk) { newPage(); cur.last = false; cur = { s, blocks: [], first: false, last: true }; pages[pages.length - 1].push(cur); brk = false; }
         cur.blocks.push(b);
@@ -611,7 +613,7 @@ export function startPathFinder(opts = {}) {
       }
       sg.blocks.forEach((b, i) => {
         if (E()) h += plus(s.id, i);
-        if (b.type === 'page' && !E()) return;
+        if ((b.type === 'page' || b.hide) && !E()) return; // ausgeblendet: Schüler, Vorschau und „Gelöst“ sehen ihn nicht
         if (b.type === 'lock' && EXAMF()) { if (E()) h += blockHtml(b); return; } // Sperren gibt es in Prüfungen nicht
         if (b.type === 'lock' && !E()) {
           if (open) h += '</div></div>';
@@ -733,7 +735,7 @@ export function startPathFinder(opts = {}) {
   }
   function tools(b) {
     const t = def(b);
-    const form = b.type === 'info' || (t && (t.form || FORMS[b.type]));
+    const form = !doc.skin || b.type === 'info' || (t && (t.form || FORMS[b.type]));
     return `<div class="ed-tools" contenteditable="false"><button class="grip" data-bact="grip" title="Ziehen zum Verschieben" aria-label="Verschieben">⠿</button><span class="lbl">${esc(b.type === 'info' ? (INFO_KINDS[b.kind]?.[1] || 'Infokasten') : b.type === 'text' && PS[b.ps] && !doc.skin ? PS[b.ps] : b.type === 'widget' && b.kind !== 'experiment' ? 'Eigenes Widget' : t?.n || b.type)}</span>`
       + `<button data-bact="up" title="Nach oben (⌥↑)">↑</button><button data-bact="down" title="Nach unten (⌥↓)">↓</button>`
       + `<button data-bact="dup" title="Verdoppeln">⧉</button>${form ? '<button data-bact="cfg" title="Einstellungen">⚙</button>' : ''}<button class="del" data-bact="del" title="Löschen">🗑</button></div>`;
@@ -750,6 +752,7 @@ export function startPathFinder(opts = {}) {
   }
   const wrap = (b, inner, cls = '') => {
     const n = gridNo?.get(b.id);
+    if (E() && b.hide) { cls += ' pf-off'; inner = `<span class="pf-eye" title="Ausgeblendet – für Schüler nicht sichtbar" aria-label="ausgeblendet">${EYE_OFF}</span>` + inner; }
     if (!n) return `<div class="blk ${cls}" data-id="${b.id}">${E() ? tools(b) : ''}${ptsTag(b)}${inner}</div>`;
     const t = gridTag(b), row = `<div class="lp-tagrow"><span class="lp-tag">#${n} · ${esc(t.l)}</span>${t.where ? `<span class="where">${esc(t.where)}</span>` : ''}${b.xp && doc.form === 'challenge' ? `<span class="txp">${+b.xp} XP</span>` : ''}</div>`;
     inner = inner.replace(/<div class="lp-card[^"]*"[^>]*>/, m => m + row);
@@ -1548,6 +1551,7 @@ export function startPathFinder(opts = {}) {
     if (mod && e.key.toLowerCase() === 'p') { e.preventDefault(); setMode(mode === 'edit' ? 'preview' : 'edit'); return; }
     if (!E()) return;
     if (ed && mod && e.key.toLowerCase() === 'e') { e.preventDefault(); wrapSel('code'); return; }
+    if (ed && mod && !e.shiftKey && (e.key === ',' || e.key === '.') && ed.closest('[data-rich]')) { e.preventDefault(); fmtCmd(e.key === ',' ? 'subscript' : 'superscript'); return; }
     if (ed && mod && e.key.toLowerCase() === 'k') { e.preventDefault(); const url = prompt('Link-Adresse (https://…)'); if (url && /^https?:\/\//.test(url)) document.execCommand('createLink', false, url); return; }
     if (ed && mod && !e.altKey && /^[biu]$/i.test(e.key) && !e.shiftKey) { e.preventDefault(); if (ed.dataset.rich) fmtCmd({ b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()]); return; }
     if (ed && ed.dataset.rich && mod && e.shiftKey && (e.code === 'Digit7' || e.code === 'Digit8')) { e.preventDefault(); fmtCmd(e.code === 'Digit7' ? 'insertOrderedList' : 'insertUnorderedList'); return; }
@@ -1569,7 +1573,7 @@ export function startPathFinder(opts = {}) {
     if (cmd === 'hiliteColor') document.execCommand('styleWithCSS', false, false);
     fmtState();
   }
-  const FMT_BTNS = [['bold', '<b>B</b>', 'Fett (⌘/Strg+B)'], ['italic', '<i>I</i>', 'Kursiv (⌘/Strg+I)'], ['underline', '<u>U</u>', 'Unterstrichen (⌘/Strg+U)'], ['|'],
+  const FMT_BTNS = [['bold', '<b>B</b>', 'Fett (⌘/Strg+B)'], ['italic', '<i>I</i>', 'Kursiv (⌘/Strg+I)'], ['underline', '<u>U</u>', 'Unterstrichen (⌘/Strg+U)'], ['subscript', '<span>x<sub>2</sub></span>', 'Tiefgestellt (⌘/Strg+,)'], ['superscript', '<span>x<sup>2</sup></span>', 'Hochgestellt (⌘/Strg+.)'], ['|'],
     ['insertUnorderedList', '•≡', 'Stichpunkte (⌘/Strg+⇧+8)'], ['insertOrderedList', '1.≡', 'Aufzählung (⌘/Strg+⇧+7)'], ['|'],
     ['m:c', '<span class="fc">A</span>', 'Textfarbe'], ['m:h', '<span class="fh">A</span>', 'Hervorheben'], ['m:s', 'aA', 'Schriftgrad'], ['|'], ['removeFormat', '⌫', 'Formatierung entfernen']];
   function fmtShow(el) {
@@ -1805,7 +1809,7 @@ export function startPathFinder(opts = {}) {
       apply = () => { Object.assign(s, b); commit(); render(); };
     } else {
       const r = findBlock(id); b = live ? r.b : clone(r.b); const t = def(b);
-      fields = t?.form || FORMS[b.type] || [];
+      fields = [...(t?.form || FORMS[b.type] || []), ...(doc.skin ? [] : [{ k: 'hide', l: 'Ausblenden', t: 'switch', help: 'Für Schüler nicht sichtbar' }])];
       title = b.type === 'info' ? (INFO_KINDS[b.kind]?.[0] + ' ' + INFO_KINDS[b.kind]?.[1]) : b.type === 'widget' && b.kind !== 'experiment' ? '🧩 Eigenes Widget' : (t?.ic || '') + ' ' + (t?.n || b.type);
       apply = () => { const rr = findBlock(id); if (rr) rr.st.blocks[rr.i] = b; commit(); render(); };
     }
@@ -1821,6 +1825,7 @@ export function startPathFinder(opts = {}) {
         if (f.t === 'text') h += `<label>${esc(f.l)}<input type="text" data-k="${f.k}" value="${esc(plain(v ?? ''))}">${help}</label>`;
         else if (f.t === 'number') h += `<label>${esc(f.l)}<input type="number" min="0" data-k="${f.k}" value="${esc(v ?? 0)}">${help}</label>`;
         else if (f.t === 'check') h += `<label class="chk"><input type="checkbox" data-k="${f.k}"${v ? ' checked' : ''}>${esc(f.l)}</label>`;
+        else if (f.t === 'switch') h += `<label class="pf-sw"><input type="checkbox" role="switch" data-k="${f.k}"${v ? ' checked' : ''}><i aria-hidden="true"></i><span><b>${esc(f.l)}</b>${f.help ? `<small>${esc(f.help)}</small>` : ''}</span></label>`;
         else if (f.t === 'shown') h += `<label class="chk"><input type="checkbox" data-k="${f.k}"${v ? '' : ' checked'}>${esc(f.l)}</label>`;
         else if (f.t === 'select') h += `<label>${esc(f.l)}<select data-k="${f.k}">${f.o.map(([k, n]) => `<option value="${k}"${k === (v ?? '') ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>${help}</label>`;
         else if (f.t === 'code') h += `<label>${esc(f.l)}<textarea class="mono" data-k="${f.k}" style="min-height:220px" spellcheck="false">${esc(v)}</textarea>${help}</label>`;
@@ -3471,6 +3476,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   }
   // was die Lehrkraft verborgen hat, kommt gar nicht erst in die Datei
   function stripHidden(d) {
+    for (const st of d.stations) st.blocks = st.blocks.filter(b => !b.hide); // ausgeblendete Bausteine gar nicht mitliefern
     for (const st of d.stations) for (const b of st.blocks) {
       if (b.tipsHide && b.tips) { b.tips = b.tips.filter((t, i) => !b.tipsHide[i]); delete b.tipsHide; }
       if (b.solHide) { b.solution = ''; delete b.solHide; }
