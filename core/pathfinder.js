@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-23a';
+const PF_BUILD = '2026-11-24s';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -108,6 +108,16 @@ const CORE = {
   order: { n: 'Reihenfolge', ic: '↕', g: 'Aufgaben', h: 'Abschnitte ordnen (Textpuzzle)', make: () => ({ words: false, title: 'Bring die Abschnitte in die richtige Reihenfolge', items: ['Erster Abschnitt', 'Zweiter Abschnitt', 'Dritter Abschnitt'], alts: [], xp: 10 }) },
   essay: { n: 'Freitext', ic: '✍', g: 'Aufgaben', h: 'offene Antwort mit Erwartungshorizont – nur in Prüfungen', exam: true, make: () => ({ title: '', html: '', img: '', lines: 6, rubric: [], pts: 4 }) },
   app: { n: 'Programmieren in JPad', ic: '☕', g: 'Aufgaben', h: 'Schüler programmieren in JPad; Ausgabe und Pflicht-Code werden geprüft – nur in Prüfungen', exam: true, make: () => ({ app: 'jpad', title: '', html: '', img: '', files: [{ name: 'Hauptprogramm', text: '' }], expect: '', compare: 'enthaelt', needs: [], rubric: [], solution: '', pts: 4 }) },
+  /* Befragung (nur in der Art „Befragung“): Fragen ohne richtig oder falsch – für Umfragen, Selbstreflexion, Gesprächsbögen.
+     share = darf mit Einwilligung weitergegeben werden (Gesprächsbogen); consent = diese Auswahl ist die Einwilligung */
+  scale: { n: 'Skala', ic: '⑩', g: 'Befragung', survey: true, h: 'Bewertung auf einer Skala, z. B. 1 bis 10', make: () => ({ q: '', min: 1, max: 10, lo: '', hi: '' }) },
+  choice: { n: 'Auswahl', ic: '◉', g: 'Befragung', survey: true, h: 'eine Antwort ankreuzen', make: () => ({ q: '', opts: ['', ''], multi: false }) },
+  multi: { n: 'Mehrfachauswahl', ic: '☑', g: 'Befragung', survey: true, alias: 'choice', h: 'mehrere Antworten ankreuzen', make: () => ({ q: '', opts: ['', ''], multi: true }) },
+  yesno: { n: 'Ja / Nein', ic: '±', g: 'Befragung', survey: true, alias: 'choice', h: 'Ja oder Nein ankreuzen', make: () => ({ q: '', opts: ['Ja', 'Nein'], multi: false }) },
+  matrix: { n: 'Raster', ic: '▦', g: 'Befragung', survey: true, h: 'mehrere Aussagen auf derselben Skala, z. B. +3 bis −3', make: () => ({ q: '', items: ['', ''], cols: ['+3', '+2', '+1', '−1', '−2', '−3'] }) },
+  open: { n: 'Offene Frage', ic: '✎', g: 'Befragung', survey: true, h: 'Antwort als Text – eine Zeile oder mehrere', make: () => ({ q: '', rows: 3, hint: '' }) },
+  datefield: { n: 'Datum', ic: '📅', g: 'Befragung', survey: true, h: 'ein Datum, z. B. „Wir schauen wieder drauf am“', make: () => ({ q: '' }) },
+  consent: { n: 'Einwilligung', ic: '✍', g: 'Befragung', survey: true, alias: 'choice', h: 'Einwilligung zur Weitergabe an die nächste Klassleitung (Gesprächsbogen)', make: () => ({ q: 'Einwilligung zur Weitergabe', text: 'Darf deine jetzige Klassenleitung deine Lernziele, vereinbarten Hilfen und Ergebnisse an deine nächste Klassenleitung weitergeben? Persönliche Dinge aus dem Gespräch werden nicht weitergegeben.', opts: ['Ja, das ist okay.', 'Nein, das möchte ich nicht.'], multi: false, consent: true }) },
   widget: { n: 'Experiment', ic: '🔬', g: 'Widgets', h: 'Hypothese → Experiment → Auswertung → Schlussfolgerung (in Prüfungen: Messreihe und Auswertung werden bewertet)', check: b => b.kind === 'experiment' || !!b.check,
     label: b => b.kind === 'experiment' ? 'das Experiment' : 'das Widget „' + String(b.title || '').replace(/<[^>]+>/g, '').slice(0, 30) + '“',
     make: () => ({ kind: 'experiment', title: 'Wie hängt das Ergebnis von der Größe ab?', intro: '', hyp: 'Wenn die Größe größer wird, dann [[wird das Ergebnis größer|wird das Ergebnis kleiner|bleibt das Ergebnis gleich]].',
@@ -122,6 +132,9 @@ const EYE_OFF = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" str
 /** Absatzstile des Bausteins „Text“ (ohne Angabe: normaler Text) */
 const PS = { h1: 'Überschrift 1', h2: 'Überschrift 2', h3: 'Überschrift 3' };
 const CORE_CHECK = new Set(['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order', 'app']);
+/** Fragen einer Befragung (ohne richtig/falsch) und was in einer Befragung sonst erlaubt ist */
+const SURVEY_T = new Set(['scale', 'choice', 'matrix', 'open', 'datefield']);
+const SURVEY_OK = new Set(['text', 'heading', 'info', 'image', 'table', 'page']);
 
 /* Experiment-Widget: Größen „Kraft F in N = Isaac 30, Anne 60 | fest“ und Rechenvorschrift (gleiche Regeln wie in pftext.js) */
 const pNum = x => parseFloat(String(x).replace(/\s/g, '').replace(',', '.'));
@@ -327,10 +340,15 @@ export function startPathFinder(opts = {}) {
       cert: { on: true, need: 'immer', pct: 80, text: 'hat den Lernpfad mit folgendem Ergebnis bearbeitet:', show: { zeit: true, tipps: true, quiz: true, xp: true } },
     };
     if (form === 'pruefung') { d.pointsOn = true; d.cert.on = false; d.design.font = 'schlicht'; d.design.shape = 'rund'; }
+    if (form === 'befragung') { d.pointsOn = false; d.cert.on = false; d.design.font = 'schlicht'; d.design.shape = 'rund'; }
     return d;
   };
   /* Digitale Prüfung: Punkte immer an, keine Rückmeldung für Schüler; EXAM() = Schüler beantworten gerade eine Prüfung */
   const EXAMF = () => doc?.form === 'pruefung';
+  /* Befragung: Fragen ohne richtig/falsch, keine Punkte, keine Sperren; NOLEARN = weder Lernpfad noch Challenge */
+  const SURVEYF = () => doc?.form === 'befragung';
+  const NOLEARN = () => EXAMF() || SURVEYF();
+  const svy = {}; // Antworten in der Vorschau einer Befragung (nur im Speicher)
   const EXAM = () => EXAMF() && !E();
   const EXAM_DONE = () => EXAMF() && !!doc.exam?.submitted; // nach der Abgabe: Antworten nur noch ansehen
   // stabile Schlüssel für Antwortoptionen und Zuordnungskarten: Antworten bleiben gültig, auch wenn gemischt wird
@@ -366,7 +384,7 @@ export function startPathFinder(opts = {}) {
   const RO = !PLAYER && !!opts.readOnly; // schreibgeschützt (z. B. Prüfung nach dem Start in Probe): ansehen mit Lösungen, Vorschau ausprobieren, nichts ändern
   let doc = null;
   // Erlaubte Formate (z. B. nur 'pruefung', wenn PathFinder in Probe eingebettet ist)
-  const FORMS_OK = Array.isArray(opts.forms) && opts.forms.length ? opts.forms : ['lernpfad', 'challenge', 'pruefung'];
+  const FORMS_OK = Array.isArray(opts.forms) && opts.forms.length ? opts.forms : ['lernpfad', 'challenge', 'pruefung', 'befragung'];
   const formOk = f => FORMS_OK.includes(f || 'lernpfad');
   let startHere = false, convertNext = false; // convertNext: das nächste geöffnete Dokument wird zur Prüfung
   if (PLAYER) doc = migrate(opts.doc);
@@ -586,12 +604,12 @@ export function startPathFinder(opts = {}) {
     const goals = doc.goals || [];
     h += `<header class="lp-hero${d.hero === 'hintergrund' && d.heroImg ? ' has-bg' : ''}${d.hero === 'gross' && d.heroImg ? ' big' : ''}"${d.hero === 'hintergrund' && d.heroImg ? ` style="background-image:url(${cssUrl(d.heroImg)})"` : ''}>`
       + (d.hero !== 'hintergrund' && d.hero !== 'keins' ? `<div class="lp-logo${d.hero === 'logo' && opts.logo && !hackImg ? ' applogo' : ''}${(d.hero !== 'logo' && d.heroImg) || hackImg ? ' own' : ''}"${E() ? ' title="Antippen: eigenes Bild oder GIF setzen"' : ''}>${logo}</div>` : '')
-      + `<div class="lp-herotxt" style="min-width:0">${ce('$kicker', doc.kicker, 'Kopfzeile, z. B. Fach · Jahrgangsstufe', { tag: 'small' })}${ce('$title', doc.title, EXAMF() ? 'Titel der Prüfung' : 'Titel des Lernpfads', { tag: 'h1', anim: doc.anim?.title })}${ce('$subtitle', doc.subtitle, 'Untertitel', { tag: 'p', rich: true, anim: doc.anim?.subtitle })}`
+      + `<div class="lp-herotxt" style="min-width:0">${ce('$kicker', doc.kicker, 'Kopfzeile, z. B. Fach · Jahrgangsstufe', { tag: 'small' })}${ce('$title', doc.title, EXAMF() ? 'Titel der Prüfung' : SURVEYF() ? 'Titel der Befragung' : 'Titel des Lernpfads', { tag: 'h1', anim: doc.anim?.title })}${ce('$subtitle', doc.subtitle, 'Untertitel', { tag: 'p', rich: true, anim: doc.anim?.subtitle })}`
       + (goals.length ? `<ul class="lp-goals">${goals.map((g, i) => ce('$goals.' + i, g, 'Lernziel', { tag: 'li', rich: true })).join('')}</ul>` : '')
       + (doc.rank ? `<div class="lp-rank">${ce('$rank', doc.rank, 'Rang', { tag: 'span', rich: true })}</div>` : '')
-      + (E() && (!goals.length || !doc.rank) ? `<div class="ed-hint" style="display:inline-block">Lernziele und Rang: ⚙ Einstellungen → Kopf</div>` : '')
+      + (E() && !SURVEYF() && (!goals.length || !doc.rank) ? `<div class="ed-hint" style="display:inline-block">Lernziele und Rang: ⚙ Einstellungen → Kopf</div>` : '')
       + `</div></header><div class="lp-divider" aria-hidden="true"></div>`;
-    h += `<nav class="lp-trail"><div class="lp-trail-in"><div class="lp-stops" id="stops">${doc.stations.map((s, i) => `<a data-sid="${s.id}" class="${stationDone(s) ? 'done' : ''}${s.id === curSid ? ' cur' : ''}" title="${esc(s.title)}">${stationDone(s) ? '✓' : esc(s.nr || i + 1)}</a>`).join('')}${doc.cert.on || EXAMF() ? `<a data-sid="cert" title="${EXAMF() ? 'Abgabe' : 'Abschluss'}">🏁</a>` : ''}</div><span class="lp-count">${doc.stations.filter(stationDone).length} / ${doc.stations.length}</span></div></nav>`;
+    h += `<nav class="lp-trail"><div class="lp-trail-in"><div class="lp-stops" id="stops">${doc.stations.map((s, i) => `<a data-sid="${s.id}" class="${!SURVEYF() && stationDone(s) ? 'done' : ''}${s.id === curSid ? ' cur' : ''}" title="${esc(s.title)}">${!SURVEYF() && stationDone(s) ? '✓' : esc(s.nr || i + 1)}</a>`).join('')}${doc.cert.on || EXAMF() ? `<a data-sid="cert" title="${EXAMF() ? 'Abgabe' : 'Abschluss'}">🏁</a>` : ''}</div>${SURVEYF() ? '' : `<span class="lp-count">${doc.stations.filter(stationDone).length} / ${doc.stations.length}</span>`}</div></nav>`;
     gridNo = null; if (d.theme === 'grid') { gridNo = new Map(); let n = 0; for (const st of doc.stations) for (const b of st.blocks) if (isCheck(b)) gridNo.set(b.id, ++n); }
     h += `<main class="lp-main">`;
     if (doc.form === 'challenge') { const x = xpNow(), mx = xpMax() || 1; h += `<div class="lp-hud"><span>⚡ ${x} XP</span><span class="bar"><i style="width:${Math.round(100 * x / mx)}%"></i></span><span>von ${mx}</span></div>`; }
@@ -603,18 +621,18 @@ export function startPathFinder(opts = {}) {
       let open = false, stepHidden = false;
       // Schrittweise aufdecken: eine Station wird erst frei, wenn die Station davor geschafft ist
       const prevSt = si > 0 ? doc.stations[si - 1] : null;
-      if (s.step && prevSt?.step && !E() && !EXAMF() && !stationDone(prevSt)) {
+      if (s.step && prevSt?.step && !E() && !NOLEARN() && !stationDone(prevSt)) {
         h += `<div class="lp-lock step locked"><div class="lp-lock-note">🔒 Diese Station wird frei, sobald du Station ${esc(prevSt.nr || si)} geschafft hast.</div></div></section>`;
         return;
       }
-      if (!sg.first && !EXAMF()) { // Fortsetzung auf neuer Seite: liegt eine Sperre davor, gilt sie hier weiter
+      if (!sg.first && !NOLEARN()) { // Fortsetzung auf neuer Seite: liegt eine Sperre davor, gilt sie hier weiter
         const k = s.blocks.indexOf(sg.blocks[0]), lk = s.blocks.slice(0, k).reverse().find(x => x.type === 'lock');
         if (lk) { const ref = findBlock(lk.after), isLocked = !!ref && isCheck(ref.b) && !prog.solved[lk.after]; h += `<div class="lp-lock${isLocked ? ' locked' : ''}"><div class="lp-lock-note">🔒 Geht weiter, sobald ${ref ? esc(blockLabel(ref.b)) : 'die Aufgabe'} gelöst ist.</div><div class="lp-lock-body">`; open = true; }
       }
       sg.blocks.forEach((b, i) => {
         if (E()) h += plus(s.id, i);
         if ((b.type === 'page' || b.hide) && !E()) return; // ausgeblendet: Schüler, Vorschau und „Gelöst“ sehen ihn nicht
-        if (b.type === 'lock' && EXAMF()) { if (E()) h += blockHtml(b); return; } // Sperren gibt es in Prüfungen nicht
+        if (b.type === 'lock' && NOLEARN()) { if (E()) h += blockHtml(b); return; } // Sperren gibt es in Prüfungen nicht
         if (b.type === 'lock' && !E()) {
           if (open) h += '</div></div>';
           const ref = findBlock(b.after), isLocked = !!ref && isCheck(ref.b) && !prog.solved[b.after];
@@ -623,7 +641,7 @@ export function startPathFinder(opts = {}) {
         }
         h += blockHtml(b);
         // Schrittweise aufdecken: nach jeder Aufgabe geht es erst weiter, wenn sie gelöst ist (ab der ersten offenen Aufgabe bleibt alles verborgen)
-        if (s.step && !E() && !EXAMF() && isCheck(b) && !stepHidden && sg.blocks.slice(i + 1).some(x => x.type !== 'page')) {
+        if (s.step && !E() && !NOLEARN() && isCheck(b) && !stepHidden && sg.blocks.slice(i + 1).some(x => x.type !== 'page')) {
           if (open) h += '</div></div>';
           const lk = !prog.solved[b.id]; if (lk) stepHidden = true;
           h += `<div class="lp-lock step${lk ? ' locked' : ''}"><div class="lp-lock-note">⬇ Weiter geht es, sobald du die Aufgabe darüber gelöst hast.</div><div class="lp-lock-body">`;
@@ -632,14 +650,14 @@ export function startPathFinder(opts = {}) {
       });
       if (open) h += '</div></div>';
       if (E()) h += plus(s.id, s.blocks.length);
-      if (s.check && !EXAMF() && sg.last) { const ok = !!prog.solved['st:' + s.id]; h += `<label class="lp-done${ok ? ' ok' : ''}"><input type="checkbox" data-sdone="${s.id}"${ok ? ' checked' : ''}${E() ? ' disabled' : ''}> Station erledigt</label>`; }
+      if (s.check && !NOLEARN() && sg.last) { const ok = !!prog.solved['st:' + s.id]; h += `<label class="lp-done${ok ? ' ok' : ''}"><input type="checkbox" data-sdone="${s.id}"${ok ? ' checked' : ''}${E() ? ' disabled' : ''}> Station erledigt</label>`; }
       h += `</section>`;
     });
     if (E()) h += `<button class="ed-add-station" data-act="addStation">＋ Neue Station</button>`;
     if (lastPage && EXAMF()) h += examFootHtml();
     else if (lastPage && (doc.cert.on || E())) h += certHtml();
     if (PG) h += `<nav class="lp-pager">${pageNo > 0 ? '<button class="lp-btn alt" data-pg="-1">‹ Zurück</button>' : '<span></span>'}<span class="lp-pgno">Seite ${pageNo + 1} von ${PG.length}</span>${lastPage ? '<span></span>' : '<button class="lp-btn" data-pg="1">Weiter ›</button>'}</nav>`;
-    h += `</main><footer class="lp-foot">${doc.form === 'challenge' ? 'Challenge' : EXAMF() ? 'Digitale Prüfung' : 'Lernpfad'} · läuft komplett im Browser${scorm?.ok ? ' · Fortschritt wird in der Lernplattform gespeichert' : ''}</footer>`;
+    h += `</main><footer class="lp-foot">${doc.form === 'challenge' ? 'Challenge' : EXAMF() ? 'Digitale Prüfung' : SURVEYF() ? 'Befragung' : 'Lernpfad'} · läuft komplett im Browser${scorm?.ok ? ' · Fortschritt wird in der Lernplattform gespeichert' : ''}</footer>`;
     lp.innerHTML = h;
     runAnims();
     xDrawAll(); wPlace();
@@ -776,7 +794,29 @@ export function startPathFinder(opts = {}) {
     return h + '</div>';
   }
 
+  /** Frage einer Befragung: im Editor Frage direkt änderbar, Antwortmöglichkeiten über ⚙; in der Vorschau ausfüllbar */
+  function surveyCard(b) {
+    const ed = E(), dis = ed ? ' disabled' : '', v = svy[b.id], nm = 'sv' + b.id, attr = `data-svy="${b.id}"${dis}`;
+    const tags = (b.share ? '<span class="where" title="Darf mit Einwilligung an die nächste Klassleitung weitergegeben werden">↪ Weitergabe</span>' : '') + (b.consent ? '<span class="where">✍ Einwilligung</span>' : '');
+    const head = `<div class="hd">${ce('q', b.q, 'Frage …', { tag: 'b', cls: 'lp-ctitle' })}${tags}</div>${b.hint ? `<div class="help">${esc(b.hint)}</div>` : ''}${b.text ? `<p class="sv-text">${esc(b.text)}</p>` : ''}`;
+    let body = '';
+    if (b.type === 'scale') {
+      const lo = +b.min || 0, hi = Math.max(lo + 1, +b.max || 10), N = Array.from({ length: Math.min(21, hi - lo + 1) }, (_, i) => lo + i);
+      body = `<div class="sv-scale" style="grid-template-columns:repeat(${Math.min(N.length, 10)},minmax(0,1fr))">${N.map(n => `<label><input type="radio" name="${nm}" value="${n}" ${attr}${+v === n ? ' checked' : ''}><span>${n}</span></label>`).join('')}</div>`
+        + (b.lo || b.hi ? `<div class="sv-ends"><span>${b.lo ? `${lo} = ${esc(b.lo)}` : ''}</span><span>${b.hi ? `${hi} = ${esc(b.hi)}` : ''}</span></div>` : '');
+    } else if (b.type === 'choice') {
+      const a = Array.isArray(v) ? v : v != null ? [v] : [];
+      body = `<div class="sv-opts">${(b.opts || []).map((o, i) => `<label><input type="${b.multi ? 'checkbox' : 'radio'}" name="${nm}" value="${i}" ${attr}${a.includes(i) ? ' checked' : ''}><span>${esc(o) || (ed ? '<i>Antwort ' + (i + 1) + '</i>' : '')}</span></label>`).join('')}</div>`;
+    } else if (b.type === 'matrix') {
+      const m = v || {}, cols = b.cols || [];
+      body = `<div class="sv-mx"><table><tr><th></th>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr>${(b.items || []).map((it, i) => `<tr><td>${esc(it) || (ed ? '<i>Aussage ' + (i + 1) + '</i>' : '')}</td>${cols.map((c, j) => `<td><input type="radio" name="${nm}_${i}" value="${j}" ${attr} data-row="${i}" aria-label="${esc(it)}: ${esc(c)}"${m[i] === j ? ' checked' : ''}></td>`).join('')}</tr>`).join('')}</table></div>`;
+    } else if (b.type === 'open') {
+      body = (+b.rows || 1) <= 1 ? `<input type="text" class="sv-line" ${attr} value="${esc(v || '')}">` : `<textarea class="sv-area" rows="${Math.min(20, +b.rows || 3)}" ${attr}>${esc(v || '')}</textarea>`;
+    } else if (b.type === 'datefield') body = `<input type="date" class="sv-date" ${attr} value="${esc(v || '')}">`;
+    return `<div class="lp-card lp-svy">${head}${body}${ed ? '<div class="ed-hint">Antwortmöglichkeiten, Hinweis und Weitergabe über ⚙ ändern</div>' : ''}</div>`;
+  }
   function blockHtml(b) {
+    if (SURVEY_T.has(b.type)) return wrap(b, surveyCard(b));
     if (EXAM() && CORE_CHECK.has(b.type)) return examBlockHtml(b);
     if (b.type === 'essay') return wrap(b, essayEdit(b));
     if (b.type === 'app') return wrap(b, appEdit(b));
@@ -1343,6 +1383,14 @@ export function startPathFinder(opts = {}) {
     return false;
   }
 
+  /* Vorschau einer Befragung: Antworten im Speicher halten (gehen erst an Probe) */
+  lp.addEventListener('change', ev => {
+    const x = ev.target.closest?.('[data-svy]'); if (!x || E()) return; const r = findBlock(x.dataset.svy); if (!r) return; const b = r.b;
+    if (b.type === 'choice') { const all = [...lp.querySelectorAll(`[data-svy="${b.id}"]:checked`)].map(i => +i.value); svy[b.id] = b.multi ? all : all[0]; }
+    else if (b.type === 'matrix') { svy[b.id] = { ...(svy[b.id] || {}), [+x.dataset.row]: +x.value }; }
+    else if (b.type === 'scale') svy[b.id] = +x.value; else svy[b.id] = x.value;
+  });
+  lp.addEventListener('input', ev => { const x = ev.target.closest?.('textarea[data-svy], input.sv-line[data-svy]'); if (x && !E()) svy[x.dataset.svy] = x.value; });
   /* ---------- Eingaben im Bearbeiten-Modus ---------- */
   function setPath(obj, path, val) { const ks = path.split('.'); let o = obj; while (ks.length > 1) { const k = ks.shift(); if (o[k] == null) o[k] = {}; o = o[k]; } o[ks[0]] = val; }
   lp.addEventListener('input', ev => {
@@ -1510,7 +1558,7 @@ export function startPathFinder(opts = {}) {
     pop = document.createElement('div'); pop.className = 'ed-pop';
     let filter = '', hi = 0;
     const draw = () => {
-      const items = Object.entries(T).filter(([k, t]) => (doc.skin ? SKIN_TYPES.has(k) : !t.skinOnly)).filter(([k, t]) => EXAMF() ? !!CORE[k] && k !== 'lock' && !t.noExam : !t.exam).filter(([k, t]) => !filter ||(t.n + ' ' + t.h + ' ' + k).toLowerCase().includes(filter));
+      const items = Object.entries(T).filter(([k, t]) => (doc.skin ? SKIN_TYPES.has(k) : !t.skinOnly)).filter(([k, t]) => SURVEYF() ? !!t.survey || SURVEY_OK.has(k) : EXAMF() ? !!CORE[k] && k !== 'lock' && !t.noExam && !t.survey : !t.exam && !t.survey).filter(([k, t]) => !filter ||(t.n + ' ' + t.h + ' ' + k).toLowerCase().includes(filter));
       let g = '', h = `<h3>${c.slash ? `Baustein: „/${esc(filter)}“` : 'Baustein einfügen'}</h3><div class="ed-pal">`;
       items.forEach(([k, t], i) => { if (t.g !== g) { g = t.g; h += `<div class="grp">${g}</div>`; } h += `<button data-type="${k}" class="${i === hi ? 'hi' : ''}"><b>${t.ic} ${esc(t.n)}</b><span>${esc(t.h)}</span></button>`; });
       if (!items.length) h += '<div class="grp">nichts gefunden</div>';
@@ -1737,6 +1785,15 @@ export function startPathFinder(opts = {}) {
       { k: 'heftBg', l: 'Hintergrund des Hefteintrags', t: 'select', o: HEFT_BG, show: b => b.heft }, { k: 'heftFont', l: 'Schrift des Hefteintrags', t: 'select', o: HEFT_FONT, show: b => b.heft }, XP],
     match: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'pairs', l: 'Paare', t: 'pairs' }, XP],
     mark: [{ k: 'title', l: 'Arbeitsauftrag', t: 'text' }, XP],
+    scale: [{ k: 'q', l: 'Frage', t: 'text' }, { k: 'min', l: 'Von', t: 'number' }, { k: 'max', l: 'Bis', t: 'number' }, { k: 'lo', l: 'Beschriftung „Von“ (z. B. gar nicht wohl)', t: 'text' }, { k: 'hi', l: 'Beschriftung „Bis“ (z. B. sehr wohl)', t: 'text' }, { k: 'hint', l: 'Hinweis unter der Frage (optional)', t: 'text' }, { k: 'share', l: '↪ Darf mit Einwilligung an die nächste Klassleitung weitergegeben werden (nur in Gesprächsbögen)', t: 'check' }],
+    choice: [{ k: 'q', l: 'Frage', t: 'text' }, { k: 'multi', l: 'Mehrere Antworten erlaubt', t: 'check', show: b => !b.consent },
+      { k: 'opts', l: 'Antwortmöglichkeiten – je Zeile eine', t: 'lines', rows: 5, get: b => (b.opts || []).join('\n'), set: (b, v) => { b.opts = v.split('\n').map(x => x.trim()).filter(Boolean); } },
+      { k: 'text', l: 'Erklärung über den Antworten (optional)', t: 'lines', rows: 3, get: b => b.text || '', set: (b, v) => { b.text = v.trim(); } },
+      { k: 'consent', l: '✍ Das ist die Einwilligung zur Weitergabe (die erste Antwort bedeutet „Ja“)', t: 'check', show: b => !b.multi }, { k: 'hint', l: 'Hinweis unter der Frage (optional)', t: 'text' }, { k: 'share', l: '↪ Darf mit Einwilligung an die nächste Klassleitung weitergegeben werden (nur in Gesprächsbögen)', t: 'check' }],
+    matrix: [{ k: 'q', l: 'Frage / Arbeitsauftrag', t: 'text' }, { k: 'items', l: 'Aussagen – je Zeile eine', t: 'lines', rows: 8, get: b => (b.items || []).join('\n'), set: (b, v) => { b.items = v.split('\n').map(x => x.trim()).filter(Boolean); } },
+      { k: 'cols', l: 'Spalten (mit Komma getrennt, z. B. +3, +2, +1, −1, −2, −3)', t: 'lines', rows: 2, get: b => (b.cols || []).join(', '), set: (b, v) => { b.cols = String(v).split(/\s*,\s*/).map(x => x.trim()).filter(Boolean); } }, { k: 'hint', l: 'Hinweis unter der Frage (optional)', t: 'text' }, { k: 'share', l: '↪ Darf mit Einwilligung an die nächste Klassleitung weitergegeben werden (nur in Gesprächsbögen)', t: 'check' }],
+    open: [{ k: 'q', l: 'Frage', t: 'text' }, { k: 'rows', l: 'Zeilen (1 = kurze Antwort)', t: 'number' }, { k: 'hint', l: 'Hinweis unter der Frage (optional)', t: 'text' }, { k: 'share', l: '↪ Darf mit Einwilligung an die nächste Klassleitung weitergegeben werden (nur in Gesprächsbögen)', t: 'check' }],
+    datefield: [{ k: 'q', l: 'Frage', t: 'text' }, { k: 'hint', l: 'Hinweis unter der Frage (optional)', t: 'text' }, { k: 'share', l: '↪ Darf mit Einwilligung an die nächste Klassleitung weitergegeben werden (nur in Gesprächsbögen)', t: 'check' }],
     sort: [{ k: 'title', l: 'Überschrift', t: 'text' }, { k: 'groups', l: 'Gruppen und Begriffe', t: 'lines', rows: 6, help: 'Je Zeile eine Gruppe: „Gruppe: Begriff, Begriff, Begriff“',
       get: b => (b.groups || []).map(g => `${g.name}: ${(g.items || []).join(', ')}`).join('\n'),
       set: (b, v) => { b.groups = v.split('\n').map(l => l.match(/^([^:]{1,60}):\s*(.*)$/)).filter(Boolean).map(m => ({ name: m[1].trim(), items: m[2].split(/\s*[,;]\s*/).map(x => x.trim()).filter(Boolean) })); } }, XP],
@@ -1956,9 +2013,9 @@ export function startPathFinder(opts = {}) {
       const pat = d.pattern || 'punkte', custom = !PATTERNS.some(x => x[0] === pat);
       el.innerHTML = `${live ? '<div class="pf-ptitle">Allgemein</div>' : '<header><b>Allgemein</b><button class="ok" data-x="ok">Fertig</button></header>'}<div class="ed-form">
         <fieldset><legend>Art</legend>
-        ${seg('form', [['lernpfad', 'Lernpfad'], ['challenge', 'Challenge'], ['pruefung', 'Digitale Prüfung']].filter(([v]) => formOk(v)), doc.form)}
-        <span class="help">${doc.form === 'challenge' ? 'Challenge: mit XP-Leiste und Rang – spielerisch.' : EXAMF() ? 'Digitale Prüfung: Punkte für jede Aufgabe, keine Tipps, Lösungen oder Sperren. Schüler sehen keine Rückmeldung; bewertet wird nach der Abgabe. Aufgaben ohne Ergebnis und Freitexte bewertest du selbst.' : 'Lernpfad: Stationen der Reihe nach, ruhig und übersichtlich.'}</span>
-        ${EXAMF() ? '' : `<label class="chk"><input type="checkbox" id="ptsIn"${doc.pointsOn ? ' checked' : ''}>Punkte für Aufgaben vergeben</label><span class="help">Die Punkte stehen links neben jeder Aufgabe, lassen sich dort anpassen und zählen im SCORM-Lernpaket.</span>`}
+        ${seg('form', [['lernpfad', 'Lernpfad'], ['challenge', 'Challenge'], ['pruefung', 'Digitale Prüfung'], ['befragung', 'Befragung']].filter(([v]) => formOk(v)), doc.form)}
+        <span class="help">${doc.form === 'challenge' ? 'Challenge: mit XP-Leiste und Rang – spielerisch.' : SURVEYF() ? 'Befragung: Umfrage, Fragebogen oder Gesprächsbogen – Fragen ohne richtig oder falsch (Skala, Auswahl, Raster, offene Frage, Datum). Ausgefüllt wird in Probe; jede Station ist ein Abschnitt.' : EXAMF() ? 'Digitale Prüfung: Punkte für jede Aufgabe, keine Tipps, Lösungen oder Sperren. Schüler sehen keine Rückmeldung; bewertet wird nach der Abgabe. Aufgaben ohne Ergebnis und Freitexte bewertest du selbst.' : 'Lernpfad: Stationen der Reihe nach, ruhig und übersichtlich.'}</span>
+        ${NOLEARN() ? '' : `<label class="chk"><input type="checkbox" id="ptsIn"${doc.pointsOn ? ' checked' : ''}>Punkte für Aufgaben vergeben</label><span class="help">Die Punkte stehen links neben jeder Aufgabe, lassen sich dort anpassen und zählen im SCORM-Lernpaket.</span>`}
         <label class="chk"><input type="checkbox" id="pagesIn"${doc.pages === 'stationen' ? ' checked' : ''}>Stationen auf eigene Seiten</label><span class="help">Schüler sehen jede Station auf einer eigenen Seite und blättern mit „Weiter“ und „Zurück“. Weitere Seitenumbrüche: Baustein „Nächste Seite“ (＋ unter einem Baustein).</span>
         </fieldset>
         <fieldset><legend>Aussehen</legend>
@@ -2506,7 +2563,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const ST = { 5: 'eine kurze Station', 10: '1–2 kurze Stationen', 20: '2 Stationen', 30: '3 Stationen', 45: 'etwa 4 Stationen', 60: 'etwa 5 Stationen', 90: '6–7 Stationen' };
     const p1 = info.p1 ?? 40, p2 = info.p2 ?? 80;
     return {
-      art: info.art === 'challenge' || info.art === 'pruefung' ? info.art : 'lernpfad',
+      art: ['challenge', 'pruefung', 'befragung'].includes(info.art) ? info.art : 'lernpfad',
       mix: [p1, p2 - p1, 100 - p2],
       thema: (info.thema || '').trim() || (lb ? lb.t : ''),
       fach, klasse: jg ? `Gymnasium in Bayern, Jahrgangsstufe ${jg}` : '',
@@ -2571,7 +2628,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     let info = {}; try { info = JSON.parse(LS.get(KK)) || {}; } catch (e) { }
     // Vorgaben von außen (Probe bzw. URL ?fach=…&jg=…&min=…): Art, Fach, Jahrgangsstufe und Umfang schon ausgefüllt
     const pre = { ...(opts.ki || {}), ...preset };
-    if (pre.art) info.art = pre.art;
+    if (pre.art) info.art = pre.art; else if (doc?.form === 'befragung' && formOk('befragung')) info.art = 'befragung';
     if (!formOk(info.art || 'lernpfad')) info.art = FORMS_OK[0];
     if (pre.fach) {
       const f = String(pre.fach).trim(), hit = L.FAECHER.find(x => x.toLowerCase() === f.toLowerCase()) || '*';
@@ -2591,12 +2648,13 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     let parsed = null, lastAtt = {}, fileAtt = {}, tok = 0, matFiles = []; // matFiles: Arbeitsmaterial für Claude (nur mit API-Key, nicht gespeichert)
     const opt = (v, t, sel) => `<option value="${esc(v)}"${String(sel) === String(v) ? ' selected' : ''}>${esc(t)}</option>`;
     const EX1 = FORMS_OK.length === 1 && FORMS_OK[0] === 'pruefung'; // nur Prüfungen (eingebettet in Probe): Beschriftungen sprechen von der Prüfung
-    const W = EX1 ? { a: 'Prüfung', den: 'die Prüfung', neu: 'neue Prüfung', head: 'Prüfung generieren', file: 'pruefung.txt' } : { a: 'Lernpfad', den: 'den Lernpfad', neu: 'neuen Lernpfad', head: 'Lernpfad, Challenge oder Prüfung erstellen', file: 'lernpfad.txt' };
+    const SV1 = FORMS_OK.length === 1 && FORMS_OK[0] === 'befragung';
+    const W = EX1 ? { a: 'Prüfung', den: 'die Prüfung', neu: 'neue Prüfung', head: 'Prüfung generieren', file: 'pruefung.txt' } : SV1 ? { a: 'Befragung', den: 'die Befragung', neu: 'neue Befragung', head: 'Befragung generieren', file: 'befragung.txt' } : { a: 'Lernpfad', den: 'den Lernpfad', neu: 'neuen Lernpfad', head: 'Lernpfad, Challenge, Prüfung oder Befragung erstellen', file: 'lernpfad.txt' };
     el.innerHTML = `<header><b>${KI_ICON} ${W.head}</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
         <div class="ki-api" id="kiApi"></div>
         <div class="ki-step"><span class="n">1</span><b>Beschreibung</b></div>
-        <label>Art des Pfades<select data-k="art">${formOk('lernpfad') ? opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad') : ''}${formOk('challenge') ? opt('challenge', 'Challenge – Übungsaufgaben', info.art) : ''}${formOk('pruefung') ? opt('pruefung', 'Digitale Prüfung – mit Punkten, ohne Rückmeldung', info.art) : ''}</select></label>
+        <label>Art des Pfades<select data-k="art">${formOk('lernpfad') ? opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad') : ''}${formOk('challenge') ? opt('challenge', 'Challenge – Übungsaufgaben', info.art) : ''}${formOk('pruefung') ? opt('pruefung', 'Digitale Prüfung – mit Punkten, ohne Rückmeldung', info.art) : ''}${formOk('befragung') ? opt('befragung', 'Befragung – Umfrage, Fragebogen, Selbstreflexion', info.art) : ''}</select></label>
         <div id="kiBasis"></div>
         <div id="kiMix" hidden>
           <label>Anteil der Aufgaben</label>
@@ -2633,7 +2691,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const matOk = () => matFiles.filter(m => m.ok);
     /** Arbeitsmaterial: mit API-Key Dateien anhängen, sonst ankündigen, dass die Lehrkraft es der externen KI selbst mitgibt */
     const drawMat = () => {
-      const box = $('#kiMat', el), was = info.art === 'pruefung' ? 'die Prüfung' : info.art === 'challenge' ? 'die Challenge' : 'der Lernpfad';
+      const box = $('#kiMat', el), was = info.art === 'befragung' ? 'die Befragung' : info.art === 'pruefung' ? 'die Prüfung' : info.art === 'challenge' ? 'die Challenge' : 'der Lernpfad';
       const kb = n => n > 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' kB';
       box.innerHTML = direct ? `<label>Arbeitsmaterial <span class="help">(optional – z. B. Arbeitsblätter, Hefteinträge, Folien, Fotos vom Tafelbild)</span></label>
         <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Dateien hinzufügen<input type="file" id="kiMatIn" multiple accept=".pdf,.docx,.pptx,.odt,.odp,.txt,.md,image/*" hidden></label><span class="help" style="align-self:center">PDF, Fotos, Word, PowerPoint oder Text – gehen mit an Claude, ${was} entsteht auf dieser Grundlage. Jede Seite kostet etwas mehr.</span></div>
@@ -3206,15 +3264,16 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const base = opts.examples ? opts.examples.replace(/[^/]*$/, '') : '';
     // Demos (pin: true in beispiele/index.json) und „Willkommen“ stehen fest oben in „Meine Dokumente“
     const pins = ex.filter(e => e.pin && e.id), pinIds = new Set([...pins.map(e => e.id), ...(opts.sample ? ['willkommen'] : [])]);
-    const icon = f => f === 'challenge' ? '⚡' : f === 'pruefung' ? '📝' : '📘';
+    const icon = f => f === 'challenge' ? '⚡' : f === 'pruefung' ? '📝' : f === 'befragung' ? '📋' : '📘';
     const mine = docList().filter(d => !pinIds.has(d.id));
     let h = '<div class="grp">Meine Dokumente (in diesem Browser)</div>';
     h += pins.map(e => `<button data-ex="${esc(e.file)}" data-exid="${esc(e.id)}" class="pin${e.id === doc.id ? ' hi' : ''}"><b>${icon(e.form)} ${esc(e.title)}</b><span>${esc(e.note || '')}</span></button>`).join('');
     if (opts.sample) h += `<button data-welcome="1" class="pin${doc.id === 'willkommen' ? ' hi' : ''}"><b>📘 Willkommen bei ${esc(appName)}</b><span>kurze Einführung zum Ausprobieren</span></button>`;
-    h += mine.map(d => `<button data-open="${esc(d.id)}" class="${d.id === doc.id ? 'hi' : ''}"><b>${d.form === 'challenge' ? '⚡' : d.form === 'pruefung' ? '📝' : '📘'} ${esc(d.title)}</b><span>zuletzt ${new Date(d.t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</span></button>`).join('') || (pins.length || opts.sample ? '' : '<div class="grp" style="text-transform:none;letter-spacing:0">noch keine</div>');
+    h += mine.map(d => `<button data-open="${esc(d.id)}" class="${d.id === doc.id ? 'hi' : ''}"><b>${icon(d.form)} ${esc(d.title)}</b><span>zuletzt ${new Date(d.t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}</span></button>`).join('') || (pins.length || opts.sample ? '' : '<div class="grp" style="text-transform:none;letter-spacing:0">noch keine</div>');
     h += '<div class="grp">Neu</div>'
       + (formOk('lernpfad') ? '<button data-new="lernpfad"><b>＋ Neuer Lernpfad</b><span>leer beginnen</span></button>' : '')
       + (formOk('challenge') ? '<button data-new="challenge"><b>＋ Neue Challenge</b><span>leer beginnen</span></button>' : '')
+      + (formOk('befragung') ? '<button data-new="befragung"><b>＋ Neue Befragung</b><span>Umfrage, Fragebogen, Gesprächsbogen – für Probe</span></button>' : '')
       + (formOk('pruefung') ? '<button data-exstart="1"><b>＋ Neue digitale Prüfung</b><span>leer, aus einem Lernpfad oder mit KI – für Probe</span></button>' : '')
       + '<div class="grp">Datei</div><button data-imp="1"><b>⤒ Datei öffnen</b><span>HTML-Lernpfad, SCORM-Paket (.zip) oder Prüfungsdatei (.json) aus PathFinder · fremde Lernpfad-Seiten behalten ihr Design</span></button>';
     const more = ex.filter(e => !(e.pin && e.id));

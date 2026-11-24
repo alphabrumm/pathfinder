@@ -898,3 +898,26 @@ label.lp-btn { display: inline-flex; align-items: center; justify-content: cente
 .pf-sw input:focus-visible + i { outline: 2px solid var(--a1, #4a6cf7); outline-offset: 2px; }
 .pf-sw span { display: flex; flex-direction: column; line-height: 1.25; }
 .pf-sw small { font-weight: 400; opacity: .75; }
+/* Befragung: Skala, Auswahl, Raster, offene Frage, Datum */
+.lp-svy .hd { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; margin-bottom: 8px; }
+.lp-svy .sv-text { margin: 0 0 8px; color: var(--ink-2); }
+.lp-svy .help { color: var(--ink-2); font-size: calc(14px * var(--fz)); margin: -4px 0 8px; }
+.lp-svy input[type=radio], .lp-svy input[type=checkbox] { position: absolute; opacity: 0; pointer-events: none; }
+.sv-scale { display: grid; gap: 6px; }
+.sv-scale span { display: grid; place-items: center; min-height: 44px; border: 2px solid var(--line); border-radius: 10px; font-weight: 700; cursor: pointer; background: var(--surface); }
+.sv-scale input:checked + span { background: var(--a1); border-color: var(--a1); color: #fff; }
+.sv-ends { display: flex; justify-content: space-between; gap: 10px; font-size: calc(13px * var(--fz)); color: var(--ink-2); margin-top: 4px; }
+.sv-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.sv-opts span { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 14px; border: 2px solid var(--line); border-radius: 11px; cursor: pointer; background: var(--surface); }
+.sv-opts span::before { content: ''; width: 16px; height: 16px; border: 2px solid var(--ink-2); border-radius: 4px; flex: none; }
+.sv-opts input[type=radio] + span::before { border-radius: 50%; }
+.sv-opts input:checked + span { border-color: var(--a1); background: var(--a1s); font-weight: 700; }
+.sv-opts input:checked + span::before { background: var(--a1); border-color: var(--a1); box-shadow: inset 0 0 0 3px var(--surface); }
+.lp-svy input:focus-visible + span { outline: 3px solid var(--a3d); }
+.sv-mx { overflow-x: auto; } .sv-mx table { border-collapse: collapse; width: 100%; }
+.sv-mx th { font-size: calc(13px * var(--fz)); color: var(--ink-2); padding: 4px; }
+.sv-mx td { border-top: 1px solid var(--line); padding: 6px 4px; } .sv-mx td:not(:first-child) { text-align: center; width: 44px; }
+.sv-mx input[type=radio] { position: static; opacity: 1; pointer-events: auto; width: 22px; height: 22px; accent-color: var(--a1); }
+.lp-svy .sv-line, .lp-svy .sv-area, .lp-svy .sv-date { font: calc(16px * var(--fz)) var(--font-body); width: 100%; padding: 10px 12px; border: 2px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); }
+.lp-svy .sv-date { width: auto; }
+.lp-svy :disabled + span, .lp-svy input:disabled, .lp-svy textarea:disabled { cursor: default; }

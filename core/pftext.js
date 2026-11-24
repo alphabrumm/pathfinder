@@ -260,6 +260,26 @@ const CORE_SECTIONS = {
     if (rubric.length) b.pts = rubric.reduce((a, r) => a + r.p, 0); else H.warn(S.line, `Freitext „${S.title || ''}“ ohne Erwartungshorizont – schreibe Zeilen „Erwartung: Teilaspekt (Punkte)“.`);
     return b;
   } },
+  // Befragung (Art: Befragung): Fragen ohne richtig/falsch. Gemeinsame Zeilen: „Hinweis:“ und „Weitergabe: ja“ (Gesprächsbogen)
+  skala: { n: 'Skala', keys: ['von', 'bis', 'hinweis', 'weitergabe'], make(S, H) {
+    const p = x => { const m = String(x || '').match(/^\s*(-?\d+)\s*(?:[=:–-]\s*(.*))?$/); return m ? [+m[1], (m[2] || '').trim()] : null; };
+    const a = p(S.one('von')) || [1, ''], z = p(S.one('bis')) || [10, ''];
+    if (z[0] <= a[0]) H.warn(S.line, 'Skala: „Bis“ muss größer sein als „Von“ – 1 bis 10 übernommen.');
+    return { type: 'scale', q: svQ(S), min: z[0] > a[0] ? a[0] : 1, max: z[0] > a[0] ? z[0] : 10, lo: a[1], hi: z[1], ...svFlags(S) };
+  } },
+  auswahl: { n: 'Auswahl', keys: ['hinweis', 'weitergabe'], make: (S, H) => svChoice(S, H, false) },
+  mehrfachauswahl: { n: 'Mehrfachauswahl', keys: ['hinweis', 'weitergabe'], make: (S, H) => svChoice(S, H, true) },
+  janein: { n: 'Ja/Nein', keys: ['hinweis', 'weitergabe'], make: (S, H) => ({ type: 'choice', q: svQ(S), opts: ['Ja', 'Nein'], multi: false, ...svFlags(S) }) },
+  einwilligung: { n: 'Einwilligung', keys: ['hinweis'], make(S, H) { const b = svChoice(S, H, false, ['Ja, das ist okay.', 'Nein, das möchte ich nicht.']); b.consent = true; b.share = false; b.q = b.q || 'Einwilligung zur Weitergabe'; return b; } },
+  raster: { n: 'Raster', keys: ['spalten', 'hinweis', 'weitergabe'], make(S, H) {
+    const items = S.body.filter(l => /^\s*([-•]|\d+[.)])\s+/.test(l)).map(l => l.replace(/^\s*([-•]|\d+[.)])\s*/, '').trim()).filter(Boolean);
+    const cols = S.one('spalten') ? S.one('spalten').split(/\s*[,;|]\s*/).map(x => x.trim()).filter(Boolean) : ['+3', '+2', '+1', '−1', '−2', '−3'];
+    if (items.length < 1) H.err(S.line, 'Raster braucht Aussagen als Zeilen „- Aussage“.');
+    if (cols.length < 2) H.err(S.line, 'Raster braucht mindestens zwei Spalten, z. B. „Spalten: trifft zu, trifft eher zu, trifft eher nicht zu, trifft nicht zu“.');
+    return { type: 'matrix', q: svQ(S), items, cols, ...svFlags(S) };
+  } },
+  offenefrage: { n: 'Offene Frage', keys: ['zeilen', 'hinweis', 'weitergabe'], make: S => ({ type: 'open', q: svQ(S), rows: Math.max(1, Math.min(20, parseInt(S.one('zeilen')) || 3)), ...svFlags(S) }) },
+  datum: { n: 'Datum', keys: ['hinweis', 'weitergabe'], make: S => ({ type: 'datefield', q: svQ(S), ...svFlags(S) }) },
   // Im Text markieren: Zielwörter in {{…}} – Schüler tippen alle passenden Wörter an
   markieren: { n: 'Markieren', keys: ['xp', 'punkte'], make(S, H) {
     const html = H.md(S.body); if (!/\{\{[^}]+\}\}/.test(html)) H.err(S.line, 'Markieren ohne Zielwort – schreibe die richtigen Wörter als {{Wort}}.');
@@ -350,11 +370,23 @@ function parseExperiment(S, H, title) {
   return { ...(main != null ? { main } : {}), type: 'widget', kind: 'experiment', title: inline(S.one('frage') || title || ''), intro: H.md(S.body), hyp: md(S.all('hypothese')), vars: V, res: res || { name: 'Ergebnis', sym: 'y', unit: '', f: '0' },
     anim: /wagen|schieb/.test(anim) ? 'wagen' : '', evalHtml: md(S.all('auswertung')), extra: (S.one('extra') || '').split(/\s*[,;]\s*/).filter(Boolean), concl: md(S.all('schlussfolgerung')), xp: S.num('xp', 30) };
 }
+const svQ = S => S.title || S.body.filter(l => l.trim() && !/^\s*[-•]/.test(l)).join(' ').trim();
+const svYes = v => /^(ja|yes|an|true|x)$/i.test(String(v || '').trim());
+const svFlags = S => ({ hint: (S.one('hinweis') || '').trim(), share: svYes(S.one('weitergabe')) });
+function svChoice(S, H, multi, def) {
+  const opts = S.body.filter(l => /^\s*([-•*]|\[[ x]?\])\s*/.test(l)).map(l => l.replace(/^\s*([-•*]|\[[ x]?\])\s*/, '').trim()).filter(Boolean);
+  const text = S.title ? S.body.filter(l => l.trim() && !/^\s*([-•*]|\[[ x]?\])/.test(l)).join(' ').trim() : '';
+  if (opts.length < 2 && !def) H.err(S.line, 'Auswahl braucht mindestens zwei Antworten als Zeilen „- Antwort“.');
+  return { type: 'choice', q: svQ(S), opts: opts.length >= 2 ? opts : def || opts, multi, ...(text ? { text } : {}), ...svFlags(S) };
+}
 const SEC_ALIAS = { aufgabe: 'aufgabe', auftrag: 'aufgabe', quiz: 'quiz', test: 'quiz', lueckentext: 'lueckentext', luecken: 'lueckentext', zuordnen: 'zuordnen', zuordnung: 'zuordnen', aufdecken: 'aufdecken', aufklappen: 'aufdecken', 'mehr erfahren': 'aufdecken', uml: 'uml', 'uml-klasse': 'uml', klasse: 'uml', html: 'html', freitext: 'freitext', 'offene aufgabe': 'freitext', essay: 'freitext',
   markieren: 'markieren', markiere: 'markieren', 'im text markieren': 'markieren', sortieren: 'sortieren', sortiere: 'sortieren', gruppen: 'sortieren', kategorisieren: 'sortieren',
   satzpuzzle: 'satzpuzzle', wortpuzzle: 'satzpuzzle', satzbau: 'satzpuzzle', reihenfolge: 'reihenfolge', textpuzzle: 'reihenfolge', ordnen: 'reihenfolge',
   jpad: 'jpad', 'jpad-aufgabe': 'jpad', qpad: 'qpad', 'qpad-aufgabe': 'qpad', flowpad: 'flowpad', 'flowpad-aufgabe': 'flowpad',
-  widget: 'widget', experiment: 'experiment', versuch: 'experiment' };
+  widget: 'widget', experiment: 'experiment', versuch: 'experiment',
+  skala: 'skala', bewertung: 'skala', auswahl: 'auswahl', einfachauswahl: 'auswahl', 'einfache auswahl': 'auswahl', mehrfachauswahl: 'mehrfachauswahl', mehrfach: 'mehrfachauswahl', 'mehrfache auswahl': 'mehrfachauswahl',
+  'ja/nein': 'janein', 'ja-nein': 'janein', janein: 'janein', 'ja oder nein': 'janein', einwilligung: 'einwilligung', raster: 'raster', matrix: 'raster',
+  'offene frage': 'offenefrage', offen: 'offenefrage', textfeld: 'offenefrage', datum: 'datum' };
 /** Bausteine, die als Aufgabe zählen (Punkte, Fortschritt) */
 export const CHECK_TYPES = ['task', 'quiz', 'gap', 'match', 'essay', 'mark', 'sort', 'order', 'app'];
 
@@ -452,7 +484,7 @@ export function parseText(src, env) {
     if (inHead && (m = l.match(/^([A-Za-zÄÖÜäöüß -]{3,24}):\s*(.*)$/))) {
       const k = norm(m[1]), v = m[2].trim();
       if (k === 'untertitel') { doc.subtitle = v; continue; }
-      if (k === 'art') { doc.form = /challenge/i.test(v) ? 'challenge' : /pr(ü|ue|u)fung|klausur|schulaufgabe|test/i.test(v) ? 'pruefung' : 'lernpfad'; if (doc.form === 'pruefung') { doc.pointsOn = true; doc.cert.on = false; } else doc.kicker = doc.kicker.replace(/Lernpfad|Challenge/, doc.form === 'challenge' ? 'Challenge' : 'Lernpfad'); continue; }
+      if (k === 'art') { doc.form = /challenge/i.test(v) ? 'challenge' : /pr(ü|ue|u)fung|klausur|schulaufgabe|test/i.test(v) ? 'pruefung' : /befragung|umfrage|fragebogen|gespr(ä|ae)chsbogen|reflexion|feedback/i.test(v) ? 'befragung' : 'lernpfad'; if (doc.form === 'befragung') { doc.pointsOn = false; doc.cert.on = false; doc.design.font = 'schlicht'; doc.design.shape = 'rund'; continue; } if (doc.form === 'pruefung') { doc.pointsOn = true; doc.cert.on = false; } else doc.kicker = doc.kicker.replace(/Lernpfad|Challenge/, doc.form === 'challenge' ? 'Challenge' : 'Lernpfad'); continue; }
       if (k === 'kopfzeile') { doc.kicker = v; continue; }
       if (k === 'aufdecken') { if (/schritt/i.test(v)) stepAll = true; continue; }
       if (k === 'seiten') { if (/station/i.test(v)) doc.pages = 'stationen'; else if (!/^(nein|aus|keine|eine)$/i.test(v.trim())) H.warn(n, 'Seiten: „Stationen“ (jede Station auf einer eigenen Seite) oder weglassen.'); continue; }
@@ -461,7 +493,7 @@ export function parseText(src, env) {
       if (k === 'kopfbild') { const src = H.img(v, n); if (src) { doc.design.heroImg = src; doc.design.hero = doc.design.hero === 'logo' ? 'bild' : doc.design.hero; } continue; }
       if (k === 'kopfbild-art' || k === 'kopfbild art') { const a = { klein: 'bild', gross: 'gross', 'groß': 'gross', hintergrund: 'hintergrund', kein: 'keins', keins: 'keins', ohne: 'keins', 'kein bild': 'keins' }[norm(v)] || { gross: 'gross' }[norm(v)]; if (a) doc.design.hero = a; else H.warn(n, 'Kopfbild-Art: klein, groß oder Hintergrund.'); continue; }
       if (k === 'titel-animation' || k === 'untertitel-animation') { const a = ANIM[norm(v)]; if (a) doc.anim[k.startsWith('titel') ? 'title' : 'subtitle'] = a; else H.warn(n, 'Animation: tippen, einblenden, glitch oder leuchten.'); continue; }
-      if (k === 'zertifikat') { doc.cert.on = doc.form !== 'pruefung' && !/^(nein|aus|no|false)$/i.test(v); continue; }
+      if (k === 'zertifikat') { doc.cert.on = doc.form !== 'pruefung' && doc.form !== 'befragung' && !/^(nein|aus|no|false)$/i.test(v); continue; }
       if (k === 'rang') { doc.rank = inline(v); continue; }
       if (k === 'punkte') { doc.pointsOn = doc.form === 'pruefung' || /^(ja|an|yes|true)$/i.test(v); continue; }
       if (k === 'ziele' || k === 'lernziele') { goalsMode = true; if (v) doc.goals.push(inline(v)); continue; }
@@ -531,6 +563,7 @@ export function parseText(src, env) {
 }
 
 /* ---------- Lernpfad → Text (zum Weitergeben an eine KI oder zum Nachlesen) ---------- */
+const svOut = b => [...(b.hint ? [`Hinweis: ${b.hint}`] : []), ...(b.share ? ['Weitergabe: ja'] : [])];
 export function docToText(doc, env, out = {}) {
   const md = htmlToMd, L = [];
   // Bilder: SVG als Code in den Anhang, Rasterbilder nur als Verweis (die bleiben hier im Editor gespeichert)
@@ -546,7 +579,7 @@ export function docToText(doc, env, out = {}) {
   const plug = {}; for (const p of env.plugins || []) for (const [k, t] of Object.entries(p.text || {})) if (t.type) plug[t.type] = { ...t, key: k };
   L.push(`# ${md(doc.title)}`);
   if (doc.subtitle) L.push(`Untertitel: ${md(doc.subtitle)}`);
-  L.push(`Art: ${doc.form === 'challenge' ? 'Challenge' : doc.form === 'pruefung' ? 'Prüfung' : 'Lernpfad'}`);
+  L.push(`Art: ${doc.form === 'challenge' ? 'Challenge' : doc.form === 'pruefung' ? 'Prüfung' : doc.form === 'befragung' ? 'Befragung' : 'Lernpfad'}`);
   if (doc.kicker) L.push(`Kopfzeile: ${md(doc.kicker)}`);
   if (doc.pages === 'stationen') L.push('Seiten: Stationen');
   L.push(`Farbe: ${env.palettes[doc.design.pal]?.n || 'Pastell'}`, `Schrift: ${doc.design.font}`);
@@ -556,8 +589,8 @@ export function docToText(doc, env, out = {}) {
   else if (doc.design.heroImg && doc.design.hero !== 'logo') { L.push(`Kopfbild: ${ref(doc.design.heroImg, 'kopf')}`); L.push(`Kopfbild-Art: ${{ bild: 'klein', gross: 'groß', hintergrund: 'Hintergrund' }[doc.design.hero] || 'klein'}`); }
   if (doc.anim?.title) L.push(`Titel-Animation: ${doc.anim.title}`);
   if (doc.anim?.subtitle) L.push(`Untertitel-Animation: ${doc.anim.subtitle}`);
-  if (doc.pointsOn && doc.form !== 'pruefung') L.push('Punkte: ja');
-  if (doc.form !== 'pruefung') L.push(`Zertifikat: ${doc.cert?.on ? 'ja' : 'nein'}`);
+  if (doc.pointsOn && doc.form !== 'pruefung' && doc.form !== 'befragung') L.push('Punkte: ja');
+  if (doc.form !== 'pruefung' && doc.form !== 'befragung') L.push(`Zertifikat: ${doc.cert?.on ? 'ja' : 'nein'}`);
   for (const s of doc.stations) {
     L.push('', `## Station: ${md(s.title)}${s.sub ? ' | ' + md(s.sub) : ''}`);
     if (s.anim) L.push(`Animation: ${s.anim}`);
@@ -583,6 +616,12 @@ export function docToText(doc, env, out = {}) {
         case 'gap': L.push(`### Lückentext${b.title ? ': ' + md(b.title) : ''}`, md(b.html)); if (b.free) L.push('Frei: ja'); else if (b.bank) L.push('Wortbank: ja'); if (b.heft) L.push('Hefteintrag: ' + ([{ kariert: 'kariert', blanko: 'ohne Linien' }[b.heftBg], { pixel: 'Pixel', schlicht: 'Standard', elegant: 'Elegant', hand: 'Handschrift' }[b.heftFont]].filter(Boolean).join(', ') || 'ja')); if (b.extra?.length) L.push(`Extra: ${b.extra.join(', ')}`); break;
         case 'match': L.push(`### Zuordnen: ${md(b.title)}`, ...b.pairs.map(p => `${p.a} -> ${p.b}`)); break;
         case 'mark': L.push(`### Markieren: ${md(b.title)}`, md(b.html)); break;
+        case 'scale': L.push(`### Skala: ${b.q || ''}`, `Von: ${b.min ?? 1}${b.lo ? ' = ' + b.lo : ''}`, `Bis: ${b.max ?? 10}${b.hi ? ' = ' + b.hi : ''}`, ...svOut(b)); break;
+        case 'choice': { const yn = !b.consent && !b.multi && (b.opts || []).join('|') === 'Ja|Nein';
+          L.push(`### ${b.consent ? 'Einwilligung' : yn ? 'Ja/Nein' : b.multi ? 'Mehrfachauswahl' : 'Auswahl'}: ${b.q || ''}`, ...(b.text ? [b.text] : []), ...(yn ? [] : (b.opts || []).map(o => '- ' + o)), ...svOut(b)); break; }
+        case 'matrix': L.push(`### Raster: ${b.q || ''}`, `Spalten: ${(b.cols || []).join(', ')}`, ...(b.items || []).map(x => '- ' + x), ...svOut(b)); break;
+        case 'open': L.push(`### Offene Frage: ${b.q || ''}`, ...(+b.rows !== 3 ? [`Zeilen: ${+b.rows || 1}`] : []), ...svOut(b)); break;
+        case 'datefield': L.push(`### Datum: ${b.q || ''}`, ...svOut(b)); break;
         case 'sort': L.push(`### Sortieren: ${md(b.title)}`, ...(b.groups || []).map(g => `${g.name}: ${(g.items || []).join(', ')}`)); break;
         case 'order': if (b.words) L.push(`### Satzpuzzle: ${md(b.title)}`, (b.items || []).join(' / '), ...(b.alts || []).map(a => `Auch richtig: ${a.join(' / ')}`));
           else L.push(`### Reihenfolge: ${md(b.title)}`, ...(b.items || []).map(x => '- ' + md(x))); break;
@@ -661,7 +700,9 @@ export const EXAM_STYLES = [
 export const EXAM_STYLES_DEFAULT = ['quiz', 'gapbank', 'gap', 'match', 'short', 'essay'];
 
 /* ---------- Anleitung für die KI ---------- */
-export function formatHelp(env) {
+/** Formatbeschreibung; art = 'pruefung' / 'lernpfad' / 'challenge' lässt die Befragungs-Bausteine weg, 'befragung' oder leer nimmt sie auf */
+export function formatHelp(env, art) {
+  const svHelp = !art || art === 'befragung';
   const extra = (env.plugins || []).flatMap(p => Object.values(p.text || {}).map(t => t.help).filter(Boolean));
   return `FORMAT (PathFinder-Text):
 # Titel des Lernpfads
@@ -747,7 +788,41 @@ Erwartung: erster Teilaspekt der erwarteten Antwort (2)   (Erwartungshorizont, Z
 Erwartung: zweiter Teilaspekt (1)
 Zeilen: 6               (optional: Höhe des Antwortfelds)
 
-### JPad: Titel         (nur in Prüfungen: Programmieraufgabe, die Schüler in JPad bearbeiten)
+${svHelp ? `BEFRAGUNG (nur mit „Art: Befragung“: Umfrage, Fragebogen, Selbstreflexion, Gesprächsbogen – Fragen ohne richtig oder falsch, ohne Punkte;
+jede Station ist ein Abschnitt; Text, Infokästen, Bilder und Tabellen sind erlaubt):
+### Skala: Wie wohl fühlst du dich gerade in der Schule?
+Von: 1 = gar nicht wohl
+Bis: 10 = sehr wohl
+
+### Auswahl: Ich fühle mich in meiner Klasse …      (genau eine Antwort)
+- wohl / zugehörig
+- teils / teils
+- eher allein
+
+### Mehrfachauswahl: Im Moment fällt mir schwer:   (mehrere Antworten möglich)
+- Motivation / Anfangen
+- Konzentration
+
+### Ja/Nein: Hast du einen festen Lernplatz zu Hause?
+
+### Raster: Wie gut kannst du das schon?            (mehrere Aussagen auf derselben Skala)
+Spalten: +3, +2, +1, −1, −2, −3
+- Vor einer Gruppe laut vorlesen
+- Wichtige Informationen in einem Text finden
+
+### Offene Frage: Was tut dir gut?
+Zeilen: 3               (1 = kurze Antwort in einer Zeile)
+Hinweis: Du musst nichts aufschreiben, was du lieber im Gespräch erzählst.   (bei jeder Frage möglich)
+
+### Datum: Wir schauen wieder drauf am
+
+### Einwilligung: Weitergabe an die nächste Klassenleitung   (nur im Gesprächsbogen der Lehrkraft)
+Darf deine Klassenleitung deine Ziele, Hilfen und Ergebnisse an die nächste Klassenleitung weitergeben?
+- Ja, das ist okay.
+- Nein, das möchte ich nicht.
+Weitergabe: ja          (bei jeder Frage im Gesprächsbogen: diese Antwort darf mit Einwilligung weitergegeben werden)
+
+` : ''}### JPad: Titel         (nur in Prüfungen: Programmieraufgabe, die Schüler in JPad bearbeiten)
 Arbeitsauftrag.
 Ausgabe: Start in 3 2 1  (optional: was das Programm ausgeben soll; mehrzeilig als \`\`\`text ausgabe … \`\`\`)
 Vergleich: enthält | gleich   (Standard: enthält – Leerzeichen und Zeilenumbrüche zählen nicht)
@@ -815,13 +890,25 @@ ${extra.length ? '\nZUSÄTZLICH IN DIESER APP:\n' + extra.join('\n\n') + '\n' : 
 export function promptFor(info, env) {
   const f = (k, d) => (info[k] || '').trim() || d;
   const ch = info.art === 'challenge', ex = info.art === 'pruefung', mix = info.mix || [40, 40, 20];
+  const sv = info.art === 'befragung';
   const app = env.appName && env.appName !== 'PathFinder' ? ` (App: ${env.appName})` : '';
-  const intro = ex
+  const intro = sv
+    ? `Du erstellst eine BEFRAGUNG (Umfrage, Fragebogen oder Selbstreflexion) für die Plattform PathFinder${app}. Die Teilnehmenden füllen sie am iPad aus; es gibt kein richtig oder falsch und keine Punkte. Ausgewertet wird nach Abschluss als Statistik je Frage.`
+    : ex
     ? `Du erstellst eine DIGITALE PRÜFUNG (Leistungsnachweis) für die Plattform PathFinder${app}. Die Schüler bearbeiten sie am iPad ohne Rückmeldung; bewertet wird erst nach der Abgabe – geschlossene Aufgaben automatisch, Freitexte von der Lehrkraft.`
     : ch
     ? `Du erstellst eine CHALLENGE (Übungsaufgaben) für die Plattform PathFinder${app}. Eine Challenge bringt nichts Neues bei: Sie greift auf das Vorwissen der Schüler zurück und lässt sie es an abwechslungsreichen Aufgaben anwenden, üben und vertiefen.`
     : `Du erstellst einen interaktiven LERNPFAD FÜR NEUES WISSEN für die Plattform PathFinder${app}. Der Lernpfad führt die Schüler Schritt für Schritt an ein neues Thema heran und festigt das Gelernte direkt mit Quiz, Aufgaben, Lückentexten und Zuordnungen.`;
-  const artRules = ex
+  const artRules = sv
+    ? `- Schreibe im Kopf die Zeile „Art: Befragung“.
+- Verwende NUR die Befragungs-Bausteine Skala, Auswahl, Mehrfachauswahl, Ja/Nein, Raster, Offene Frage und Datum – KEINE Aufgaben, Quiz, Lückentexte, Punkte, Tipps oder Lösungen.
+- Gliedere in wenige Stationen als Themenabschnitte (z. B. „## Station: Wie geht es mir?“); vor einer Station höchstens ein kurzer Satz zur Einordnung.
+- Formuliere neutral, kurz und altersgerecht; keine Suggestivfragen, keine doppelten Verneinungen, je Frage nur ein Gedanke.
+- Bevorzuge geschlossene Fragen (Skala, Auswahl, Raster) – sie lassen sich auswerten. Offene Fragen sparsam und freiwillig („Du musst nichts aufschreiben …“ als Hinweis).
+- Antwortmöglichkeiten einer Auswahl decken alle Fälle ab und überschneiden sich nicht; bei Bedarf „weiß nicht“ oder „Sonstiges“.
+- Keine Fragen, die Gesundheit, Familie oder andere sehr persönliche Dinge direkt abfragen, außer die Lehrkraft verlangt es ausdrücklich.
+`
+    : ex
     ? `- Schreibe im Kopf die Zeile „Art: Prüfung“.
 - KEINE Erklärungen, Merkkästen, Figuren, Tipps, Lösungen zum Aufdecken oder Sperren – nur kurze Arbeitsanweisungen, Material (Texte, Tabellen, Abbildungen) und Aufgaben.
 - Gliedere die Prüfung in Stationen als Teilaufgaben oder Themenblöcke (z. B. „## Station: Teil A | Grundwissen“).
@@ -851,7 +938,7 @@ ${EXAM_STYLES.filter(s => s[0] !== 'essay' && s[0] !== 'jpad' && info.types.incl
 - Von einfach zu schwer; jede Station baut auf der vorigen auf. Eine abschließende Station wiederholt das Wichtigste.
 `;
   // Arbeitsmaterial der Lehrkraft (Arbeitsblätter, Hefteinträge …): direkt angehängt (API) oder für eine externe KI angekündigt
-  const mat = info.material || {}, was = ex ? 'die Prüfung' : ch ? 'die Challenge' : 'der Lernpfad';
+  const mat = info.material || {}, was = sv ? 'die Befragung' : ex ? 'die Prüfung' : ch ? 'die Challenge' : 'der Lernpfad';
   const matTop = mat.extern ? `ZUERST – ARBEITSMATERIAL DER LEHRKRAFT
 Die Lehrkraft gibt dir zusätzlich eigenes Arbeitsmaterial mit (z. B. Arbeitsblätter, Hefteinträge, Folien, Fotos von Tafelbildern) – als angehängte Dateien, Bilder oder eingefügten Text. ${was[0].toUpperCase() + was.slice(1)} soll auf diesem Material aufbauen.
 - Prüfe, BEVOR du irgendetwas erstellst, ob dieses Material in der Nachricht enthalten ist.
@@ -886,7 +973,7 @@ UMFANG: ${f('umfang', 'etwa 4 Stationen, ca. 45 Minuten')}
 REGELN
 - WICHTIG – alles in EINEN kopierbaren Textblock: Der komplette Lernpfad samt Anhang mit allen Grafiken steht in einem einzigen Codeblock, damit die Lehrkraft nur einmal kopieren und einfügen muss. Beginne den Block mit vier Backticks und „text“ (\`\`\`\`text) und beende ihn mit vier Backticks (\`\`\`\`), damit Code-Beispiele darin den Block nicht vorzeitig schließen. Kein Text davor oder danach, nichts auf mehrere Blöcke oder Nachrichten verteilen.
 - Halte dich exakt an das unten beschriebene PathFinder-Textformat, damit der Lernpfad ohne Nacharbeit eingelesen werden kann.
-- Wenn du Dateien zum Herunterladen erzeugen kannst, liefere denselben Inhalt zusätzlich als eine Textdatei „${ex ? 'pruefung' : ch ? 'challenge' : 'lernpfad'}.txt“.
+- Wenn du Dateien zum Herunterladen erzeugen kannst, liefere denselben Inhalt zusätzlich als eine Textdatei „${sv ? 'befragung' : ex ? 'pruefung' : ch ? 'challenge' : 'lernpfad'}.txt“.
 - Sprache: Deutsch, Schüler werden mit „du“ angesprochen, kurze Sätze.${/englisch|französisch|franzoesisch|spanisch|italienisch|russisch|latein|griechisch/i.test(info.fach || '') ? ` Ausnahme Fremdsprache (${info.fach.trim()}): Texte, Beispiele, Sätze und Wörter der Aufgaben stehen in der Zielsprache (Latein/Griechisch: Originalsprache mit deutscher Übersetzung, wo nötig); Arbeitsanweisungen auf Deutsch, ab der Mittelstufe gern in der Zielsprache.` : ''}
 ${info.ask ? '- Schreibe im Kopf die Zeile „Kopfzeile: <Fach> · <Jahrgangsstufe>“ (mit den Angaben der Lehrkraft).\n' : ''}${(info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')) ? `- Schreibe im Kopf die Zeile „Kopfzeile: ${info.kopf || [info.fach, info.klasse].map(x => (x || '').trim()).filter(Boolean).join(' · ')}“.` : ''}${info.lehrplan ? '- Bleib beim Lehrplanbezug: Inhalte, Fachbegriffe und Schwierigkeit passend zu dieser Jahrgangsstufe, nichts vorwegnehmen, was erst später im Lehrplan kommt.\n' : ''}${artRules}- Aufgaben mit eindeutiger Lösung bekommen eine „Antwort:“-Zeile, damit sie automatisch geprüft werden.
 ${ex ? '' : `- Tipps bauen aufeinander auf: zuerst ein kleiner Denkanstoß, zuletzt fast die Lösung.
@@ -897,5 +984,5 @@ ${ex ? '' : `- Tipps bauen aufeinander auf: zuerst ein kleiner Denkanstoß, zule
 - Innerhalb eines ###-Abschnitts (Aufgabe, Quiz, Lückentext, Zuordnen …) keine Bild-Zeilen und keine Infokästen: Sie beenden den Abschnitt. Bilder und Kästen gehören davor oder dahinter (bei Aufgaben stattdessen „Bild: anhang:name“). Normaler Text nach einem Abschnitt steht nach einer Leerzeile.
 - Im Lückentext ist JEDE [[Lücke]] eine Antwort, die Schüler einsetzen müssen – Arbeitsanweisungen ohne Lücken als normalen Text vor den Abschnitt schreiben.
 
-${formatHelp(env)}`;
+${formatHelp(env, info.art || 'lernpfad')}`;
 }

@@ -33,6 +33,17 @@ die Seite später sehen. Gebaut für das iPad (mit oder ohne Tastatur).
 * **Indizes und Hochzahlen** im Text: `v_A`, `v_{End}`, `m/s^2`, `10^{-3}`.
 * Normaler Text nach einem Quiz, Lückentext usw. ist erlaubt: Er steht nach einer Leerzeile und beendet den Abschnitt.
 
+## Befragung
+
+Vierte Art neben Lernpfad, Challenge und Prüfung (`doc.form = 'befragung'`, 📂 Dokumente → ＋ Neue Befragung): Umfragen,
+Fragebögen, Selbstreflexion und Gesprächsbögen – Fragen ohne richtig oder falsch, ohne Punkte. Bausteine: **Skala**,
+**Auswahl**, **Mehrfachauswahl**, **Ja/Nein**, **Raster** (mehrere Aussagen auf derselben Skala), **Offene Frage**, **Datum**,
+**Einwilligung** (Weitergabe an die nächste Klassleitung) – dazu Text, Infokästen, Bilder, Tabellen; jede Station ist ein
+Abschnitt. Je Frage optional „Hinweis“ und „Weitergabe“ (für Gesprächsbögen). Textformat: `### Skala:`, `### Auswahl:`,
+`### Mehrfachauswahl:`, `### Ja/Nein:`, `### Raster:` (`Spalten: …`), `### Offene Frage:` (`Zeilen: n`), `### Datum:`,
+`### Einwilligung:`; auch der KI-Dialog erstellt Befragungen. Ausgefüllt wird in Probe: `core/pfsurvey.js` →
+`surveySpec(doc)` macht daraus die Vorlage (Fragen, Statistik-Felder, Einwilligung). Tests: `node tools/test-survey.mjs`.
+
 ## Digitale Prüfung
 
 Neben „Lernpfad“ und „Challenge“ gibt es das Format **Digitale Prüfung** (`doc.form = 'pruefung'`, 📂 Dokumente → ＋ Neue digitale Prüfung
