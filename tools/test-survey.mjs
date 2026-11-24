@@ -1,6 +1,6 @@
 // Tests für die Befragung: Textformat (hin und zurück) und surveySpec
 import * as T from '../core/pftext.js';
-import { surveySpec } from '../core/pfsurvey.js';
+import { surveySpec, answersFromSvy, surveyStats } from '../core/pfsurvey.js';
 let n = 0, ok = 0; const t = (name, c) => { n++; if (c) ok++; else console.log('✗ ' + name); };
 let k = 0; const env = { emptyDoc: f => ({ form: f, stations: [], design: {}, cert: { on: true }, kicker: '', goals: [] }), palettes: [{ n: 'Pastell' }], figures: [], uid: () => 'b' + (++k), plugins: [], isCheck: () => false, appName: 'Probe' };
 const src = `# Selbstreflexion kompakt
@@ -78,4 +78,23 @@ t('Statistik ohne Freitext', S.sections.flatMap(s => s.qs).filter(q => q.stat).e
 // Prompt
 const p = T.promptFor({ art: 'befragung', thema: 'Lerncoaching' }, env);
 t('Prompt Befragung', p.includes('Art: Befragung') && p.includes('befragung.txt') && !p.includes('Punkte: n'));
+// Antworten aus dem Ausfüllen (Indizes) → Antworten zur Vorlage → Statistik
+{
+    const d = { id: 'x', title: 'T', stations: [{ id: 's', title: 'A', blocks: [
+    { id: 'a', type: 'scale', q: 'Wohl?', min: 1, max: 5 },
+    { id: 'b', type: 'choice', q: 'Klasse', opts: ['gut', '', 'schlecht'] },
+    { id: 'c', type: 'choice', multi: true, q: 'Schwer', opts: ['M', 'K', 'Z'] },
+    { id: 'm', type: 'matrix', q: 'R', items: ['x', '', 'y'], cols: ['+1', '−1'] },
+    { id: 'o', type: 'open', q: 'Offen', rows: 3 },
+  ] }] };
+  const A1 = answersFromSvy(d, { a: 4, b: 2, c: [0, 2], m: { 0: 0, 2: 1 }, o: ' hallo ' });
+  t('answersFromSvy rechnet Indizes in Texte und Werte um', A1.a === 4 && A1.b === 'schlecht' && A1.c.join() === 'M,Z' && A1.m[0] === 1 && A1.m[1] === -1 && A1.o === 'hallo');
+  const A2 = answersFromSvy(d, { a: 2, b: 0, m: { 0: 1 } });
+  const St = surveyStats(surveySpec(d), [A1, A2]);
+  const q = id => St.qs.find(x => x.id === id);
+  t('Skala: Mittelwert und Verteilung', St.n === 2 && q('a').mean === 3 && q('a').counts[4] === 1);
+  t('Auswahl: Häufigkeiten (leere Antworten fallen weg)', q('b').counts.join() === '1,1' && q('c').counts.join() === '1,0,1');
+  t('Raster: Mittelwert je Aussage', q('m').rows[0].mean === 0 && q('m').rows[1].counts.join() === '0,1' && q('m').n === 2);
+  t('Freitexte nur auf Wunsch', q('o').texts.length === 1 && !surveyStats(surveySpec(d), [A1], { texts: false }).qs.find(x => x.id === 'o').texts);
+}
 console.log(`${ok}/${n} Tests bestanden`); if (ok !== n) process.exit(1);

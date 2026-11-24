@@ -56,3 +56,49 @@ export function surveySpec(doc) {
   return { id: doc.id, title: plain(doc.title), sub: plain(doc.subtitle), kicker: plain(doc.kicker), sections, consent, share,
     stats: all.filter(q => q.stat).length + (consent ? 1 : 0), questions: all.filter(q => q.t !== 'info').length + (consent ? 1 : 0) };
 }
+
+/** Antworten aus PathFinder (Indizes, wie sie das Ausfüllen liefert) in Antworten zur Vorlage (Texte, Werte) umrechnen.
+ *  Leere Antwortmöglichkeiten fallen in der Vorlage weg – die Zuordnung folgt deshalb dem Text, nicht der Position. */
+export function answersFromSvy(doc, svy = {}) {
+  const out = {};
+  for (const s of doc.stations || []) for (const b of s.blocks || []) {
+    if (b.hide || !(b.id in svy)) continue; const v = svy[b.id];
+    if (b.type === 'scale') { if (Number.isFinite(+v) && v !== '') out[b.id] = +v; }
+    else if (b.type === 'choice') {
+      const T = i => plain((b.opts || [])[i]); const key = b.consent ? 'weitergabe' : b.id;
+      if (b.multi) { const L = (Array.isArray(v) ? v : [v]).map(T).filter(Boolean); if (L.length) out[key] = L; }
+      else { const t = T(Array.isArray(v) ? v[0] : v); if (t) out[key] = t; }
+    }
+    else if (b.type === 'matrix') {
+      const items = (b.items || []).map(plain), cols = (b.cols || []).map(plain), keep = items.map((x, i) => x ? i : -1).filter(i => i >= 0);
+      const ci = cols.map((x, i) => x ? i : -1).filter(i => i >= 0), vals = matrixVals(cols.filter(Boolean)), m = {};
+      for (const [r, c] of Object.entries(v || {})) { const ri = keep.indexOf(+r), k = ci.indexOf(+c); if (ri >= 0 && k >= 0) m[ri] = vals[k]; }
+      if (Object.keys(m).length) out[b.id] = m;
+    }
+    else if (b.type === 'open' || b.type === 'datefield') { const t = String(v ?? '').trim(); if (t) out[b.id] = t.slice(0, 5000); }
+  }
+  return out;
+}
+
+/** Statistik über viele ausgefüllte Bögen (Antworten wie answersFromSvy). Freitexte nur, wenn texts = true.
+ *  → { n, qs: [{ q, t, n, mean?, counts?, rows?, texts? }] } in der Reihenfolge der Vorlage */
+export function surveyStats(spec, list, { texts = true } = {}) {
+  const qs = [], all = spec.sections.flatMap(s => s.qs.map(q => ({ ...q, sec: s.title })));
+  if (spec.consent) all.push({ ...spec.consent, sec: '' });
+  for (const q of all) {
+    if (q.t === 'info') continue;
+    const A = list.map(a => a?.[q.id]).filter(v => v != null && v !== '' && !(Array.isArray(v) && !v.length));
+    const r = { id: q.id, q: q.q, t: q.t, sec: q.sec, n: A.length };
+    if (q.t === 'scale') { r.min = q.min; r.max = q.max; r.lo = q.lo; r.hi = q.hi; r.counts = {}; for (let x = q.min; x <= q.max; x++) r.counts[x] = 0; for (const v of A) if (+v in r.counts) r.counts[+v]++; r.mean = A.length ? A.reduce((s, v) => s + +v, 0) / A.length : null; }
+    else if (q.t === 'single' || q.t === 'multi' || q.t === 'consent') { r.opts = q.opts; r.counts = q.opts.map(o => A.filter(v => Array.isArray(v) ? v.includes(o) : v === o).length); }
+    else if (q.t === 'matrix') {
+      r.cols = q.cols; r.vals = q.vals;
+      r.rows = q.items.map((it, i) => { const V = A.map(m => m?.[i]).filter(v => v != null); return { item: it, n: V.length, counts: q.vals.map(x => V.filter(v => v === x).length), mean: V.length ? V.reduce((s, v) => s + v, 0) / V.length : null }; });
+      r.n = list.filter(a => a?.[q.id] && Object.keys(a[q.id]).length).length;
+    }
+    else if (q.t === 'text' || q.t === 'line') { if (texts) r.texts = A.map(String); }
+    else if (q.t === 'date') { if (texts) r.texts = A.map(String); }
+    qs.push(r);
+  }
+  return { n: list.length, qs };
+}

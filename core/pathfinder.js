@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-24t';
+const PF_BUILD = '2026-11-24u';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -436,6 +436,7 @@ export function startPathFinder(opts = {}) {
     try { saved = JSON.parse((scorm && scorm.get('cmi.suspend_data')) || LS.get(PROGKEY) || 'null'); } catch (e) { }
     if (saved) prog = { ...freshProg(), ...saved };
     if (opts.answers) prog.ans = clone(opts.answers); // Prüfung: Antworten kommen von der Plattform (z. B. nach dem Neuladen)
+    if (opts.answers && doc.form === 'befragung') Object.assign(svy, clone(opts.answers)); // Befragung: Entwurf der Plattform
   }
   /* Editor: Vorschau-Fortschritt je Lernpfad im Browser merken (die gelöste Vorschau wird nie gespeichert) */
   const PREVKEY = () => 'pathfinder.vorschau.' + doc.id;
@@ -660,6 +661,7 @@ export function startPathFinder(opts = {}) {
     });
     if (E()) h += `<button class="ed-add-station" data-act="addStation">＋ Neue Station</button>`;
     if (lastPage && EXAMF()) h += examFootHtml();
+    else if (lastPage && SURVEYF()) h += surveyFootHtml();
     else if (lastPage && (doc.cert.on || E())) h += certHtml();
     if (PG) h += `<nav class="lp-pager">${pageNo > 0 ? '<button class="lp-btn alt" data-pg="-1">‹ Zurück</button>' : '<span></span>'}<span class="lp-pgno">Seite ${pageNo + 1} von ${PG.length}</span>${lastPage ? '<span></span>' : '<button class="lp-btn" data-pg="1">Weiter ›</button>'}</nav>`;
     h += `</main><footer class="lp-foot">${doc.form === 'challenge' ? 'Challenge' : EXAMF() ? 'Digitale Prüfung' : SURVEYF() ? 'Befragung' : 'Lernpfad'} · läuft komplett im Browser${scorm?.ok ? ' · Fortschritt wird in der Lernplattform gespeichert' : ''}</footer>`;
@@ -1394,8 +1396,26 @@ export function startPathFinder(opts = {}) {
     if (b.type === 'choice') { const all = [...lp.querySelectorAll(`[data-svy="${b.id}"]:checked`)].map(i => +i.value); svy[b.id] = b.multi ? all : all[0]; }
     else if (b.type === 'matrix') { svy[b.id] = { ...(svy[b.id] || {}), [+x.dataset.row]: +x.value }; }
     else if (b.type === 'scale') svy[b.id] = +x.value; else svy[b.id] = x.value;
+    svyChanged(b.id);
   });
-  lp.addEventListener('input', ev => { const x = ev.target.closest?.('textarea[data-svy], input.sv-line[data-svy]'); if (x && !E()) svy[x.dataset.svy] = x.value; });
+  lp.addEventListener('input', ev => { const x = ev.target.closest?.('textarea[data-svy], input.sv-line[data-svy]'); if (x && !E()) { svy[x.dataset.svy] = x.value; svyChanged(x.dataset.svy); } });
+  const svyBlocks = () => doc.stations.flatMap(s => s.blocks.filter(b => !b.hide && def(b)?.survey));
+  const svyDone = b => { const v = svy[b.id]; return v != null && v !== '' && !(Array.isArray(v) && !v.length) && !(typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length); };
+  const svyCount = () => { const B = svyBlocks(); return `${B.filter(svyDone).length} von ${B.length} Fragen beantwortet`; };
+  function svyChanged(id) { host.onAnswer?.(id, svy[id], clone(svy)); const f = $('#svFootCount', lp); if (f) f.textContent = svyCount(); }
+  /** Ende einer Befragung: im Editor ein Hinweis, eingebettet (Probe) der Knopf „Abschicken“ */
+  function surveyFootHtml() {
+    if (E()) return `<div class="lp-cert lp-examfoot" id="st-cert"><div class="seal">✓</div><div><b>Abschicken</b><br>Am Ende schicken die Teilnehmenden ihre Antworten ab – in Probe verschlüsselt, nur du kannst sie lesen. Niemand muss alle Fragen beantworten.</div></div>`;
+    if (!host.submit) return '';
+    return `<div class="lp-cert lp-examfoot" id="st-cert"><div class="seal">📨</div><div><b>Fertig?</b><br><span id="svFootCount">${svyCount()}</span>${host.submitNote ? `<br><span class="help">${esc(host.submitNote)}</span>` : ''}<br><button class="lp-btn" data-act="svsubmit">Abschicken</button></div></div>`;
+  }
+  async function surveySubmit() {
+    if (!host.submit) return;
+    const n = svyBlocks().filter(svyDone).length;
+    if (!n && !confirm('Du hast noch nichts ausgefüllt. Trotzdem abschicken?')) return;
+    const b = $('[data-act="svsubmit"]', lp); if (b) { b.disabled = true; b.textContent = 'wird verschlüsselt …'; }
+    try { await host.submit({ answers: clone(svy) }); } finally { if (b && b.isConnected) { b.disabled = false; b.textContent = 'Abschicken'; } }
+  }
   /* ---------- Eingaben im Bearbeiten-Modus ---------- */
   function setPath(obj, path, val) { const ks = path.split('.'); let o = obj; while (ks.length > 1) { const k = ks.shift(); if (o[k] == null) o[k] = {}; o = o[k]; } o[ks[0]] = val; }
   lp.addEventListener('input', ev => {
@@ -1436,6 +1456,7 @@ export function startPathFinder(opts = {}) {
       if (a === 'certprev') { certPreview(); return; }
       if (a === 'examprot') { examProtocol(); return; }
       if (a === 'examsubmit') { examSubmit(); return; }
+      if (a === 'svsubmit') { surveySubmit(); return; }
     }
     const sact = t.closest('[data-sact]');
     if (sact) {
@@ -2627,15 +2648,109 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     el.addEventListener('click', e => { const b = e.target.closest('[data-wgo]'); if (b) go(+b.dataset.wgo); });
     go(1); return go;
   }
+  /** KI-Dialog „Umfrage erstellen“: Titel, Zielgruppe, was befragt werden soll, Material – dann Prompt bzw. direkt; Antwort einfügen */
+  const SV_ALTER = ['Grundschule (1.–4. Klasse)', '5.–6. Klasse', '7.–8. Klasse', '9.–10. Klasse', 'Oberstufe (11.–13. Klasse)', 'Eltern / Erziehungsberechtigte', 'Lehrkräfte / Kollegium', 'Erwachsene'];
+  async function openSurveyKI(preset = {}) {
+    const [T, A] = await Promise.all([loadText(), loadApi()]); const env = textEnv();
+    const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
+    const KK = (opts.storage || 'pathfinder') + '.kisv';
+    let info = {}; try { info = JSON.parse(LS.get(KK)) || {}; } catch (e) { }
+    const jg = +(preset.jg || opts.ki?.jg) || 0;
+    if (!info.alter && jg) info.alter = SV_ALTER[jg <= 4 ? 0 : jg <= 6 ? 1 : jg <= 8 ? 2 : jg <= 10 ? 3 : 4];
+    const save = () => LS.set(KK, JSON.stringify(info));
+    let parsed = null, fileAtt = {}, matFiles = [], direct = false;
+    const matOk = () => matFiles.filter(m => m.ok);
+    const opt = (v, t, sel) => `<option value="${esc(v)}"${String(sel) === String(v) ? ' selected' : ''}>${esc(t)}</option>`;
+    el.innerHTML = `<header><b>${KI_ICON} Umfrage erstellen</b><button class="ok" data-x="1">Schließen</button></header>
+      <div class="ed-form">
+        <div class="ki-wiz" style="grid-template-columns:repeat(2,1fr)"><button type="button" class="ki-wstep" data-wgo="1"><b>1</b><span>Umfrage beschreiben</span></button><button type="button" class="ki-wstep" data-wgo="2"><b>2</b><span>Antwort einfügen</span></button></div>
+        <div class="ki-wpage" data-wpage="1">
+          <p class="help ki-wintro">Beschreibe, was du wissen möchtest. Die KI schreibt daraus einen Fragebogen mit Skalen, Auswahlfragen, Rastern und wenigen offenen Fragen – ohne richtig und falsch. Danach den Prompt kopieren und in deiner KI (z. B. ByLKI oder Claude) einfügen.</p>
+          <div class="ki-api" id="kiApi"></div>
+          <label>Titel der Umfrage<input type="text" data-s="titel" value="${esc(info.titel || '')}" placeholder="z. B. Feedback zur Unterrichtseinheit Optik"></label>
+          <label>Wer wird befragt?<select data-s="alter">${opt('', '– Altersstufe wählen –', info.alter || '')}${SV_ALTER.map(a => opt(a, a, info.alter)).join('')}</select></label>
+          <label>Was möchtest du befragen?<textarea data-s="was" rows="6" placeholder="z. B. Wie gut haben die Schüler:innen die Einheit verstanden, wie fanden sie die Experimente und die Gruppenarbeit, was wünschen sie sich für die nächste Einheit? Etwa 10 Fragen, höchstens 10 Minuten.">${esc(info.was || '')}</textarea></label>
+          <div id="kiMat" class="ki-mat"></div>
+          <div class="ki-btns"><button class="lp-btn" data-copy="prompt">${KI_ICON} KI-Prompt generieren</button><button class="lp-btn alt" data-copy="show">Format ansehen</button></div>
+          <div class="ki-btns" id="kiDirRow" hidden><button class="lp-btn" data-direct="ki">⚡ Umfrage direkt erstellen</button></div>
+          <div id="kiLive" class="ki-res"></div>
+          <div class="ki-btns ki-wnav"><button type="button" class="ki-wlink" data-wgo="2">Antwort der KI schon da? Direkt zu Schritt 2 ›</button><span class="sp"></span><button type="button" class="lp-btn alt" data-wgo="2">Weiter: Antwort einfügen ›</button></div>
+        </div>
+        <div class="ki-wpage" data-wpage="2" hidden>
+          <p class="help ki-wintro">Füge hier die komplette Antwort der KI ein – oder lade ihre Datei befragung.txt. Fehler im Format zeigt PathFinder sofort an.</p>
+          <textarea id="kiIn" rows="10" spellcheck="false" placeholder="# Titel der Umfrage&#10;Art: Befragung&#10;&#10;## Station: …"></textarea>
+          <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Datei der KI laden<input type="file" id="kiFiles" multiple accept=".txt,.md,.svg,.png,.jpg,.jpeg,.webp,.zip" hidden></label></div>
+          <div id="kiRes" class="ki-res"></div>
+          <div class="ki-btns ki-wnav"><button type="button" class="lp-btn alt" data-wgo="1">‹ Zurück</button><span class="sp"></span><button class="lp-btn" id="kiOpen" disabled>＋ Als neue Umfrage öffnen</button></div>
+        </div>
+      </div>`;
+    const go = n => { $$('.ki-wpage', el).forEach(p => { p.hidden = +p.dataset.wpage !== n; }); $$('.ki-wstep', el).forEach(b => { const k = +b.dataset.wgo; b.classList.toggle('on', k === n); b.classList.toggle('done', k < n); }); el.scrollTop = 0; if (n === 2) setTimeout(() => $('#kiIn', el)?.focus(), 50); };
+    go(1);
+    const res = $('#kiRes', el), openB = $('#kiOpen', el);
+    const drawMat = () => {
+      const box = $('#kiMat', el), kb = n => n > 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' kB';
+      box.innerHTML = direct ? `<label>Material <span class="help">(optional – z. B. Arbeitsblätter der Einheit, ein alter Fragebogen, Stichpunkte)</span></label>
+        <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Dateien hinzufügen<input type="file" id="kiMatIn" multiple accept=".pdf,.docx,.pptx,.odt,.odp,.txt,.md,image/*" hidden></label><span class="help" style="align-self:center">PDF, Fotos, Word, PowerPoint oder Text – gehen mit an Claude.</span></div>
+        ${matFiles.length ? `<ul>${matFiles.map((m, i) => `<li class="${m.ok ? 'good' : 'bad'}">${m.ok ? '✓' : '✗'} ${esc(m.name)} <span class="help">${esc(m.note)}${m.ok ? ' · ' + kb(m.size) : ''}</span> <button class="lp-btn alt sm" data-matdel="${i}" aria-label="entfernen">✕</button></li>`).join('')}</ul>` : ''}`
+        : `<label class="chk"><input type="checkbox" data-kmat="1"${info.matExt ? ' checked' : ''}>Zusätzliches Material ergänze ich für die externe KI</label>
+        <span class="help">Der Prompt kündigt dein Material an (z. B. Arbeitsblätter der Unterrichtseinheit oder einen bisherigen Fragebogen): Die KI fragt vor dem Erstellen danach, falls du die Dateien nicht gleich mit hochlädst, und baut die Umfrage darauf auf.</span>`;
+    };
+    const refreshApi = () => { direct = A.hasKey(); $('#kiApi', el).innerHTML = apiBarHtml(A); drawMat(); $('#kiDirRow', el).hidden = !direct; };
+    const pInfo = viaApi => ({ art: 'befragung', titel: (info.titel || '').trim(), thema: (info.was || '').trim() || (info.titel || '').trim(), klasse: info.alter || '', kopf: opts.ki?.kopf || 'Umfrage',
+      umfang: 'etwa 5–10 Minuten zum Ausfüllen (wenn die Beschreibung nichts anderes sagt)', extra: /Eltern|Lehrkr|Erwachsen/.test(info.alter || '') ? 'Die Befragten sind Erwachsene: Sprich sie mit „Sie“ an (nicht mit „du“).' : '',
+      material: viaApi && matOk().length ? { files: matOk().map(m => m.name) } : (!direct && info.matExt) || (direct && matOk().length) ? { extern: true } : null });
+    const ready = viaApi => { if (!(info.was || '').trim() && !(info.titel || '').trim()) { toast('Bitte beschreiben, was du befragen möchtest'); $('[data-s="was"]', el).focus(); return null; } return pInfo(viaApi); };
+    const check = () => {
+      const src = $('#kiIn', el).value;
+      if (!src.trim()) { res.innerHTML = ''; openB.disabled = true; parsed = null; return; }
+      parsed = T.parseText(src, { ...env, attachments: {}, files: fileAtt });
+      const { errors, warnings, stats } = parsed, n = parsed.doc.stations.flatMap(s => s.blocks).filter(b => def(b)?.survey).length;
+      res.innerHTML = (errors.length ? `<div class="bad">✗ ${errors.length} Fehler – bitte korrigieren (oder die KI bitten, es zu korrigieren):</div><ul>${errors.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>`
+        : `<div class="good">✓ Erkannt: „${esc(plain(parsed.doc.title))}“ · ${stats.stations} Teil${stats.stations === 1 ? '' : 'e'} · ${n} Frage${n === 1 ? '' : 'n'}</div>`)
+        + (warnings.length ? `<div class="warn">Hinweise:</div><ul>${warnings.map(e => `<li>Zeile ${e.n}: ${esc(e.m)}</li>`).join('')}</ul>` : '');
+      openB.disabled = !!errors.length;
+    };
+    el.addEventListener('input', e => { const k = e.target.dataset.s; if (k) { info[k] = e.target.value; save(); } if (e.target.id === 'kiIn') check(); });
+    el.addEventListener('change', async e => {
+      const t = e.target;
+      if (t.dataset.s) { info[t.dataset.s] = t.value; save(); }
+      if (t.dataset.kmat != null) { info.matExt = t.checked; save(); }
+      if (t.id === 'kiMatIn' && t.files.length) { const fs = [...t.files]; t.value = ''; $('#kiMat', el).insertAdjacentHTML('beforeend', '<div class="help">Dateien werden gelesen …</div>'); matFiles.push(...await A.materialOf(fs, T.unzip)); drawMat(); }
+      if (t.id === 'kiFiles' && t.files.length) { const { att, text } = await T.readFiles([...t.files]); Object.assign(fileAtt, att); t.value = ''; if (text) $('#kiIn', el).value = text; check(); }
+    });
+    el.addEventListener('click', async e => {
+      const w = e.target.closest('[data-wgo]'); if (w) { go(+w.dataset.wgo); return; }
+      const t = e.target.closest('button'); if (!t) return;
+      if (t.dataset.x) { closeDlg(false); return; }
+      if (t.dataset.api) { apiSettings(refreshApi); return; }
+      if (t.dataset.matdel != null) { matFiles.splice(+t.dataset.matdel, 1); drawMat(); return; }
+      if (t.dataset.copy === 'show') { const pre = document.createElement('pre'); pre.className = 'ki-fmt'; pre.textContent = T.formatHelp(env, 'befragung'); t.closest('.ki-btns').after(pre); t.remove(); return; }
+      if (t.dataset.copy === 'prompt') { const p = ready(false); if (!p) return; if (await copyText(T.promptFor(p, env))) kiCopiedPopup('mit der Umfrage fertig ist', p.material ? 'Lade dort auch dein Material hoch – sonst fragt die KI zuerst danach.' : '', () => go(2)); else toast('Kopieren ging nicht'); return; }
+      if (t.dataset.direct === 'ki') {
+        const p = ready(true); if (!p) return; const inp = $('#kiIn', el); inp.value = ''; check();
+        const r = await runDirect({ prompt: T.promptFor(p, env), content: matOk().flatMap(m => m.blocks), target: inp, box: $('#kiLive', el), maxTokens: 24000, what: 'die Umfrage', title: 'Umfrage wird gebaut' });
+        if (r != null) { check(); if (parsed && !parsed.errors.length) { openB.click(); return; } go(2); }
+        return;
+      }
+      if (t.id === 'kiOpen' && parsed && !parsed.errors.length) {
+        const d = parsed.doc; if (d.form !== 'befragung') { d.form = 'befragung'; d.pointsOn = false; d.cert.on = false; d.design.theme = 'lumi'; }
+        if (!plain(d.kicker || '').trim() && opts.ki?.kopf) d.kicker = esc(opts.ki.kopf);
+        closeDlg(false); openDoc(d); toast(`„${esc(plain(d.title))}“ angelegt – jetzt kannst du alle Fragen im Editor anpassen.`);
+      }
+    });
+    refreshApi();
+  }
   async function openKI(preset = {}) {
+    if (preset.art === 'befragung' || (FORMS_OK.length === 1 && FORMS_OK[0] === 'befragung')) return openSurveyKI(preset); // Umfragen haben einen eigenen Dialog
     const [T, L, A] = await Promise.all([loadText(), loadLp(), loadApi()]); const env = textEnv();
     const { el, bd } = dialog('ki-dlg'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
     const KK = (opts.storage || 'pathfinder') + '.ki';
     let info = {}; try { info = JSON.parse(LS.get(KK)) || {}; } catch (e) { }
     // Vorgaben von außen (Probe bzw. URL ?fach=…&jg=…&min=…): Art, Fach, Jahrgangsstufe und Umfang schon ausgefüllt
     const pre = { ...(opts.ki || {}), ...preset };
-    if (pre.art) info.art = pre.art; else if (doc?.form === 'befragung' && formOk('befragung')) info.art = 'befragung';
-    if (!formOk(info.art || 'lernpfad')) info.art = FORMS_OK[0];
+    if (pre.art) info.art = pre.art;
+    if (info.art === 'befragung') info.art = 'lernpfad'; // Befragungen: eigener Dialog „Umfrage erstellen“
+    if (!formOk(info.art || 'lernpfad')) info.art = FORMS_OK.find(f => f !== 'befragung') || 'lernpfad';
     if (pre.fach) {
       const f = String(pre.fach).trim(), hit = L.FAECHER.find(x => x.toLowerCase() === f.toLowerCase()) || '*';
       if (hit !== info.fsel || (hit === '*' && info.ffrei !== f)) { info.lb = ''; info.inh = []; }
@@ -2655,12 +2770,12 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const opt = (v, t, sel) => `<option value="${esc(v)}"${String(sel) === String(v) ? ' selected' : ''}>${esc(t)}</option>`;
     const EX1 = FORMS_OK.length === 1 && FORMS_OK[0] === 'pruefung'; // nur Prüfungen (eingebettet in Probe): Beschriftungen sprechen von der Prüfung
     const SV1 = FORMS_OK.length === 1 && FORMS_OK[0] === 'befragung';
-    const W = EX1 ? { a: 'Prüfung', den: 'die Prüfung', neu: 'neue Prüfung', head: 'Prüfung generieren', file: 'pruefung.txt' } : SV1 ? { a: 'Befragung', den: 'die Befragung', neu: 'neue Befragung', head: 'Befragung generieren', file: 'befragung.txt' } : { a: 'Lernpfad', den: 'den Lernpfad', neu: 'neuen Lernpfad', head: 'Lernpfad, Challenge, Prüfung oder Befragung erstellen', file: 'lernpfad.txt' };
+    const W = EX1 ? { a: 'Prüfung', den: 'die Prüfung', neu: 'neue Prüfung', head: 'Prüfung generieren', file: 'pruefung.txt' } : { a: 'Lernpfad', den: 'den Lernpfad', neu: 'neuen Lernpfad', head: 'Lernpfad, Challenge oder Prüfung erstellen', file: 'lernpfad.txt' };
     el.innerHTML = `<header><b>${KI_ICON} ${W.head}</b><button class="ok" data-x="1">Schließen</button></header>
       <div class="ed-form">
         <div class="ki-api" id="kiApi"></div>
         <div class="ki-step"><span class="n">1</span><b>Beschreibung</b></div>
-        <label>Art des Pfades<select data-k="art">${formOk('lernpfad') ? opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad') : ''}${formOk('challenge') ? opt('challenge', 'Challenge – Übungsaufgaben', info.art) : ''}${formOk('pruefung') ? opt('pruefung', 'Digitale Prüfung – mit Punkten, ohne Rückmeldung', info.art) : ''}${formOk('befragung') ? opt('befragung', 'Befragung – Umfrage, Fragebogen, Selbstreflexion', info.art) : ''}</select></label>
+        <label>Art des Pfades<select data-k="art">${formOk('lernpfad') ? opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad') : ''}${formOk('challenge') ? opt('challenge', 'Challenge – Übungsaufgaben', info.art) : ''}${formOk('pruefung') ? opt('pruefung', 'Digitale Prüfung – mit Punkten, ohne Rückmeldung', info.art) : ''}</select></label>
         <div id="kiBasis"></div>
         <div id="kiMix" hidden>
           <label>Anteil der Aufgaben</label>
@@ -3137,8 +3252,11 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     return { d, from, tasks, removed };
   }
   const examTakenMsg = r => `Aus „${esc(r.from || 'Lernpfad')}“ übernommen: ${r.tasks} Aufgabe${r.tasks === 1 ? '' : 'n'}${r.removed ? `, ${r.removed} App-Baustein${r.removed === 1 ? '' : 'e'} weggelassen` : ''}. Lösche Erklärungen, die nicht in die Prüfung gehören, und prüfe die Punkte.`;
-  /** Neue Prüfung: aus einem Lernpfad, mit KI oder leer beginnen */
+  /** Neue Prüfung: aus einem Lernpfad, mit KI oder leer beginnen. Eingebettet nur für Befragungen (Probe-Umfragen): gleicher Dialog für Befragungen */
   function examStart(view = 'start') {
+    const SV = FORMS_OK.length === 1 && FORMS_OK[0] === 'befragung', F = SV ? 'befragung' : 'pruefung', W = SV ? 'Befragung' : 'Prüfung';
+    const svN = d => (d.stations || []).flatMap(s => s.blocks || []).filter(b => def(b)?.survey).length;
+    const asSurvey = d => { if (SV && d.form !== 'befragung') { d.form = 'befragung'; d.pointsOn = false; if (d.cert) d.cert.on = false; d.design = { ...(d.design || {}), theme: 'lumi' }; } return d; };
     if (pending) commit();
     closeDlg(false);
     const { el, bd } = dialog('ex-start'); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } };
@@ -3147,6 +3265,15 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const load = id => { try { return JSON.parse(LS.get(SRC + '.doc.' + id)); } catch (e) { return null; } };
     let sel = null;
     const draw = () => {
+      if (view === 'start' && SV) { el.innerHTML = `<header><b>📋 Neue Befragung</b><button data-x="1">Abbrechen</button></header><div class="ed-form"><span class="help">Womit möchtest du beginnen? Danach kannst du alles bearbeiten und Fragen ergänzen.</span>
+        <div class="ex-choices">
+          ${(opts.vorlagen || []).length ? `<button data-v="vor"><span class="ic">📋</span><span class="tx"><b>Aus einer Vorlage</b><span>${esc(opts.vorlagenText || 'Eine fertige Befragung übernehmen und anpassen.')}</span></span></button>` : ''}
+          <button data-v="ki"><span class="ic">${KI_ICON}</span><span class="tx"><b>Mit KI erstellen</b><span>Zielgruppe, Anlass und Thema angeben – die KI schreibt den ganzen Fragebogen.</span></span></button>
+          <button data-v="new"><span class="ic">＋</span><span class="tx"><b>Leere Befragung</b><span>Fragen selbst zusammenstellen: Skalen, Auswahl, Raster, offene Fragen.</span></span></button>
+          <button data-v="load"><span class="ic">⤒</span><span class="tx"><b>Fertige Befragung laden</b><span>Eine Befragung im PathFinder-Textformat einfügen oder als Datei öffnen – z. B. von einer anderen KI erstellt. <span class="ex-plink" data-v="prompt" role="link" tabindex="0">Prompt für externe KI anzeigen ›</span></span></span></button>
+        </div></div>`; return; }
+      if (view === 'vor') { el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>Aus einer Vorlage</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
+        <div class="ex-lplist">${opts.vorlagen.map((v, i) => `<div class="ex-lp"><button data-vor="${i}"><b>📋 ${esc(v.title)}</b><span>${esc(v.sub || '')}</span></button></div>`).join('')}</div></div>`; return; }
       if (view === 'start') { el.innerHTML = `<header><b>📝 Neue Prüfung</b><button data-x="1">Abbrechen</button></header><div class="ed-form"><span class="help">Womit möchtest du beginnen? Danach kannst du alles bearbeiten, Aufgaben ergänzen und Punkte anpassen.</span>
         <div class="ex-choices">
           ${opts.examFromLernpfad === false ? '' : `<button data-v="lp"><span class="ic">📘</span><span class="tx"><b>Aus einem Lernpfad</b><span>Aufgaben eines Lernpfads übernehmen, mit dem deine Klasse gelernt hat – oder die KI neue Prüfungsaufgaben zu seinem Inhalt schreiben lassen.</span></span></button>`}
@@ -3156,20 +3283,20 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         </div></div>`; return; }
       if (view === 'prompt') {
         el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>Prompt für externe KI</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
-          <span class="help">Mit diesem Prompt erstellt jede KI (ByLKI, ChatGPT, Gemini, Copilot, Mistral, Claude …) eine Prüfung, die ${esc(appName)} ohne Nacharbeit einlesen kann. Die KI fragt zuerst nach Fach, Jahrgangsstufe, Thema, Zeit und Aufgabenarten.</span>
-          <ol class="ex-steps"><li><b>Prompt kopieren</b> und in den KI-Chat einfügen.</li><li>Die <b>Rückfragen der KI</b> beantworten – gern mit Arbeitsblättern als Datei.</li><li>Den <b>Textblock</b> der Antwort kopieren (oder die Datei pruefung.txt laden).</li><li>Hier unter <b>Fertige Prüfung laden</b> einfügen.</li></ol>
-          <div class="ki-btns"><button class="lp-btn" data-pcopy="1">📋 Prompt kopieren</button><button class="lp-btn alt" data-v="load">Weiter: Prüfung laden ›</button></div>
+          <span class="help">Mit diesem Prompt erstellt jede KI (ByLKI, ChatGPT, Gemini, Copilot, Mistral, Claude …) eine ${W}, die ${esc(appName)} ohne Nacharbeit einlesen kann. ${SV ? 'Die KI fragt zuerst nach Zielgruppe, Anlass und Thema.' : 'Die KI fragt zuerst nach Fach, Jahrgangsstufe, Thema, Zeit und Aufgabenarten.'}</span>
+          <ol class="ex-steps"><li><b>Prompt kopieren</b> und in den KI-Chat einfügen.</li><li>Die <b>Rückfragen der KI</b> beantworten${SV ? '' : ' – gern mit Arbeitsblättern als Datei'}.</li><li>Den <b>Textblock</b> der Antwort kopieren (oder die Datei ${F}.txt laden).</li><li>Hier unter <b>Fertige ${W} laden</b> einfügen.</li></ol>
+          <div class="ki-btns"><button class="lp-btn" data-pcopy="1">📋 Prompt kopieren</button><button class="lp-btn alt" data-v="load">Weiter: ${W} laden ›</button></div>
           <pre class="ki-fmt" id="exPrompt">lädt …</pre></div>`;
         loadText().then(T => { const p = $('#exPrompt', el); if (p) p.textContent = promptText(T); });
         return;
       }
       if (view === 'load') {
-        el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>Fertige Prüfung laden</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
-          <span class="help">Füge den Text der Prüfung ein (beginnt mit „# Titel“) oder wähle eine Datei. Noch keine Prüfung? <span class="ex-plink" data-v="prompt" role="link" tabindex="0">Prompt für externe KI anzeigen ›</span></span>
-          <textarea id="exIn" rows="10" spellcheck="false" placeholder="# Titel der Prüfung&#10;Art: Prüfung&#10;&#10;## Station: Teil A | …">${esc(pasted)}</textarea>
-          <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Datei wählen<input type="file" id="exFiles" multiple accept=".txt,.md,.json,.html,.htm,.zip,.svg,.png,.gif,.jpg,.jpeg,.webp" hidden></label><span class="help" style="align-self:center">pruefung.txt einer KI (gern mit Bildern), eine gesicherte Prüfung (.probe.json) oder ein PathFinder-Export (.html, .zip)</span></div>
+        el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>Fertige ${W} laden</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
+          <span class="help">Füge den Text der ${W} ein (beginnt mit „# Titel“) oder wähle eine Datei. Noch keine ${W}? <span class="ex-plink" data-v="prompt" role="link" tabindex="0">Prompt für externe KI anzeigen ›</span></span>
+          <textarea id="exIn" rows="10" spellcheck="false" placeholder="# Titel der ${W}&#10;Art: ${W}&#10;&#10;## Station: ${SV ? 'Teil 1' : 'Teil A'} | …">${esc(pasted)}</textarea>
+          <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Datei wählen<input type="file" id="exFiles" multiple accept="${SV ? '.txt,.md,.json' : '.txt,.md,.json,.html,.htm,.zip,.svg,.png,.gif,.jpg,.jpeg,.webp'}" hidden></label><span class="help" style="align-self:center">${SV ? 'befragung.txt einer KI oder eine gesicherte Befragung (.json)' : 'pruefung.txt einer KI (gern mit Bildern), eine gesicherte Prüfung (.probe.json) oder ein PathFinder-Export (.html, .zip)'}</span></div>
           <div id="exRes" class="ki-res"></div>
-          <div class="ki-btns"><button class="lp-btn" id="exOpen" disabled>＋ Als neue Prüfung öffnen</button></div></div>`;
+          <div class="ki-btns"><button class="lp-btn" id="exOpen" disabled>＋ Als neue ${W} öffnen</button></div></div>`;
         exCheck(); return;
       }
       const L = list();
@@ -3180,7 +3307,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     };
     // „Fertige Prüfung laden“: eingefügter Text oder Datei im PathFinder-Textformat
     let pasted = '', files = {}, parsed = null;
-    const promptText = T => T.promptFor({ art: 'pruefung', ask: true }, textEnv());
+    const promptText = T => T.promptFor({ art: F, ask: true }, textEnv());
     const exCheck = async () => {
       const res = $('#exRes', el), ob = $('#exOpen', el); if (!res) return;
       if (!pasted.trim()) { parsed = null; ob.disabled = true; res.innerHTML = Object.keys(files).length ? `<div class="good">✓ ${Object.keys(files).length} Bild${Object.keys(files).length === 1 ? '' : 'er'} geladen – jetzt den Text der Prüfung einfügen.</div>` : ''; return; }
@@ -3188,6 +3315,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       const { errors, warnings, stats } = parsed;
       res.innerHTML = errors.length
         ? `<div class="bad">✗ ${errors.length} Fehler – bitte korrigieren oder die KI bitten, genau diese Stellen zu korrigieren:</div><ul>${errors.map(x => `<li>Zeile ${x.n}: ${esc(x.m)}</li>`).join('')}</ul>`
+        : SV ? `<div class="good">✓ Erkannt: „${esc(plain(parsed.doc.title))}“ · ${stats.stations} Teil${stats.stations === 1 ? '' : 'e'} · ${svN(parsed.doc)} Frage${svN(parsed.doc) === 1 ? '' : 'n'}</div>`
         : `<div class="good">✓ Erkannt: „${esc(plain(parsed.doc.title))}“ · ${stats.stations} Station${stats.stations === 1 ? '' : 'en'} · ${stats.tasks} Aufgabe${stats.tasks === 1 ? '' : 'n'}${parsed.doc.form !== 'pruefung' ? ' · wird zur Prüfung umgewandelt' : ''}</div>`
           + (warnings.length ? `<div class="warn">Hinweise:</div><ul>${warnings.map(x => `<li>Zeile ${x.n}: ${esc(x.m)}</li>`).join('')}</ul>` : '');
       ob.disabled = !!errors.length;
@@ -3200,10 +3328,10 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       const js = fs.find(f => /\.json$/i.test(f.name)); // gesicherte Prüfung: als neue Prüfung (eigene ID, nicht abgegeben) öffnen
       if (js) {
         let d; try { d = JSON.parse(await js.text()); if (!Array.isArray(d?.stations)) throw new Error('keine Prüfungsdatei'); } catch (er) { toast('Datei ließ sich nicht öffnen: ' + esc(er.message), 4000); return; }
-        d.id = uid(); delete d.exam; if (opts.ki?.kopf) d.kicker = esc(opts.ki.kopf);
-        closeDlg(false); if (d.form !== 'pruefung') convertNext = true; openDoc(d); toast(`„${esc(plain(d.title || 'ohne Titel'))}“ geladen – passe Titel, Aufgaben und Punkte für die neue Prüfung an.`, 5000); return;
+        d.id = uid(); delete d.exam; if (opts.ki?.kopf) d.kicker = esc(opts.ki.kopf); asSurvey(d);
+        closeDlg(false); if (d.form !== F) convertNext = true; openDoc(d); toast(`„${esc(plain(d.title || 'ohne Titel'))}“ geladen – passe Titel, Aufgaben und Punkte für die neue Prüfung an.`, 5000); return;
       }
-      const whole = fs.find(f => /\.(html?|zip)$/i.test(f.name)); // PathFinder-Export: direkt öffnen
+      const whole = !SV && fs.find(f => /\.(html?|zip)$/i.test(f.name)); // PathFinder-Export: direkt öffnen
       if (whole) { closeDlg(false); convertNext = true; try { await openFile(whole); } finally { convertNext = false; } return; }
       const T = await loadText(), r = await T.readFiles(fs); Object.assign(files, r.att);
       if (r.text) { pasted = r.text; $('#exIn', el).value = r.text; }
@@ -3213,11 +3341,12 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     el.addEventListener('click', async e => {
       const t = e.target.closest('.ex-plink, button'); if (!t) return;
       if (t.dataset.x) { closeDlg(false); return; }
-      if (t.dataset.v === 'start' || t.dataset.v === 'lp' || t.dataset.v === 'load' || t.dataset.v === 'prompt') { view = t.dataset.v; sel = null; draw(); return; }
+      if (t.dataset.vor) { const v = opts.vorlagen[+t.dataset.vor]; if (!v) return; let src = v.doc; if (!src && v.text) { const T = await loadText(), r = T.parseText(v.text, { ...textEnv(), attachments: {}, files: {} }); if (r.errors.length) { toast('Vorlage fehlerhaft: ' + esc(r.errors[0].m)); return; } src = r.doc; } const d = asSurvey(migrate(JSON.parse(JSON.stringify(src)))); d.id = uid(); if (opts.ki?.kopf && !plain(d.kicker || '').trim()) d.kicker = esc(opts.ki.kopf); closeDlg(false); openDoc(d); toast(`„${esc(plain(d.title))}“ übernommen – passe die Fragen an.`); return; }
+      if (t.dataset.v === 'start' || t.dataset.v === 'lp' || t.dataset.v === 'load' || t.dataset.v === 'prompt' || t.dataset.v === 'vor') { view = t.dataset.v; sel = null; draw(); return; }
       if (t.dataset.pcopy) { const T = await loadText(); toast(await copyText(promptText(T)) ? '📋 Prompt kopiert – jetzt im KI-Chat einfügen' : 'Kopieren ging nicht'); return; }
-      if (t.id === 'exOpen' && parsed && !parsed.errors.length) { const d = parsed.doc; if (!plain(d.kicker || '').trim() && opts.ki?.kopf) d.kicker = esc(opts.ki.kopf); closeDlg(false); if (d.form !== 'pruefung') convertNext = true; openDoc(d); toast(`„${esc(plain(d.title))}“ geladen – prüfe Aufgaben und Punkte im Editor.`); return; }
-      if (t.dataset.v === 'new') { closeDlg(false); const d = emptyDoc('pruefung'); if (opts.ki?.kopf) d.kicker = opts.ki.kopf; openDoc(d); toast('Leere Prüfung angelegt – Titel antippen, Aufgaben über ＋ einfügen'); return; }
-      if (t.dataset.v === 'ki') { closeDlg(false); openKI({ art: 'pruefung' }); return; }
+      if (t.id === 'exOpen' && parsed && !parsed.errors.length) { const d = asSurvey(parsed.doc); if (!plain(d.kicker || '').trim() && opts.ki?.kopf) d.kicker = esc(opts.ki.kopf); closeDlg(false); if (d.form !== F) convertNext = true; openDoc(d); toast(SV ? `„${esc(plain(d.title))}“ geladen – prüfe die Fragen im Editor.` : `„${esc(plain(d.title))}“ geladen – prüfe Aufgaben und Punkte im Editor.`); return; }
+      if (t.dataset.v === 'new') { closeDlg(false); const d = emptyDoc(F); if (opts.ki?.kopf) d.kicker = opts.ki.kopf; openDoc(d); toast(SV ? 'Leere Befragung angelegt – Titel antippen, Fragen über ＋ einfügen' : 'Leere Prüfung angelegt – Titel antippen, Aufgaben über ＋ einfügen'); return; }
+      if (t.dataset.v === 'ki') { closeDlg(false); openKI({ art: F }); return; }
       if (t.dataset.pick) { sel = sel === t.dataset.pick ? null : t.dataset.pick; draw(); return; }
       if (t.dataset.take) { const d = load(t.dataset.take); if (!d) { toast('Lernpfad nicht gefunden'); return; } closeDlg(false); convertNext = true; openDoc(d); return; }
       if (t.dataset.kib) { const d = load(t.dataset.kib); if (!d) { toast('Lernpfad nicht gefunden'); return; } const T = await loadText(); closeDlg(false); openKI({ art: 'pruefung', basis: { title: plain(d.title) || 'ohne Titel', text: T.docToText(migrate(d), textEnv(), { refs: true }) } }); return; }
@@ -3491,14 +3620,15 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   }
   if ($('#bKI')) $('#bKI').onclick = e => { // nur in der eigenständigen WebApp: Auswahl der KI-Prompts
     closePop(); pop = document.createElement('div'); pop.className = 'ed-pop ki-menu';
-    const ONLY_EXAM = FORMS_OK.length === 1 && FORMS_OK[0] === 'pruefung'; // eingebettet in Probe
+    const ONLY_EXAM = FORMS_OK.length === 1 && FORMS_OK[0] === 'pruefung', ONLY_SV = FORMS_OK.length === 1 && FORMS_OK[0] === 'befragung'; // eingebettet in Probe
     pop.innerHTML = `<h3>KI-Tools</h3><div class="ed-pal ed-pal1">
-      ${ONLY_EXAM ? `<button data-k="ki"><b>${KI_ICON} Prüfung generieren</b><span>eine digitale Prüfung Schritt für Schritt von einer KI erstellen lassen</span></button>`
+      ${ONLY_SV ? `<button data-k="sv"><b>${KI_ICON} Umfrage erstellen</b><span>einen Fragebogen von einer KI schreiben lassen</span></button>` : ONLY_EXAM ? `<button data-k="ki"><b>${KI_ICON} Prüfung generieren</b><span>eine digitale Prüfung Schritt für Schritt von einer KI erstellen lassen</span></button>`
         : `<button data-k="ki"><b>${KI_ICON} Lernpfad, Challenge oder Prüfung erstellen</b><span>einen neuen Lernpfad, eine Challenge oder eine digitale Prüfung von einer KI schreiben lassen</span></button>`}
-      <button data-k="exam"><b>${KI_ICON} Fragensammlung für ByCS generieren</b><span>aus dem offenen Lernpfad: Fragen für Moodle/ByCS (Moodle-XML)</span></button></div>`;
+      ${!ONLY_SV && !ONLY_EXAM && formOk('befragung') ? `<button data-k="sv"><b>${KI_ICON} Umfrage erstellen</b><span>Fragebogen, Feedback oder Selbstreflexion – ohne richtig und falsch, mit Auswertung</span></button>` : ''}
+      ${ONLY_SV ? '' : `<button data-k="exam"><b>${KI_ICON} Fragensammlung für ByCS generieren</b><span>aus dem offenen Lernpfad: Fragen für Moodle/ByCS (Moodle-XML)</span></button>`}</div>`;
     pop.insertAdjacentHTML('beforeend', '<button class="ki-menu-link" data-k="api">KI API Key verwenden</button>');
     document.body.appendChild(pop); placePop(e.currentTarget);
-    pop.onclick = ev => { const k = ev.target.closest('[data-k]')?.dataset.k; if (!k) return; closePop(); if (k === 'ki') openKI(); else if (k === 'api') apiSettings(); else openExam(); };
+    pop.onclick = ev => { const k = ev.target.closest('[data-k]')?.dataset.k; if (!k) return; closePop(); if (k === 'ki') openKI(); else if (k === 'sv') openSurveyKI(); else if (k === 'api') apiSettings(); else openExam(); };
   };
   const bWide = $('#bWide'); if (bWide) bWide.onclick = () => $('#app').classList.toggle('lp-only');
   function infoDlg(title, html) { const { el, bd } = dialog(); bd.onclick = () => closeDlg(false); dlg = { el, bd, apply: () => { } }; el.innerHTML = `<header><b>${title}</b><button class="ok" data-x="1">Schließen</button></header>${html}`; el.onclick = ev => { if (ev.target.closest('[data-x]')) closeDlg(false); }; }
@@ -3752,6 +3882,6 @@ ${SC}
   save(); render(); updUndo();
   aiFloat();
   host.attach?.(ctx);
-  if (!PLAYER && ((startHere && formOk('pruefung')) || opts.startDialog)) setTimeout(() => examStart(), 250);
+  if (!PLAYER && ((startHere && (formOk('pruefung') || FORMS_OK[0] === 'befragung')) || opts.startDialog)) setTimeout(() => examStart(), 250);
   return ctx;
 }
