@@ -41,9 +41,11 @@ Fragebögen, Selbstreflexion und Gesprächsbögen – Fragen ohne richtig oder f
 **Einwilligung** (Weitergabe an die nächste Klassleitung) – dazu Text, Infokästen, Bilder, Tabellen; jede Station ist ein
 Abschnitt. Je Frage optional „Hinweis“ und „Weitergabe“ (für Gesprächsbögen). Textformat: `### Skala:`, `### Auswahl:`,
 `### Mehrfachauswahl:`, `### Ja/Nein:`, `### Raster:` (`Spalten: …`), `### Offene Frage:` (`Zeilen: n`), `### Datum:`,
-`### Einwilligung:`; auch der KI-Dialog erstellt Befragungen. Neue Befragungen bekommen den Stil **„Lumi“**
+`### Einwilligung:`; die KI erstellt Befragungen über KI-Tools → **Umfrage erstellen** (eigener Dialog: Titel, Zielgruppe,
+was befragt werden soll, Material). Neue Befragungen bekommen den Stil **„Lumi“**
 (wie die Lumi-Coaching-App: Nachthimmel mit Pixel-Sternen, Papierblatt, animierte Pixel-Eule als Kopfbild; immer hell;
-wählbar unter ⚙ Einstellungen → Farbpalette). Ausgefüllt wird in Probe: `core/pfsurvey.js` →
+wählbar unter ⚙ Einstellungen → Farbpalette). Eingebettet (`forms: ['befragung']`, z. B. Probe) gibt es „Abschicken“
+(`host.submit`), Vorlagen im Startdialog (`opts.vorlagen`) und in `core/pfsurvey.js` `answersFromSvy`/`surveyStats` für die Auswertung. Ausgefüllt wird in Probe: `core/pfsurvey.js` →
 `surveySpec(doc)` macht daraus die Vorlage (Fragen, Statistik-Felder, Einwilligung). Tests: `node tools/test-survey.mjs`.
 
 ## Digitale Prüfung
