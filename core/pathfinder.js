@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-24u';
+const PF_BUILD = '2026-11-25a';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -3613,7 +3613,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     bDone.textContent = '✓ ' + (host.doneLabel || 'Fertig'); bDone.title = host.doneTitle || 'Prüfung fertigstellen'; $('#bMore').before(bDone);
     bDone.onclick = async () => {
       if (pending) commit();
-      let warn = []; try { warn = (await import(modUrl('pfsplit.js'))).splitExam(doc).warnings; } catch (e) { }
+      let warn = []; if (EXAMF()) try { warn = (await import(modUrl('pfsplit.js'))).splitExam(doc).warnings; } catch (e) { } // nur Prüfungen (nicht Befragungen)
       if (!RO && warn.length && !confirm('Bitte prüfen:\n\n• ' + warn.join('\n• ') + '\n\nTrotzdem fertigstellen?')) return;
       await host.done(clone(doc));
     };
