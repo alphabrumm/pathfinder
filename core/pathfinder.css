@@ -921,3 +921,21 @@ label.lp-btn { display: inline-flex; align-items: center; justify-content: cente
 .lp-svy .sv-line, .lp-svy .sv-area, .lp-svy .sv-date { font: calc(16px * var(--fz)) var(--font-body); width: 100%; padding: 10px 12px; border: 2px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); }
 .lp-svy .sv-date { width: auto; }
 .lp-svy :disabled + span, .lp-svy input:disabled, .lp-svy textarea:disabled { cursor: default; }
+/* Stil „Lumi“ (Standard für Befragungen): Nachthimmel mit Pixel-Sternen, Inhalt auf einem Papierblatt, Pixel-Eule als Kopfbild */
+.lp[data-theme="lumi"] { background: #221e44 var(--lumi-stars) repeat; background-size: 288px 288px; }
+.lp[data-theme="lumi"] .lp-hero { background: transparent; color: #f6f4fc; padding: 22px 18px 18px; }
+.lp[data-theme="lumi"] .lp-hero::before { display: none; }
+.lp[data-theme="lumi"] .lp-hero small { color: #ffe58a; opacity: 1; }
+.lp[data-theme="lumi"] .lp-hero h1 { color: #f6f4fc; }
+.lp[data-theme="lumi"] .lp-hero p { color: #e6e2f5; }
+.lp[data-theme="lumi"] .lp-logo { width: 78px; height: 78px; background: none; box-shadow: none; border-radius: 0; }
+.lp[data-theme="lumi"] .lp-logo img { object-fit: contain; image-rendering: pixelated; image-rendering: crisp-edges; }
+.lp[data-theme="lumi"] .lp-divider { background: var(--div, #5648a8); height: 4px; }
+.lp[data-theme="lumi"] .lp-trail { background: #191532; border-bottom: 0; }
+.lp[data-theme="lumi"] .lp-trail .lp-count { color: #e6e2f5; }
+.lp[data-theme="lumi"] .lp-main { background: #f6f4fc; border: 3px solid #191532; border-radius: 6px; box-shadow: 4px 4px 0 #191532, 4px 4px 0 3px rgba(142,124,240,.25); margin-top: 18px !important; margin-bottom: 26px !important; padding-top: 14px; }
+.lp[data-theme="lumi"] .lp-card { background: #fff; border: 2px solid #191532; border-radius: 6px; box-shadow: 3px 3px 0 #191532; }
+.lp[data-theme="lumi"] .lp-foot { color: #b9b6cb; border-top: 0; }
+.lp[data-theme="lumi"] .fontsize button { background: #3a3465; color: #f6f4fc; border-color: #5648a8; }
+.lp[data-theme="lumi"] .sv-scale input:checked + span, .lp[data-theme="lumi"] .sv-opts input:checked + span::before { background: #5648a8; border-color: #5648a8; }
+.ed-sw button.lumi { padding: 0; overflow: hidden; }
