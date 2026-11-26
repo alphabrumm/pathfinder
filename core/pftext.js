@@ -791,6 +791,10 @@ Erwartung: erster Teilaspekt der erwarteten Antwort (2)   (Erwartungshorizont, Z
 Erwartung: zweiter Teilaspekt (1)
 Zeilen: 6               (optional: Höhe des Antwortfelds)
 
+### Handschrift: Titel     (nur in Prüfungen: Lösung auf Papier – die Schüler fotografieren sie, Probe macht daraus ein Schwarz-Weiß-Bild)
+Aufgabenstellung (eine kleine Aufgabe: Rechnung, Skizze, Diagramm).
+Erwartung: Teilaspekt (2)   (Erwartungshorizont wie beim Freitext, die Lehrkraft bewertet)
+
 ${svHelp ? `BEFRAGUNG (nur mit „Art: Befragung“: Umfrage, Fragebogen, Selbstreflexion, Gesprächsbogen – Fragen ohne richtig oder falsch, ohne Punkte;
 jede Station ist ein Abschnitt; Text, Infokästen, Bilder und Tabellen sind erlaubt):
 ### Skala: Wie wohl fühlst du dich gerade in der Schule?
@@ -915,7 +919,7 @@ export function promptFor(info, env) {
     ? `- Schreibe im Kopf die Zeile „Art: Prüfung“.
 - KEINE Erklärungen, Merkkästen, Figuren, Tipps, Lösungen zum Aufdecken oder Sperren – nur kurze Arbeitsanweisungen, Material (Texte, Tabellen, Abbildungen) und Aufgaben.
 - Gliedere die Prüfung in Stationen als Teilaufgaben oder Themenblöcke (z. B. „## Station: Teil A | Grundwissen“).
-- Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle, Reihenfolge, Freitext, JPad) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken, Markieren und Sortieren etwa 1 Punkt je zwei Wörter bzw. Begriffe, ein Satzpuzzle 1–2 Punkte.
+- Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle, Reihenfolge, Freitext, Handschrift, JPad) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken, Markieren und Sortieren etwa 1 Punkt je zwei Wörter bzw. Begriffe, ein Satzpuzzle 1–2 Punkte.
 ${!info.types?.length || info.types.includes('short') ? `- Rechenaufgaben mit eindeutigem Ergebnis als „### Aufgabe“ mit „Antwort:“ (Zahl, ohne Einheit, mehrere richtige mit | trennen) – sie werden automatisch bewertet. Schreibe die erwartete Einheit in den Auftrag.` : ''}
 ${!info.types?.length || info.types.includes('essay') ? `- Offene Aufgaben (erklären, begründen, beschreiben, beurteilen) als „### Freitext“ mit Erwartungshorizont: mehrere Zeilen „Erwartung: … (Punkte)“; die Summe ergibt die Punkte der Aufgabe.` : ''}
 ${info.ask ? `- AUFGABENARTEN – verwende die Arten, die die Lehrkraft gewählt hat, und zwar JEDE mindestens einmal; ohne Vorgabe eine abwechslungsreiche, zum Thema passende Auswahl (Lösungsschritte nur bei Rechenwegen):

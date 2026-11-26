@@ -38,6 +38,7 @@ const BEWERTUNG = `Probe bewertet nach der Abgabe; die Schüler bekommen währen
 | Sortieren | je Begriff |
 | Satzpuzzle, Reihenfolge | je Teil an richtiger Stelle (längste richtige Teilfolge), beste der erlaubten Lösungen |
 | Freitext | von der Lehrkraft, mit Erwartungshorizont |
+| Handschrift | von der Lehrkraft am Foto der Lösung, mit Erwartungshorizont |
 | JPad | ohne \`Erwartung:\` automatisch je Prüfung (Ausgabe des letzten Programmlaufs, jeder \`Muss:\`-Code); mit \`Erwartung:\` von der Lehrkraft – die Prüfungen sind dann nur Hinweise |
 | Experiment | je Teil: verschiedene Werte für die untersuchte Größe, faire Messreihe (nur diese Größe verändert), jede Auswertungslücke; die Hypothese wird nur festgehalten |
 

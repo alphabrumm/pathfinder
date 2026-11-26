@@ -51,7 +51,7 @@ REGELN
 - Schreibe im Kopf die Zeile „Art: Prüfung“.
 - KEINE Erklärungen, Merkkästen, Figuren, Tipps, Lösungen zum Aufdecken oder Sperren – nur kurze Arbeitsanweisungen, Material (Texte, Tabellen, Abbildungen) und Aufgaben.
 - Gliedere die Prüfung in Stationen als Teilaufgaben oder Themenblöcke (z. B. „## Station: Teil A | Grundwissen“).
-- Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle, Reihenfolge, Freitext, JPad) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken, Markieren und Sortieren etwa 1 Punkt je zwei Wörter bzw. Begriffe, ein Satzpuzzle 1–2 Punkte.
+- Gib JEDER Aufgabe (Aufgabe, Quiz, Lückentext, Zuordnen, Markieren, Sortieren, Satzpuzzle, Reihenfolge, Freitext, Handschrift, JPad) eine Zeile „Punkte: n“. Die Punkte spiegeln den Aufwand; ein Quiz bekommt etwa 1 Punkt je Frage, ein Lückentext etwa 1 Punkt je Lücke oder je zwei Lücken, Markieren und Sortieren etwa 1 Punkt je zwei Wörter bzw. Begriffe, ein Satzpuzzle 1–2 Punkte.
 - Rechenaufgaben mit eindeutigem Ergebnis als „### Aufgabe“ mit „Antwort:“ (Zahl, ohne Einheit, mehrere richtige mit | trennen) – sie werden automatisch bewertet. Schreibe die erwartete Einheit in den Auftrag.
 - Offene Aufgaben (erklären, begründen, beschreiben, beurteilen) als „### Freitext“ mit Erwartungshorizont: mehrere Zeilen „Erwartung: … (Punkte)“; die Summe ergibt die Punkte der Aufgabe.
 - AUFGABENARTEN – verwende die Arten, die die Lehrkraft gewählt hat, und zwar JEDE mindestens einmal; ohne Vorgabe eine abwechslungsreiche, zum Thema passende Auswahl (Lösungsschritte nur bei Rechenwegen):
@@ -163,6 +163,10 @@ Erwartung: erster Teilaspekt der erwarteten Antwort (2)   (Erwartungshorizont, Z
 Erwartung: zweiter Teilaspekt (1)
 Zeilen: 6               (optional: Höhe des Antwortfelds)
 
+### Handschrift: Titel     (nur in Prüfungen: Lösung auf Papier – die Schüler fotografieren sie, Probe macht daraus ein Schwarz-Weiß-Bild)
+Aufgabenstellung (eine kleine Aufgabe: Rechnung, Skizze, Diagramm).
+Erwartung: Teilaspekt (2)   (Erwartungshorizont wie beim Freitext, die Lehrkraft bewertet)
+
 ### JPad: Titel         (nur in Prüfungen: Programmieraufgabe, die Schüler in JPad bearbeiten)
 Arbeitsauftrag.
 Ausgabe: Start in 3 2 1  (optional: was das Programm ausgeben soll; mehrzeilig als ```text ausgabe … ```)
@@ -241,6 +245,7 @@ Probe bewertet nach der Abgabe; die Schüler bekommen während der Prüfung kein
 | Sortieren | je Begriff |
 | Satzpuzzle, Reihenfolge | je Teil an richtiger Stelle (längste richtige Teilfolge), beste der erlaubten Lösungen |
 | Freitext | von der Lehrkraft, mit Erwartungshorizont |
+| Handschrift | von der Lehrkraft am Foto der Lösung, mit Erwartungshorizont |
 | JPad | ohne `Erwartung:` automatisch je Prüfung (Ausgabe des letzten Programmlaufs, jeder `Muss:`-Code); mit `Erwartung:` von der Lehrkraft – die Prüfungen sind dann nur Hinweise |
 | Experiment | je Teil: verschiedene Werte für die untersuchte Größe, faire Messreihe (nur diese Größe verändert), jede Auswertungslücke; die Hypothese wird nur festgehalten |
 
