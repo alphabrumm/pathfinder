@@ -946,7 +946,18 @@ label.lp-btn { display: inline-flex; align-items: center; justify-content: cente
 .lp-hand-btn { display: inline-flex; align-items: center; gap: 6px; }
 .lp-hand-dlg { position: fixed; inset: 0; z-index: 9999; background: rgba(10, 14, 30, .6); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .lp-hand-dlg .box { background: var(--surface, #fff); color: var(--ink, #18203a); border-radius: 16px; padding: 18px; max-width: min(760px, 100%); max-height: 100%; overflow: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, .35); font-family: var(--font-body); }
-.lp-hand-dlg .pic { margin: 10px 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.lp-hand-dlg .pic img { display: block; width: 100%; height: auto; max-height: 60vh; object-fit: contain; }
+.lp-hand-dlg .pic { margin: 10px 0; background: #6b7080; border-radius: 10px; padding: 14px; display: flex; justify-content: center; }
+.lp-hand-dlg .crop { position: relative; display: inline-block; overflow: hidden; line-height: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+.lp-hand-dlg .crop img { display: block; max-width: 100%; max-height: 55vh; width: auto; height: auto; background: #fff; pointer-events: none; }
+.lp-hand-dlg .cbox { position: absolute; box-sizing: border-box; border: 2px solid var(--a1, #4f7cf0); box-shadow: 0 0 0 9999px rgba(20, 24, 40, .55); }
+.lp-hand-dlg .cbox i { position: absolute; display: block; background: var(--a3, #ffc94d); border: 2px solid #fff; border-radius: 99px; box-shadow: 0 1px 4px rgba(0, 0, 0, .45); touch-action: none; cursor: grab; animation: lp-blink 1s ease-in-out infinite; }
+.lp-hand-dlg .cbox i::after { content: ''; position: absolute; inset: -14px; } /* größere Fläche zum Anfassen */
+.lp-hand-dlg .cbox i[data-h=l], .lp-hand-dlg .cbox i[data-h=r] { width: 12px; height: 46px; top: 50%; margin-top: -23px; }
+.lp-hand-dlg .cbox i[data-h=l] { left: 3px; } .lp-hand-dlg .cbox i[data-h=r] { right: 3px; }
+.lp-hand-dlg .cbox i[data-h=t], .lp-hand-dlg .cbox i[data-h=b] { height: 12px; width: 46px; left: 50%; margin-left: -23px; }
+.lp-hand-dlg .cbox i[data-h=t] { top: 3px; } .lp-hand-dlg .cbox i[data-h=b] { bottom: 3px; }
+.lp-hand-dlg .cbox i.used { animation: none; }
+@keyframes lp-blink { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.9); } }
+@media (prefers-reduced-motion: reduce) { .lp-hand-dlg .cbox i { animation-duration: 2.5s; } }
 .lp-hand-dlg .btns { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .lp-hand-dlg .wait { margin: 20px 30px; }

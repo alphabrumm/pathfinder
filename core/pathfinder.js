@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-26a';
+const PF_BUILD = '2026-11-26b';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1346,21 +1346,44 @@ export function startPathFinder(opts = {}) {
   /** Foto verarbeiten und fragen, ob alles gut erkennbar ist; erst dann wird es die Antwort */
   async function handTake(id, file) {
     let mode = 'bw', res;
+    const cr = { l: 0, t: 0, r: 1, b: 1 }; // Zuschnitt als Anteil der Bildbreite/-höhe
     const ov = document.createElement('div'); ov.className = 'lp-hand-dlg'; ov.innerHTML = '<div class="box"><p class="wait">Foto wird aufbereitet …</p></div>'; lp.append(ov);
     const close = () => ov.remove();
+    const place = () => { const c = $('.cbox', ov); if (c) Object.assign(c.style, { left: cr.l * 100 + '%', top: cr.t * 100 + '%', width: (cr.r - cr.l) * 100 + '%', height: (cr.b - cr.t) * 100 + '%' }); };
     const draw = async () => {
       try { res = await (await import(modUrl('pfscan.js'))).scanPhoto(file, { mode }); }
       catch (e) { ov.querySelector('.box').innerHTML = `<p>${esc(e.message || 'Das Foto ließ sich nicht verarbeiten.')}</p><div class="btns"><button type="button" class="lp-btn" data-x="no">Schließen</button></div>`; return; }
-      ov.querySelector('.box').innerHTML = `<b>Ist alles gut erkennbar?</b><div class="pic"><img src="${res.img}" alt="Aufbereitetes Foto"></div>
-        <p class="help">Prüfe, ob du jede Zeile lesen kannst. Sonst fotografiere noch einmal – gerade von oben, mit gutem Licht, ohne Schatten. (${res.kb} KB)</p>
+      ov.querySelector('.box').innerHTML = `<b>Schneide das Bild zu</b>
+        <p class="help">Ziehe die blinkenden Griffe links, rechts, oben und unten, bis nur noch deine Lösung zu sehen ist – alles andere wird weggeschnitten.</p>
+        <div class="pic"><div class="crop"><img src="${res.img}" alt="Aufbereitetes Foto" draggable="false"><div class="cbox"><i data-h="l" aria-label="linker Rand"></i><i data-h="r" aria-label="rechter Rand"></i><i data-h="t" aria-label="oberer Rand"></i><i data-h="b" aria-label="unterer Rand"></i></div></div></div>
+        <p class="help"><b>Ist dann alles gut erkennbar?</b> Prüfe, ob du jede Zeile lesen kannst. Sonst fotografiere noch einmal – gerade von oben, mit gutem Licht, ohne Schatten.</p>
         <div class="btns"><button type="button" class="lp-btn alt" data-x="mode">${mode === 'bw' ? 'Graustufen versuchen (blasse Schrift)' : 'Schwarz-Weiß versuchen'}</button><button type="button" class="lp-btn alt" data-x="no">Neu fotografieren</button><button type="button" class="lp-btn" data-x="ok">Ja, gut lesbar – verwenden</button></div>`;
+      place();
     };
+    // Griffe ziehen (Finger, Stift oder Maus); mindestens 10 % bleiben stehen
+    ov.addEventListener('pointerdown', e => {
+      const hd = e.target.closest('[data-h]'); if (!hd) return;
+      e.preventDefault(); hd.classList.add('used'); hd.setPointerCapture?.(e.pointerId);
+      const box = $('.crop img', ov).getBoundingClientRect(), k = hd.dataset.h;
+      const mv = ev => {
+        const fx = (ev.clientX - box.left) / box.width, fy = (ev.clientY - box.top) / box.height, cl = v => Math.max(0, Math.min(1, v));
+        if (k === 'l') cr.l = Math.min(cl(fx), cr.r - 0.1); if (k === 'r') cr.r = Math.max(cl(fx), cr.l + 0.1);
+        if (k === 't') cr.t = Math.min(cl(fy), cr.b - 0.1); if (k === 'b') cr.b = Math.max(cl(fy), cr.t + 0.1);
+        place();
+      };
+      const up = () => { hd.removeEventListener('pointermove', mv); hd.removeEventListener('pointerup', up); hd.removeEventListener('pointercancel', up); };
+      hd.addEventListener('pointermove', mv); hd.addEventListener('pointerup', up); hd.addEventListener('pointercancel', up);
+    });
     ov.onclick = async e => {
       const x = e.target.closest('[data-x]')?.dataset.x; if (!x) return;
       if (x === 'mode') { mode = mode === 'bw' ? 'gray' : 'bw'; ov.querySelector('.box').innerHTML = '<p class="wait">Foto wird aufbereitet …</p>'; await draw(); return; }
+      if (x === 'ok' && res && !EXAM_DONE()) {
+        let out = res;
+        try { out = await (await import(modUrl('pfscan.js'))).cropScan(res, cr); } catch (er) { /* dann ungeschnitten */ }
+        close(); prog.ans[id] = { img: out.img, w: out.w, h: out.h, mode: out.mode, at: Date.now() }; render(); examChanged(id); return;
+      }
       close();
-      if (x === 'no') { $(`.blk[data-id="${id}"] [data-handin]`, lp)?.click(); return; }
-      if (x === 'ok' && res && !EXAM_DONE()) { prog.ans[id] = { img: res.img, w: res.w, h: res.h, mode: res.mode, at: Date.now() }; render(); examChanged(id); }
+      if (x === 'no') $(`.blk[data-id="${id}"] [data-handin]`, lp)?.click();
     };
     await draw();
   }

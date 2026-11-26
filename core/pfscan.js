@@ -48,3 +48,14 @@ function loadImg(file) {
     im.src = u;
   });
 }
+
+/** Zuschnitt { l, t, r, b } (Anteile 0–1) auf ein Ergebnis von scanPhoto anwenden – gleiches Format, gleiche Qualität */
+export async function cropScan(res, c) {
+  if (c.l <= 0.002 && c.t <= 0.002 && c.r >= 0.998 && c.b >= 0.998) return res;
+  const im = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => no(new Error('Bild')); i.src = res.img; });
+  const x = Math.round(c.l * im.width), y = Math.round(c.t * im.height), w = Math.max(1, Math.round((c.r - c.l) * im.width)), h = Math.max(1, Math.round((c.b - c.t) * im.height));
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(im, x, y, w, h, 0, 0, w, h);
+  const blob = await new Promise(r => cv.toBlob(r, res.mode === 'gray' ? 'image/jpeg' : 'image/png', 0.72));
+  const img = await new Promise((r, j) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.onerror = j; fr.readAsDataURL(blob); });
+  return { img, w, h, mode: res.mode, kb: Math.round(blob.size / 1024) };
+}
