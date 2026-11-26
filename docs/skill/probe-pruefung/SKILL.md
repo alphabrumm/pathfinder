@@ -5,7 +5,7 @@ description: Digitale Prüfungen für Probe (probe.pandapy.de) im PathFinder-Tex
 
 # Probe-Prüfungen
 
-Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-26a). Die Spezifikation unten ist dieselbe, die Probe
+Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-26c). Die Spezifikation unten ist dieselbe, die Probe
 als „Prompt für externe KI“ anzeigt. Weicht etwas vom aktuellen Probe-Verhalten ab, gilt der Code in alphabrumm/pathfinder
 (`core/pftext.js`, `core/pfsplit.js`).
 
@@ -67,7 +67,7 @@ REGELN
   • Textpuzzle (Reihenfolge): „### Reihenfolge“ – 4–6 Abschnitte, Sätze oder Dialogzeilen, je Zeile einer, in der richtigen Reihenfolge; die Reihenfolge muss eindeutig sein (Signalwörter, Handlungsablauf)
   • Experiment (Erkenntnisgewinnung): „### Widget: Experiment“ – die Schüler planen und messen selbst: „Frage:“, „Untersuche: <Symbol der untersuchten Größe>“, zwei bis drei „Größe:“-Zeilen mit je 3 Werten OHNE „| fest“ (die faire Messreihe zu planen ist Teil der Leistung), „Ergebnis:“ mit physikalisch richtiger Rechenvorschrift, „Auswertung:“ als Lückentext (Je-desto-Satz, Proportionalität) mit zwei Ablenkern unter „Extra:“; keine „Hypothese:“- und „Schlussfolgerung:“-Zeilen – die Hypothese mit Begründung davor als „### Freitext“, eine Vorhersage danach als „### Aufgabe“ mit „Antwort:“; Punkte: 2 für die Messreihe plus 1 je Auswertungslücke
   • Freitext: „### Freitext“ mit Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“
-  • Handschriftliche Aufgabe: „### Handschrift: Titel“ – eine kleine Aufgabe, die die Schüler auf Papier lösen (Rechnung, Skizze, Diagramm) und dann fotografieren; Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“; Platz für eine halbe Seite, nicht mehr
+  • Handschriftliche Aufgabe: „### Handschrift: Titel“ – eine kleine Aufgabe, die die Schüler auf Papier lösen (Rechnung, Skizze, Diagramm) und dann fotografieren; Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“ und eine Musterlösung in Zeilen „Lösung: …“ (Formeln in LaTeX zwischen $…$); Platz für eine halbe Seite, nicht mehr
   • Programmieren in JPad: „### JPad: Titel“ – die Schüler programmieren in JPad (Java): kurzer Auftrag, Startcode als ```java start Klassenname … ``` (optional, je Datei ein Block), „Ausgabe:“ mit der erwarteten Programmausgabe (Teil der Ausgabe genügt) und/oder „Muss:“ für Pflicht-Code (z. B. while); Musterlösung als ```java lösung … ``` (sieht nur die Lehrkraft). Ohne „Erwartung:“-Zeilen wird automatisch nach Ausgabe und Pflicht-Code bewertet; mit „Erwartung: … (Punkte)“ bewertet die Lehrkraft. Java wie in JPad üblich: println() und print() ohne System.out, Wrapper-Typen Integer, Double, Boolean, Character statt int, double, boolean, char
 - Anforderungsbereiche: wie von der Lehrkraft angegeben, sonst etwa 40 % der Punkte Reproduktion (AFB I), 40 % Anwendung und Transfer (AFB II), 20 % Problemlösen und Beurteilen (AFB III); von leicht nach schwer.
 - Quizfragen mit genau einer richtigen Antwort und plausiblen falschen Antworten; Rückmeldungen nach // sind nicht nötig.
@@ -166,6 +166,7 @@ Zeilen: 6               (optional: Höhe des Antwortfelds)
 ### Handschrift: Titel     (nur in Prüfungen: Lösung auf Papier – die Schüler fotografieren sie, Probe macht daraus ein Schwarz-Weiß-Bild)
 Aufgabenstellung (eine kleine Aufgabe: Rechnung, Skizze, Diagramm).
 Erwartung: Teilaspekt (2)   (Erwartungshorizont wie beim Freitext, die Lehrkraft bewertet)
+Lösung: $F = m \cdot a = 2\,\text{kg} \cdot 3\,\text{m/s}^2 = 6\,\text{N}$   (Musterlösung, auch mehrere Zeilen; Formeln in LaTeX zwischen $…$ – nie in der Prüfung, nur Lehrkraft, Respizienz und Ergebnisseite)
 
 ### JPad: Titel         (nur in Prüfungen: Programmieraufgabe, die Schüler in JPad bearbeiten)
 Arbeitsauftrag.

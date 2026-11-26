@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-26b';
+const PF_BUILD = '2026-11-26c';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -1184,7 +1184,7 @@ export function startPathFinder(opts = {}) {
   function essayEdit(b) {
     const R = b.rubric || [];
     return `<div class="lp-card lp-task lp-essay"><div class="hd">${ce('title', b.title, b.hand ? 'Handschriftliche Aufgabe' : 'Freitext', { tag: 'b', cls: 'lp-ctitle' })}</div>${imgHtml(b.img, '', 'klein')}${ce('html', b.html, 'Aufgabenstellung …', { rich: true })}`
-      + (b.hand ? `<div class="lp-hand"><div class="lp-hand-empty">📷 Hier fotografieren die Schüler ihre Lösung auf Papier – als Schwarz-Weiß-Bild.</div></div>`
+      + (b.hand ? `<div class="lp-hand"><div class="lp-hand-empty">📷 Hier fotografieren die Schüler ihre Lösung auf Papier – als Schwarz-Weiß-Bild.</div>${b.solution ? `<div class="lp-hand-sol"><b>Musterlösung</b> <span>(nicht in der Prüfung – rechts im Seitenfeld bearbeiten)</span><pre>${esc(b.solution)}</pre></div>` : ''}</div>`
         : `<textarea class="lp-essay-in" rows="${Math.max(2, +b.lines || 6)}" disabled placeholder="Hier schreiben die Schüler ihre Antwort."></textarea>`)
       + (E() ? `<div class="ed-hint">${R.length ? `Erwartungshorizont (nur für dich): ${R.map(r => `${esc(r.t || '…')} (${+r.p || 0} P.)`).join(' · ')}` : 'Erwartungshorizont mit Teilpunkten über ⚙'}</div>` : '') + '</div>';
   }
@@ -1886,7 +1886,9 @@ export function startPathFinder(opts = {}) {
         set: (b, v) => { b.items = b.words ? v.split(/\s*\/\s*|\n/).map(x => x.trim()).filter(Boolean) : v.split('\n').map(x => esc(x.trim())).filter(Boolean); } },
       { k: 'alts', l: 'Weitere richtige Reihenfolgen (optional)', t: 'lines', rows: 3, show: b => b.words, help: 'Je Zeile eine, mit denselben Teilen, z. B. Never / have / I / been / to London',
         get: b => (b.alts || []).map(a => a.join(' / ')).join('\n'), set: (b, v) => { b.alts = v.split('\n').map(l => l.split(/\s*\/\s*/).map(x => x.trim()).filter(Boolean)).filter(a => a.length > 1); } }, XP],
-    essay: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'hand', l: '📷 Handschriftlich: die Schüler fotografieren ihre Lösung auf Papier (statt zu tippen)', t: 'check' }, { k: 'lines', l: 'Höhe des Antwortfelds in Zeilen', t: 'number', show: b => !b.hand }, { k: 'rubric', l: 'Erwartungshorizont', t: 'rubric' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }],
+    essay: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'hand', l: '📷 Handschriftlich: die Schüler fotografieren ihre Lösung auf Papier (statt zu tippen)', t: 'check' }, { k: 'lines', l: 'Höhe des Antwortfelds in Zeilen', t: 'number', show: b => !b.hand }, { k: 'rubric', l: 'Erwartungshorizont', t: 'rubric' },
+      { k: 'solution', l: 'Musterlösung', t: 'lines', rows: 7, show: b => b.hand, get: b => b.solution || '', set: (b, v) => { b.solution = v.replace(/\s+$/, ''); },
+        help: 'Text, Formeln in LaTeX zwischen $…$ (z. B. $F = m \\cdot a$) oder $$…$$. Nie Teil der Prüfung auf den Schüler-Geräten – sehen nur du, die Respizienz und nach dem Veröffentlichen die Schüler auf ihrer Ergebnisseite.' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }],
     app: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'app', l: 'App', t: 'select', o: [['jpad', '☕ JPad (Java)'], ['qpad', '🗄 QPad (SQL) – noch nicht verfügbar'], ['flowpad', '🔀 FlowPad – noch nicht verfügbar']] },
       { k: 'project', l: 'Projekt (optional)', t: 'text', help: 'Aufgaben mit demselben Projektnamen (z. B. Rakete) bauen aufeinander auf: Beim ersten Öffnen bekommt eine Aufgabe eine Kopie des Codes der Aufgabe davor; danach hat sie ihren eigenen Stand und wird damit bewertet. Startcode meist nur bei der ersten Aufgabe – eigener Startcode beginnt neu.' },
       { k: 'files', l: 'Startcode (je Datei; leer = Schüler beginnen mit einem leeren Hauptprogramm)', t: 'appfiles' },

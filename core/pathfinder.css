@@ -961,3 +961,5 @@ label.lp-btn { display: inline-flex; align-items: center; justify-content: cente
 @media (prefers-reduced-motion: reduce) { .lp-hand-dlg .cbox i { animation-duration: 2.5s; } }
 .lp-hand-dlg .btns { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .lp-hand-dlg .wait { margin: 20px 30px; }
+.lp-hand-sol { width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 10px; background: color-mix(in srgb, var(--a1, #4f7cf0) 10%, transparent); font-size: .92em; }
+.lp-hand-sol span { opacity: .7; font-size: .9em; } .lp-hand-sol pre { margin: 4px 0 0; white-space: pre-wrap; font-family: inherit; }

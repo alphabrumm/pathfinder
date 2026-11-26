@@ -261,7 +261,11 @@ const CORE_SECTIONS = {
     return b;
   } },
   // Handschriftliche Aufgabe: wie Freitext, die Schüler fotografieren ihre Lösung auf Papier
-  handschrift: { n: 'Handschrift', keys: ['erwartung', 'punkte', 'bild'], make(S, H) { const b = CORE_SECTIONS.freitext.make(S, H); delete b.lines; b.hand = true; return b; } },
+  handschrift: { n: 'Handschrift', keys: ['erwartung', 'punkte', 'bild', 'loesung'], make(S, H) {
+    const b = CORE_SECTIONS.freitext.make(S, H); delete b.lines; b.hand = true;
+    const sol = S.all('loesung').join('\n').trim(); if (sol) b.solution = sol; // Musterlösung (Text/LaTeX), mehrere Zeilen „Lösung: …“
+    return b;
+  } },
   // Befragung (Art: Befragung): Fragen ohne richtig/falsch. Gemeinsame Zeilen: „Hinweis:“ und „Weitergabe: ja“ (Gesprächsbogen)
   skala: { n: 'Skala', keys: ['von', 'bis', 'hinweis', 'weitergabe'], make(S, H) {
     const p = x => { const m = String(x || '').match(/^\s*(-?\d+)\s*(?:[=:–-]\s*(.*))?$/); return m ? [+m[1], (m[2] || '').trim()] : null; };
@@ -613,7 +617,7 @@ export function docToText(doc, env, out = {}) {
         case 'uml': L.push(`### UML: ${b.name}`, ...b.attrs.map(a => '- ' + a), ...b.methods.map(a => '+ ' + a)); break;
         case 'html': L.push('### HTML', '```html', b.html, '```'); break;
         case 'task': L.push(`### Aufgabe: ${md(b.title)}`, md(b.html)); if (b.answer) L.push(`Antwort: ${b.answer}`); if (b.img) L.push(`Bild: ${ref(b.img, 'bild')}`); (b.tips || []).forEach((t, i) => L.push(`Tipp${b.tipsHide?.[i] ? ' (verborgen)' : ''}: ${md(t)}`)); if (b.solution) L.push(`Lösung${b.solHide ? ' (verborgen)' : ''}: ${md(b.solution).replace(/\n+/g, ' ')}`); if (doc.form !== 'pruefung') L.push(`XP: ${b.xp}`); break;
-        case 'essay': L.push(`### ${b.hand ? 'Handschrift' : 'Freitext'}: ${md(b.title)}`, md(b.html)); if (b.img) L.push(`Bild: ${ref(b.img, 'bild')}`); (b.rubric || []).forEach(r => L.push(`Erwartung: ${r.t} (${String(r.p).replace('.', ',')})`)); if (!b.hand && (b.lines || 6) !== 6) L.push(`Zeilen: ${b.lines}`); break;
+        case 'essay': L.push(`### ${b.hand ? 'Handschrift' : 'Freitext'}: ${md(b.title)}`, md(b.html)); if (b.img) L.push(`Bild: ${ref(b.img, 'bild')}`); (b.rubric || []).forEach(r => L.push(`Erwartung: ${r.t} (${String(r.p).replace('.', ',')})`)); if (!b.hand && (b.lines || 6) !== 6) L.push(`Zeilen: ${b.lines}`); if (b.hand && b.solution) String(b.solution).split('\n').forEach(z => L.push(`Lösung: ${z}`)); break;
         case 'quiz': L.push('### Quiz'); b.qs.forEach(q => { L.push(`? ${md(q.q)}`); q.opts.forEach(o => L.push(`[${o.ok ? 'x' : ' '}] ${md(o.t)}${o.fb ? ' // ' + md(o.fb) : ''}`)); }); break;
         case 'gap': L.push(`### Lückentext${b.title ? ': ' + md(b.title) : ''}`, md(b.html)); if (b.free) L.push('Frei: ja'); else if (b.bank) L.push('Wortbank: ja'); if (b.heft) L.push('Hefteintrag: ' + ([{ kariert: 'kariert', blanko: 'ohne Linien' }[b.heftBg], { pixel: 'Pixel', schlicht: 'Standard', elegant: 'Elegant', hand: 'Handschrift' }[b.heftFont]].filter(Boolean).join(', ') || 'ja')); if (b.extra?.length) L.push(`Extra: ${b.extra.join(', ')}`); break;
         case 'match': L.push(`### Zuordnen: ${md(b.title)}`, ...b.pairs.map(p => `${p.a} -> ${p.b}`)); break;
@@ -696,7 +700,7 @@ export const EXAM_STYLES = [
   ['textorder', 'Textpuzzle (Reihenfolge)', 'Abschnitte oder Dialogzeilen ordnen', '„### Reihenfolge“ – 4–6 Abschnitte, Sätze oder Dialogzeilen, je Zeile einer, in der richtigen Reihenfolge; die Reihenfolge muss eindeutig sein (Signalwörter, Handlungsablauf)'],
   ['experiment', 'Experiment (Erkenntnisgewinnung)', 'Messreihe planen, messen und auswerten – Naturwissenschaften', '„### Widget: Experiment“ – die Schüler planen und messen selbst: „Frage:“, „Untersuche: <Symbol der untersuchten Größe>“, zwei bis drei „Größe:“-Zeilen mit je 3 Werten OHNE „| fest“ (die faire Messreihe zu planen ist Teil der Leistung), „Ergebnis:“ mit physikalisch richtiger Rechenvorschrift, „Auswertung:“ als Lückentext (Je-desto-Satz, Proportionalität) mit zwei Ablenkern unter „Extra:“; keine „Hypothese:“- und „Schlussfolgerung:“-Zeilen – die Hypothese mit Begründung davor als „### Freitext“, eine Vorhersage danach als „### Aufgabe“ mit „Antwort:“; Punkte: 2 für die Messreihe plus 1 je Auswertungslücke'],
   ['essay', 'Freitext', 'mit Erwartungshorizont, du bewertest', '„### Freitext“ mit Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“'],
-  ['hand', 'Handschriftliche Aufgabe', 'Lösung auf Papier, Foto als Schwarz-Weiß-Bild, du bewertest', '„### Handschrift: Titel“ – eine kleine Aufgabe, die die Schüler auf Papier lösen (Rechnung, Skizze, Diagramm) und dann fotografieren; Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“; Platz für eine halbe Seite, nicht mehr'],
+  ['hand', 'Handschriftliche Aufgabe', 'Lösung auf Papier, Foto als Schwarz-Weiß-Bild, du bewertest', '„### Handschrift: Titel“ – eine kleine Aufgabe, die die Schüler auf Papier lösen (Rechnung, Skizze, Diagramm) und dann fotografieren; Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“ und eine Musterlösung in Zeilen „Lösung: …“ (Formeln in LaTeX zwischen $…$); Platz für eine halbe Seite, nicht mehr'],
   ['jpad', 'Programmieren in JPad', 'Java-Programm in JPad schreiben, nur für Informatik', '„### JPad: Titel“ – die Schüler programmieren in JPad (Java): kurzer Auftrag, Startcode als ```java start Klassenname … ``` (optional, je Datei ein Block), „Ausgabe:“ mit der erwarteten Programmausgabe (Teil der Ausgabe genügt) und/oder „Muss:“ für Pflicht-Code (z. B. while); Musterlösung als ```java lösung … ``` (sieht nur die Lehrkraft). Ohne „Erwartung:“-Zeilen wird automatisch nach Ausgabe und Pflicht-Code bewertet; mit „Erwartung: … (Punkte)“ bewertet die Lehrkraft. Java wie in JPad üblich: println() und print() ohne System.out, Wrapper-Typen Integer, Double, Boolean, Character statt int, double, boolean, char'],
 ];
 /** vorausgewählte Aufgabenstile (Lösungsschritte nur, wenn das Thema Rechenwege hat) */
@@ -794,6 +798,7 @@ Zeilen: 6               (optional: Höhe des Antwortfelds)
 ### Handschrift: Titel     (nur in Prüfungen: Lösung auf Papier – die Schüler fotografieren sie, Probe macht daraus ein Schwarz-Weiß-Bild)
 Aufgabenstellung (eine kleine Aufgabe: Rechnung, Skizze, Diagramm).
 Erwartung: Teilaspekt (2)   (Erwartungshorizont wie beim Freitext, die Lehrkraft bewertet)
+Lösung: $F = m \\cdot a = 2\\,\\text{kg} \\cdot 3\\,\\text{m/s}^2 = 6\\,\\text{N}$   (Musterlösung, auch mehrere Zeilen; Formeln in LaTeX zwischen $…$ – nie in der Prüfung, nur Lehrkraft, Respizienz und Ergebnisseite)
 
 ${svHelp ? `BEFRAGUNG (nur mit „Art: Befragung“: Umfrage, Fragebogen, Selbstreflexion, Gesprächsbogen – Fragen ohne richtig oder falsch, ohne Punkte;
 jede Station ist ein Abschnitt; Text, Infokästen, Bilder und Tabellen sind erlaubt):

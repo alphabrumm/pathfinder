@@ -204,9 +204,9 @@ test('Zerlegen ändert das Original nicht', () => {
 });
 
 test('Handschriftliche Aufgabe: Flag bleibt, Foto wird Antwort, nur data:image', () => {
-  const d = { v: 2, id: 'h', form: 'pruefung', title: 'H', design: { pal: 0 }, pointsOn: true, stations: [{ id: 's', title: 'A', blocks: [{ id: 'h1', type: 'essay', hand: true, pts: 4, title: 'Skizze', html: 'Zeichne', rubric: [{ t: 'Kräfte', p: 4 }] }] }] };
+  const d = { v: 2, id: 'h', form: 'pruefung', title: 'H', design: { pal: 0 }, pointsOn: true, stations: [{ id: 's', title: 'A', blocks: [{ id: 'h1', type: 'essay', hand: true, pts: 4, title: 'Skizze', html: 'Zeichne', solution: 'GEHEIM $F=ma$', rubric: [{ t: 'Kräfte', p: 4 }] }] }] };
   const { student: st, key: k } = splitExam(d);
-  assert.equal(st.stations[0].blocks[0].hand, true); assert.equal(k.tasks[0].hand, true); assert.ok(!JSON.stringify(st).includes('Kräfte'));
+  assert.equal(st.stations[0].blocks[0].hand, true); assert.equal(k.tasks[0].hand, true); assert.ok(!JSON.stringify(st).includes('Kräfte') && !JSON.stringify(st).includes('GEHEIM')); assert.equal(k.tasks[0].solution, 'GEHEIM $F=ma$');
   const img = 'data:image/png;base64,iVBORw0KGgo=';
   let r = gradeExam(k, { h1: { img, w: 10, h: 10 } }, {}).items[0];
   assert.equal(r.img, img); assert.equal(r.open, true); assert.ok(r.text.includes('Foto'));
