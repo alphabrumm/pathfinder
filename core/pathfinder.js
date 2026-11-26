@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-25a';
+const PF_BUILD = '2026-11-26a';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -112,6 +112,7 @@ const CORE = {
   puzzle: { n: 'Satzpuzzle', ic: '⇢', g: 'Aufgaben', h: 'Wörter in die richtige Reihenfolge bringen', alias: 'order', make: () => ({ words: true, title: 'Bring die Wörter in die richtige Reihenfolge', items: ['I', 'have', 'never', 'been', 'to London'], alts: [], xp: 10 }) },
   order: { n: 'Reihenfolge', ic: '↕', g: 'Aufgaben', h: 'Abschnitte ordnen (Textpuzzle)', make: () => ({ words: false, title: 'Bring die Abschnitte in die richtige Reihenfolge', items: ['Erster Abschnitt', 'Zweiter Abschnitt', 'Dritter Abschnitt'], alts: [], xp: 10 }) },
   essay: { n: 'Freitext', ic: '✍', g: 'Aufgaben', h: 'offene Antwort mit Erwartungshorizont – nur in Prüfungen', exam: true, make: () => ({ title: '', html: '', img: '', lines: 6, rubric: [], pts: 4 }) },
+  hand: { n: 'Handschriftliche Aufgabe', ic: '📷', g: 'Aufgaben', h: 'Lösung auf Papier, die Schüler fotografieren sie (Schwarz-Weiß) – nur in Prüfungen', exam: true, alias: 'essay', make: () => ({ title: '', html: '', img: '', lines: 6, rubric: [], pts: 4, hand: true }) },
   app: { n: 'Programmieren in JPad', ic: '☕', g: 'Aufgaben', h: 'Schüler programmieren in JPad; Ausgabe und Pflicht-Code werden geprüft – nur in Prüfungen', exam: true, make: () => ({ app: 'jpad', title: '', html: '', img: '', files: [{ name: 'Hauptprogramm', text: '' }], expect: '', compare: 'enthaelt', needs: [], rubric: [], solution: '', pts: 4 }) },
   /* Befragung (nur in der Art „Befragung“): Fragen ohne richtig oder falsch – für Umfragen, Selbstreflexion, Gesprächsbögen.
      share = darf mit Einwilligung weitergegeben werden (Gesprächsbogen); consent = diese Auswahl ist die Einwilligung */
@@ -1182,8 +1183,9 @@ export function startPathFinder(opts = {}) {
   }
   function essayEdit(b) {
     const R = b.rubric || [];
-    return `<div class="lp-card lp-task lp-essay"><div class="hd">${ce('title', b.title, 'Freitext', { tag: 'b', cls: 'lp-ctitle' })}</div>${imgHtml(b.img, '', 'klein')}${ce('html', b.html, 'Aufgabenstellung …', { rich: true })}`
-      + `<textarea class="lp-essay-in" rows="${Math.max(2, +b.lines || 6)}" disabled placeholder="Hier schreiben die Schüler ihre Antwort."></textarea>`
+    return `<div class="lp-card lp-task lp-essay"><div class="hd">${ce('title', b.title, b.hand ? 'Handschriftliche Aufgabe' : 'Freitext', { tag: 'b', cls: 'lp-ctitle' })}</div>${imgHtml(b.img, '', 'klein')}${ce('html', b.html, 'Aufgabenstellung …', { rich: true })}`
+      + (b.hand ? `<div class="lp-hand"><div class="lp-hand-empty">📷 Hier fotografieren die Schüler ihre Lösung auf Papier – als Schwarz-Weiß-Bild.</div></div>`
+        : `<textarea class="lp-essay-in" rows="${Math.max(2, +b.lines || 6)}" disabled placeholder="Hier schreiben die Schüler ihre Antwort."></textarea>`)
       + (E() ? `<div class="ed-hint">${R.length ? `Erwartungshorizont (nur für dich): ${R.map(r => `${esc(r.t || '…')} (${+r.p || 0} P.)`).join(' · ')}` : 'Erwartungshorizont mit Teilpunkten über ⚙'}</div>` : '') + '</div>';
   }
   const ansOf = id => { const a = prog.ans || (prog.ans = {}); return a[id] && typeof a[id] === 'object' ? a[id] : (a[id] = {}); };
@@ -1270,6 +1272,7 @@ export function startPathFinder(opts = {}) {
     if (b.type === 'sort') return !!a && sortSides(b).I.every(x => a[x.k] != null);
     if (b.type === 'order') return Array.isArray(a) && a.length > 0 && a.length === orderPool(b).length;
     if (b.type === 'app') return !!a && (!!a.run || !!a.ed);
+    if (b.type === 'essay' && b.hand) return !!a?.img;
     if (b.type === 'widget') { const ne = xGaps(b.evalHtml).length; return !!a && (a.rows || []).length > 0 && Array.from({ length: ne }, (_, i) => String(a.e?.['e' + i] ?? '').trim()).every(Boolean); }
     return typeof a === 'string' && a.trim() !== '';
   }
@@ -1330,8 +1333,36 @@ export function startPathFinder(opts = {}) {
     // Aufgabe mit Ergebnis: kurze Antwort; ohne Ergebnis und Freitext: freie Antwort
     const short = b.type === 'task' && (b.answer || b.short), v = typeof a === 'string' ? a : '';
     const field = short ? `<span class="lp-answer"><input data-xans value="${esc(v)}" placeholder="${esc(b.answerPh || 'Ergebnis')}" ${NOCORR}></span>`
+      : b.type === 'essay' && b.hand ? handField(b, a)
       : `<textarea class="lp-essay-in" data-xans rows="${Math.max(2, +b.lines || 6)}" placeholder="Deine Antwort …" ${NOCORR}>${esc(v)}</textarea>`;
-    return wrap(b, `<div class="lp-card lp-task lp-exam"><div class="hd"><b class="lp-ctitle">${esc(plain(b.title)) || (b.type === 'essay' ? 'Freitext' : 'Aufgabe')}</b>${examState(b)}</div>${imgHtml(b.img, '', 'klein')}<div>${b.html || ''}</div>${field}</div>`);
+    return wrap(b, `<div class="lp-card lp-task lp-exam"><div class="hd"><b class="lp-ctitle">${esc(plain(b.title)) || (b.type === 'essay' ? (b.hand ? 'Handschriftliche Aufgabe' : 'Freitext') : 'Aufgabe')}</b>${examState(b)}</div>${imgHtml(b.img, '', 'klein')}<div>${b.html || ''}</div>${field}</div>`);
+  }
+  /** Handschrift: Foto der Lösung auf Papier (Kamera), daraus ein kleines Schwarz-Weiß-Bild; nach dem Abgeben nur ansehen */
+  function handField(b, a) {
+    const img = a?.img && /^data:image\/(png|jpeg);base64,/.test(a.img) ? a.img : '';
+    return `<div class="lp-hand">${img ? `<img class="lp-hand-img" src="${img}" alt="Foto deiner Lösung">` : '<div class="lp-hand-empty">Schreibe deine Lösung auf Papier und fotografiere sie dann.</div>'}`
+      + (EXAM_DONE() ? '' : `<label class="lp-btn lp-hand-btn">📷 ${img ? 'Neu fotografieren' : 'Lösung fotografieren'}<input type="file" accept="image/*" capture="environment" data-handin hidden></label>`) + '</div>';
+  }
+  /** Foto verarbeiten und fragen, ob alles gut erkennbar ist; erst dann wird es die Antwort */
+  async function handTake(id, file) {
+    let mode = 'bw', res;
+    const ov = document.createElement('div'); ov.className = 'lp-hand-dlg'; ov.innerHTML = '<div class="box"><p class="wait">Foto wird aufbereitet …</p></div>'; lp.append(ov);
+    const close = () => ov.remove();
+    const draw = async () => {
+      try { res = await (await import(modUrl('pfscan.js'))).scanPhoto(file, { mode }); }
+      catch (e) { ov.querySelector('.box').innerHTML = `<p>${esc(e.message || 'Das Foto ließ sich nicht verarbeiten.')}</p><div class="btns"><button type="button" class="lp-btn" data-x="no">Schließen</button></div>`; return; }
+      ov.querySelector('.box').innerHTML = `<b>Ist alles gut erkennbar?</b><div class="pic"><img src="${res.img}" alt="Aufbereitetes Foto"></div>
+        <p class="help">Prüfe, ob du jede Zeile lesen kannst. Sonst fotografiere noch einmal – gerade von oben, mit gutem Licht, ohne Schatten. (${res.kb} KB)</p>
+        <div class="btns"><button type="button" class="lp-btn alt" data-x="mode">${mode === 'bw' ? 'Graustufen versuchen (blasse Schrift)' : 'Schwarz-Weiß versuchen'}</button><button type="button" class="lp-btn alt" data-x="no">Neu fotografieren</button><button type="button" class="lp-btn" data-x="ok">Ja, gut lesbar – verwenden</button></div>`;
+    };
+    ov.onclick = async e => {
+      const x = e.target.closest('[data-x]')?.dataset.x; if (!x) return;
+      if (x === 'mode') { mode = mode === 'bw' ? 'gray' : 'bw'; ov.querySelector('.box').innerHTML = '<p class="wait">Foto wird aufbereitet …</p>'; await draw(); return; }
+      close();
+      if (x === 'no') { $(`.blk[data-id="${id}"] [data-handin]`, lp)?.click(); return; }
+      if (x === 'ok' && res && !EXAM_DONE()) { prog.ans[id] = { img: res.img, w: res.w, h: res.h, mode: res.mode, at: Date.now() }; render(); examChanged(id); }
+    };
+    await draw();
   }
   /** nach jeder Antwort: speichern, der Plattform melden, Anzeige „beantwortet“ und Stationsleiste nachführen (ohne neu zu zeichnen) */
   function examChanged(id) {
@@ -1392,6 +1423,8 @@ export function startPathFinder(opts = {}) {
 
   /* Vorschau einer Befragung: Antworten im Speicher halten (gehen erst an Probe) */
   lp.addEventListener('change', ev => {
+    const hi = ev.target.closest?.('[data-handin]');
+    if (hi) { document.documentElement.removeAttribute('data-pf-camera'); const f = hi.files?.[0]; hi.value = ''; if (f && EXAM() && !EXAM_DONE()) handTake(hi.closest('.blk').dataset.id, f); return; }
     const x = ev.target.closest?.('[data-svy]'); if (!x || E()) return; const r = findBlock(x.dataset.svy); if (!r) return; const b = r.b;
     if (b.type === 'choice') { const all = [...lp.querySelectorAll(`[data-svy="${b.id}"]:checked`)].map(i => +i.value); svy[b.id] = b.multi ? all : all[0]; }
     else if (b.type === 'matrix') { svy[b.id] = { ...(svy[b.id] || {}), [+x.dataset.row]: +x.value }; }
@@ -1504,6 +1537,7 @@ export function startPathFinder(opts = {}) {
     if (d.dataset.tip != null) prog.tips[id + ':' + d.dataset.tip] = 1;
     if (d.dataset.sol) prog.sol[id] = 1;
   }, true);
+  lp.addEventListener('click', ev => { if (ev.target.closest?.('.lp-hand-btn')) document.documentElement.setAttribute('data-pf-camera', String(Date.now())); }, true); // Kamera öffnet sich: kein Fokuswechsel
   lp.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.matches?.('[data-ans]')) { ev.preventDefault(); runAction(ev.target.closest('.blk').dataset.id, 'answer'); } });
   lp.addEventListener('input', ev => {
     if (EXAM()) { const x = ev.target.closest('[data-xgap], [data-xans]'); if (!x || EXAM_DONE()) return; const id = x.closest('.blk').dataset.id; if (x.dataset.xgap != null) ansOf(id)[x.dataset.xgap] = x.value; else prog.ans[id] = x.value; examChanged(id); return; }
@@ -1829,7 +1863,7 @@ export function startPathFinder(opts = {}) {
         set: (b, v) => { b.items = b.words ? v.split(/\s*\/\s*|\n/).map(x => x.trim()).filter(Boolean) : v.split('\n').map(x => esc(x.trim())).filter(Boolean); } },
       { k: 'alts', l: 'Weitere richtige Reihenfolgen (optional)', t: 'lines', rows: 3, show: b => b.words, help: 'Je Zeile eine, mit denselben Teilen, z. B. Never / have / I / been / to London',
         get: b => (b.alts || []).map(a => a.join(' / ')).join('\n'), set: (b, v) => { b.alts = v.split('\n').map(l => l.split(/\s*\/\s*/).map(x => x.trim()).filter(Boolean)).filter(a => a.length > 1); } }, XP],
-    essay: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'lines', l: 'Höhe des Antwortfelds in Zeilen', t: 'number' }, { k: 'rubric', l: 'Erwartungshorizont', t: 'rubric' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }],
+    essay: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'hand', l: '📷 Handschriftlich: die Schüler fotografieren ihre Lösung auf Papier (statt zu tippen)', t: 'check' }, { k: 'lines', l: 'Höhe des Antwortfelds in Zeilen', t: 'number', show: b => !b.hand }, { k: 'rubric', l: 'Erwartungshorizont', t: 'rubric' }, { k: 'img', l: 'Bild oder GIF zur Aufgabe', t: 'image' }],
     app: [{ k: 'title', l: 'Titel', t: 'text' }, { k: 'app', l: 'App', t: 'select', o: [['jpad', '☕ JPad (Java)'], ['qpad', '🗄 QPad (SQL) – noch nicht verfügbar'], ['flowpad', '🔀 FlowPad – noch nicht verfügbar']] },
       { k: 'project', l: 'Projekt (optional)', t: 'text', help: 'Aufgaben mit demselben Projektnamen (z. B. Rakete) bauen aufeinander auf: Beim ersten Öffnen bekommt eine Aufgabe eine Kopie des Codes der Aufgabe davor; danach hat sie ihren eigenen Stand und wird damit bewertet. Startcode meist nur bei der ersten Aufgabe – eigener Startcode beginnt neu.' },
       { k: 'files', l: 'Startcode (je Datei; leer = Schüler beginnen mit einem leeren Hauptprogramm)', t: 'appfiles' },
@@ -2600,7 +2634,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       inhalte: lb ? (info.inh || []).filter(k => lb.k.includes(k)) : [],
       alleInhalte: lb ? lb.k : [],
       extra: info.extra || '',
-      ...(info.art === 'pruefung' || info.art === 'challenge' ? { types: (Array.isArray(info.types) ? info.types : ['quiz', 'gapbank', 'gap', 'match', 'short', 'essay']).filter(k => info.art === 'pruefung' || k !== 'essay') } : {}),
+      ...(info.art === 'pruefung' || info.art === 'challenge' ? { types: (Array.isArray(info.types) ? info.types : ['quiz', 'gapbank', 'gap', 'match', 'short', 'essay']).filter(k => info.art === 'pruefung' || (k !== 'essay' && k !== 'hand')) } : {}),
       ...(basisOf() ? { basis: basisOf().text, basisTitle: basisOf().title } : {})
     };
   }
@@ -2782,7 +2816,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
           <div class="ex-tri"><div class="ex-bar" id="kiBar"></div><input type="range" id="kiP1" min="0" max="100" step="5" value="${info.p1 ?? 40}" aria-label="Grenze Grundlagen / Fortgeschritten"><input type="range" id="kiP2" min="0" max="100" step="5" value="${info.p2 ?? 80}" aria-label="Grenze Fortgeschritten / Experte"></div>
           <div class="ex-lv" id="kiLv"></div>
         </div>
-        <div id="kiTypes" hidden><label>Aufgabenstile</label><div class="ex-types">${T.EXAM_STYLES.map(([k, n, h]) => `<label class="chk"${k === 'essay' || k === 'jpad' ? ' data-exonly="1"' : ''}><input type="checkbox" data-kty="${k}"${(info.types || T.EXAM_STYLES_DEFAULT).includes(k) ? ' checked' : ''}>${esc(n)} <span class="help">– ${esc(h)}</span></label>`).join('')}</div><span class="help">Die KI nimmt jede angekreuzte Art mindestens einmal auf – und keine anderen.</span></div>
+        <div id="kiTypes" hidden><label>Aufgabenstile</label><div class="ex-types">${T.EXAM_STYLES.map(([k, n, h]) => `<label class="chk"${k === 'essay' || k === 'hand' || k === 'jpad' ? ' data-exonly="1"' : ''}><input type="checkbox" data-kty="${k}"${(info.types || T.EXAM_STYLES_DEFAULT).includes(k) ? ' checked' : ''}>${esc(n)} <span class="help">– ${esc(h)}</span></label>`).join('')}</div><span class="help">Die KI nimmt jede angekreuzte Art mindestens einmal auf – und keine anderen.</span></div>
         <div class="row"><label>Jahrgangsstufe<select data-k="jg">${opt('', '– wählen –', info.jg || '')}${[5, 6, 7, 8, 9, 10, 11, 12, 13].map(j => opt(j, j + '. Jahrgangsstufe', info.jg)).join('')}</select></label>
           <label>Fach<select data-k="fsel">${opt('', '– wählen –', info.fsel || '')}${L.FAECHER.map(f => opt(f, f, info.fsel)).join('')}${opt('*', 'anderes Fach …', info.fsel)}</select></label></div>
         <label id="kiFrei" hidden>Fach<input type="text" data-k="ffrei" value="${esc(info.ffrei || '')}" placeholder="z. B. Chemie"></label>

@@ -203,4 +203,15 @@ test('Zerlegen ändert das Original nicht', () => {
   assert.equal(doc.stations[0].blocks[1].qs[0].opts[0].ok, true);
 });
 
+test('Handschriftliche Aufgabe: Flag bleibt, Foto wird Antwort, nur data:image', () => {
+  const d = { v: 2, id: 'h', form: 'pruefung', title: 'H', design: { pal: 0 }, pointsOn: true, stations: [{ id: 's', title: 'A', blocks: [{ id: 'h1', type: 'essay', hand: true, pts: 4, title: 'Skizze', html: 'Zeichne', rubric: [{ t: 'Kräfte', p: 4 }] }] }] };
+  const { student: st, key: k } = splitExam(d);
+  assert.equal(st.stations[0].blocks[0].hand, true); assert.equal(k.tasks[0].hand, true); assert.ok(!JSON.stringify(st).includes('Kräfte'));
+  const img = 'data:image/png;base64,iVBORw0KGgo=';
+  let r = gradeExam(k, { h1: { img, w: 10, h: 10 } }, {}).items[0];
+  assert.equal(r.img, img); assert.equal(r.open, true); assert.ok(r.text.includes('Foto'));
+  r = gradeExam(k, { h1: { img: 'javascript:alert(1)' } }, { manual: { h1: 3 } }).items[0];
+  assert.equal(r.img, ''); assert.equal(r.text, ''); assert.equal(r.pts, 3);
+});
+
 console.log(`\n${n} Tests bestanden.`);

@@ -132,7 +132,7 @@ export function taskTitle(b) {
   if (b.type === 'quiz') return (b.qs || []).length > 1 ? `Quiz (${b.qs.length} Fragen)` : strip(b.qs?.[0]?.q).slice(0, 60) || 'Quiz';
   if (b.type === 'gap') return 'Lückentext';
   if (b.type === 'match') return 'Zuordnen';
-  if (b.type === 'essay') return 'Freitext';
+  if (b.type === 'essay') return b.hand ? 'Handschriftliche Aufgabe' : 'Freitext';
   if (b.type === 'mark') return 'Markieren';
   if (b.type === 'sort') return 'Sortieren';
   if (b.type === 'order') return b.words ? 'Satzpuzzle' : 'Reihenfolge';
@@ -202,8 +202,8 @@ export function splitExam(doc) {
         out.blocks.push({ id: b.id, type: 'task', pts, title: b.title || '', html: b.html || '', img: b.img || '', ...(short ? { short: true, answerPh: b.answerPh || '' } : {}) });
         tasks.push({ id: b.id, type: 'task', pts, title, short, answer: b.answer || '', solution: b.solution || '' });
       } else if (b.type === 'essay') {
-        out.blocks.push({ id: b.id, type: 'essay', pts, title: b.title || '', html: b.html || '', img: b.img || '', lines: b.lines || 6 });
-        tasks.push({ id: b.id, type: 'essay', pts, title, rubric: (b.rubric || []).map(r => ({ t: r.t || '', p: +r.p || 0 })), solution: b.solution || '' });
+        out.blocks.push({ id: b.id, type: 'essay', pts, title: b.title || '', html: b.html || '', img: b.img || '', lines: b.lines || 6, ...(b.hand ? { hand: true } : {}) });
+        tasks.push({ id: b.id, type: 'essay', pts, title, rubric: (b.rubric || []).map(r => ({ t: r.t || '', p: +r.p || 0 })), solution: b.solution || '', ...(b.hand ? { hand: true } : {}) });
       } else if (b.type === 'app') {
         // Startcode gehört zur Aufgabe; erwartete Ausgabe, Pflicht-Code, Erwartungshorizont und Musterlösung nicht
         const files = (b.files || []).filter(f => f && (f.text || '').trim()).map(f => ({ name: String(f.name || ''), text: String(f.text) }));
@@ -300,6 +300,8 @@ export function gradeExam(key, answers = {}, opt = {}) {
       it.text = [/\[\[/.test(t.hyp) ? 'Hypothese (ohne Punkte): ' + fill(t.hyp, 'h', a?.h) : '', rows.length ? 'Messungen:\n' + rows.map((r, k) => `${k + 1}) ${r.s.map((oi, i) => `${V[i]?.sym} = ${val(i, oi)}`).join(', ')} → ${t.res.sym} = ${String(Math.round(r.y * 100) / 100).replace('.', ',')}${t.res.unit ? ' ' + t.res.unit : ''}`).join('\n') : 'Keine Messung.'].filter(Boolean).join('\n');
     } else { // Freitext: bewertet die Lehrkraft
       it.auto = false; it.text = typeof a === 'string' ? a : '';
+      // Handschrift: Foto als Schwarz-Weiß-Bild (nur data:image); als Text steht nur ein Hinweis da (z. B. für KI-Hilfen und Protokolle)
+      if (t.hand) { const img = a && typeof a === 'object' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(a.img || '') ? a.img : ''; it.hand = true; it.img = img; it.text = img ? '[Handschriftliche Lösung als Foto]' : ''; }
       const m = opt.manual?.[t.id];
       if (m == null) { it.open = true; it.pts = null; } else it.pts = Math.max(0, Math.min(t.pts, +m || 0));
     }

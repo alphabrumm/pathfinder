@@ -1,6 +1,6 @@
 # Prüfungsformat für Probe
 
-> Automatisch erzeugt mit `node tools/doku.mjs` aus `core/pftext.js` (PathFinder 2026-11-25a). Nicht von Hand ändern.
+> Automatisch erzeugt mit `node tools/doku.mjs` aus `core/pftext.js` (PathFinder 2026-11-26a). Nicht von Hand ändern.
 
 Prüfungen für [Probe](https://github.com/alphabrumm/probe) sind Texte im **PathFinder-Textformat** mit `Art: Prüfung`.
 Jede KI kann sie schreiben; Probe liest sie ohne Nacharbeit ein. Der Claude-Skill „probe-pruefung“
@@ -33,6 +33,7 @@ Unter „Prompt für externe KI anzeigen“ zeigt Probe genau die Spezifikation 
 | Textpuzzle (Reihenfolge) | „### Reihenfolge“ – 4–6 Abschnitte, Sätze oder Dialogzeilen, je Zeile einer, in der richtigen Reihenfolge; die Reihenfolge muss eindeutig sein (Signalwörter, Handlungsablauf) |
 | Experiment (Erkenntnisgewinnung) | „### Widget: Experiment“ – die Schüler planen und messen selbst: „Frage:“, „Untersuche: <Symbol der untersuchten Größe>“, zwei bis drei „Größe:“-Zeilen mit je 3 Werten OHNE „\| fest“ (die faire Messreihe zu planen ist Teil der Leistung), „Ergebnis:“ mit physikalisch richtiger Rechenvorschrift, „Auswertung:“ als Lückentext (Je-desto-Satz, Proportionalität) mit zwei Ablenkern unter „Extra:“; keine „Hypothese:“- und „Schlussfolgerung:“-Zeilen – die Hypothese mit Begründung davor als „### Freitext“, eine Vorhersage danach als „### Aufgabe“ mit „Antwort:“; Punkte: 2 für die Messreihe plus 1 je Auswertungslücke |
 | Freitext | „### Freitext“ mit Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“ |
+| Handschriftliche Aufgabe | „### Handschrift: Titel“ – eine kleine Aufgabe, die die Schüler auf Papier lösen (Rechnung, Skizze, Diagramm) und dann fotografieren; Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“; Platz für eine halbe Seite, nicht mehr |
 | Programmieren in JPad | „### JPad: Titel“ – die Schüler programmieren in JPad (Java): kurzer Auftrag, Startcode als ```java start Klassenname … ``` (optional, je Datei ein Block), „Ausgabe:“ mit der erwarteten Programmausgabe (Teil der Ausgabe genügt) und/oder „Muss:“ für Pflicht-Code (z. B. while); Musterlösung als ```java lösung … ``` (sieht nur die Lehrkraft). Ohne „Erwartung:“-Zeilen wird automatisch nach Ausgabe und Pflicht-Code bewertet; mit „Erwartung: … (Punkte)“ bewertet die Lehrkraft. Java wie in JPad üblich: println() und print() ohne System.out, Wrapper-Typen Integer, Double, Boolean, Character statt int, double, boolean, char |
 
 ## Spezifikation
@@ -69,6 +70,7 @@ REGELN
   • Textpuzzle (Reihenfolge): „### Reihenfolge“ – 4–6 Abschnitte, Sätze oder Dialogzeilen, je Zeile einer, in der richtigen Reihenfolge; die Reihenfolge muss eindeutig sein (Signalwörter, Handlungsablauf)
   • Experiment (Erkenntnisgewinnung): „### Widget: Experiment“ – die Schüler planen und messen selbst: „Frage:“, „Untersuche: <Symbol der untersuchten Größe>“, zwei bis drei „Größe:“-Zeilen mit je 3 Werten OHNE „| fest“ (die faire Messreihe zu planen ist Teil der Leistung), „Ergebnis:“ mit physikalisch richtiger Rechenvorschrift, „Auswertung:“ als Lückentext (Je-desto-Satz, Proportionalität) mit zwei Ablenkern unter „Extra:“; keine „Hypothese:“- und „Schlussfolgerung:“-Zeilen – die Hypothese mit Begründung davor als „### Freitext“, eine Vorhersage danach als „### Aufgabe“ mit „Antwort:“; Punkte: 2 für die Messreihe plus 1 je Auswertungslücke
   • Freitext: „### Freitext“ mit Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“
+  • Handschriftliche Aufgabe: „### Handschrift: Titel“ – eine kleine Aufgabe, die die Schüler auf Papier lösen (Rechnung, Skizze, Diagramm) und dann fotografieren; Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“; Platz für eine halbe Seite, nicht mehr
   • Programmieren in JPad: „### JPad: Titel“ – die Schüler programmieren in JPad (Java): kurzer Auftrag, Startcode als ```java start Klassenname … ``` (optional, je Datei ein Block), „Ausgabe:“ mit der erwarteten Programmausgabe (Teil der Ausgabe genügt) und/oder „Muss:“ für Pflicht-Code (z. B. while); Musterlösung als ```java lösung … ``` (sieht nur die Lehrkraft). Ohne „Erwartung:“-Zeilen wird automatisch nach Ausgabe und Pflicht-Code bewertet; mit „Erwartung: … (Punkte)“ bewertet die Lehrkraft. Java wie in JPad üblich: println() und print() ohne System.out, Wrapper-Typen Integer, Double, Boolean, Character statt int, double, boolean, char
 - Anforderungsbereiche: wie von der Lehrkraft angegeben, sonst etwa 40 % der Punkte Reproduktion (AFB I), 40 % Anwendung und Transfer (AFB II), 20 % Problemlösen und Beurteilen (AFB III); von leicht nach schwer.
 - Quizfragen mit genau einer richtigen Antwort und plausiblen falschen Antworten; Rückmeldungen nach // sind nicht nötig.
