@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-26c';
+const PF_BUILD = '2026-11-26d';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -674,7 +674,31 @@ export function startPathFinder(opts = {}) {
     scroller.scrollTop = sc;
     if (selId && !findBlock(selId)) selId = null;
     markSel();
+    tipGate();
   }
+  /* Tipps nacheinander: der nächste Tipp öffnet sich frühestens TIP_GAP nach dem vorigen (nicht im Editor, nicht in der gelösten Vorschau) */
+  const TIP_GAP = 120000;
+  const tipAt = v => (v === 1 || v === true ? 0 : +v || 0); // ältere Stände speichern nur 1 = „irgendwann geöffnet“
+  function tipGate() {
+    if (doc.skin) return;
+    const off = E() || solvedView, now = Date.now();
+    $$('.blk', lp).forEach(blk => {
+      const id = blk.dataset.id; let prev = 0, j = 0;
+      $$('details[data-tip]', blk).forEach(d => {
+        if (d.closest('.blk') !== blk || d.classList.contains('pf-hidden')) return;
+        const v = prog.tips[id + ':' + d.dataset.tip], seen = v != null, w = $('.pf-tipwait', d);
+        let lock = '', txt = '';
+        if (!off && j && !seen && !d.open) {
+          if (prev == null) { lock = 'prev'; txt = `🔒 erst Tipp ${j} öffnen`; }
+          else { const r = prev + TIP_GAP - now; if (r > 0) { const s = Math.ceil(r / 1000); lock = 'wait'; txt = `⏳ in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; } }
+        }
+        if (lock) d.dataset.lock = lock; else delete d.dataset.lock;
+        if (w && w.textContent !== txt) w.textContent = txt;
+        prev = seen ? tipAt(v) : null; j++;
+      });
+    });
+  }
+  setInterval(() => { if (lp.querySelector('details[data-lock="wait"]')) tipGate(); }, 1000);
   /* ---------- Originaldesign: Lernpfad im Aussehen der Vorlage bearbeiten ---------- */
   let SK = null, skinCssFor = null;
   const loadSkin = async () => SK || (SK = await import(modUrl('pfskin.js')));
@@ -795,7 +819,7 @@ export function startPathFinder(opts = {}) {
     let k = 0;
     (b.tips || []).forEach((t, i) => {
       const hid = !!b.tipsHide?.[i]; if (hid && !E()) return; if (!hid) k++;
-      h += `<details data-tip="${i}"${hid ? ' class="pf-hidden"' : ''}><summary>${hid ? `Tipp · <span class="pf-hid">für Schüler verborgen</span>` : `Tipp ${k}`}</summary><div>${t}</div></details>`;
+      h += `<details data-tip="${i}"${hid ? ' class="pf-hidden"' : ''}><summary>${hid ? `Tipp · <span class="pf-hid">für Schüler verborgen</span>` : `Tipp ${k}<span class="pf-tipwait" aria-live="polite"></span>`}</summary><div>${t}</div></details>`;
     });
     if (b.solution && (!b.solHide || E())) h += `<details data-sol="1"${b.solHide ? ' class="pf-hidden"' : ''}><summary>Lösung anzeigen${b.solHide ? ` · <span class="pf-hid">für Schüler verborgen</span>` : ''}</summary><div>${b.solution}</div></details>`;
     if (E() && !(b.tips || []).length && !b.solution) h += `<div class="ed-hint">Tipps und Lösung über ⚙ hinzufügen</div>`;
@@ -1557,8 +1581,17 @@ export function startPathFinder(opts = {}) {
     if (E()) return;
     const d = ev.target; if (!d.matches || !d.matches('details') || !d.open) return;
     const id = d.closest('.blk')?.dataset.id; if (!id) return;
-    if (d.dataset.tip != null) prog.tips[id + ':' + d.dataset.tip] = 1;
+    if (d.dataset.tip != null) {
+      if (d.dataset.lock && !solvedView) { d.open = false; return; } // gesperrt (z. B. per Tastatur geöffnet)
+      const k = id + ':' + d.dataset.tip; if (prog.tips[k] == null) prog.tips[k] = Date.now(); // erste Öffnung zählt
+      tipGate(); if (PLAYER) progSave(); else prevSave();
+    }
     if (d.dataset.sol) prog.sol[id] = 1;
+  }, true);
+  lp.addEventListener('click', ev => { // gesperrten Tipp nicht öffnen, sondern kurz auf die Wartezeit hinweisen
+    const sm = ev.target.closest?.('summary'), d = sm?.parentElement;
+    if (!d || E() || !d.matches('details[data-lock]') || d.open) return;
+    ev.preventDefault(); const w = $('.pf-tipwait', d); if (w) { w.classList.remove('nudge'); void w.offsetWidth; w.classList.add('nudge'); }
   }, true);
   lp.addEventListener('click', ev => { if (ev.target.closest?.('.lp-hand-btn')) document.documentElement.setAttribute('data-pf-camera', String(Date.now())); }, true); // Kamera öffnet sich: kein Fokuswechsel
   lp.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.matches?.('[data-ans]')) { ev.preventDefault(); runAction(ev.target.closest('.blk').dataset.id, 'answer'); } });

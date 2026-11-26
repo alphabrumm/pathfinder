@@ -188,8 +188,19 @@ export const nrOf = (doc, s) => s.nr || String(doc.stations.indexOf(s) + 1);
 export const headMap = doc => ({ title: esc(doc.title), kicker: doc.kicker || '', subtitle: doc.subtitle || '', goals: (doc.goals || []).map(g => `<li>${g}</li>`).join('\n') });
 export function stationHead(doc, s, n) { return fillHolders(s.skin?.head || doc.skin.stHead, { nr: esc(s.nr || n), sub: esc(s.sub), title: esc(s.title) }); }
 export const doneRow = (doc, n) => fillHolders(doc.skin.done, { nr: String(n) });
-const tipsHtml = b => (b.tips || []).map((t, i) => `<details class="reveal"><summary>Tipp${b.tips.length > 1 ? ' ' + (i + 1) : ''}</summary><div class="answer">${t}</div></details>`).join('') + (b.solution ? `<details class="reveal"><summary>Lösung anzeigen</summary><div class="answer">${b.solution}</div></details>` : '');
+const tipsHtml = b => (b.tips || []).map((t, i) => `<details class="reveal" data-pftip="${i}"><summary>Tipp${b.tips.length > 1 ? ' ' + (i + 1) : ''}<span class="pf-tipwait"></span></summary><div class="answer">${t}</div></details>`).join('') + (b.solution ? `<details class="reveal"><summary>Lösung anzeigen</summary><div class="answer">${b.solution}</div></details>` : '');
 export const keyOf = b => b.skinKey || 'pf_' + b.id;
+
+/* Tipps nacheinander, frühestens 2 Minuten nach dem vorigen (wie im PathFinder-Player; Zeiten nur für diesen Seitenaufruf) */
+const TIP_GATE = `\n<style>.pf-tipwait:not(:empty){margin-left:10px;font-size:.85em;opacity:.75}details[data-lock]>summary{cursor:not-allowed}</style>
+<script>(function(){var G=120000,T={};function grp(d){return d.parentElement?Array.prototype.filter.call(d.parentElement.children,function(x){return x.hasAttribute('data-pftip')}):[d]}
+function upd(){var n=Date.now();document.querySelectorAll('details[data-pftip]').forEach(function(d){var g=grp(d),j=g.indexOf(d),p=j>0?g[j-1]:null,t='',l='';
+if(p&&!T[d.id||(d.id='pft'+Math.random().toString(36).slice(2))]&&!d.open){var pt=T[p.id];if(!pt){l='1';t='\\uD83D\\uDD12 erst Tipp '+j+' öffnen'}else{var r=pt+G-n;if(r>0){var s=Math.ceil(r/1e3);l='1';t='\\u23F3 in '+Math.floor(s/60)+':'+('0'+s%60).slice(-2)}}}
+if(l)d.setAttribute('data-lock','');else d.removeAttribute('data-lock');var w=d.querySelector('.pf-tipwait');if(w&&w.textContent!==t)w.textContent=t})}
+document.querySelectorAll('details[data-pftip]').forEach(function(d){if(!d.id)d.id='pft'+Math.random().toString(36).slice(2)});
+document.addEventListener('click',function(e){var s=e.target.closest&&e.target.closest('summary'),d=s&&s.parentElement;if(d&&d.hasAttribute('data-lock')&&!d.open)e.preventDefault()},true);
+document.addEventListener('toggle',function(e){var d=e.target;if(!d.matches||!d.matches('details[data-pftip]')||!d.open)return;if(d.hasAttribute('data-lock')){d.open=false;return}if(!T[d.id])T[d.id]=Date.now();upd()},true);
+upd();setInterval(upd,1000)})()${SC}\n`;
 
 /** Baustein im Originaldesign (für Schüler). data: { src, quiz } sammelt Quelltexte und Quizfragen. */
 export function blockHtml(b, data) {
@@ -228,6 +239,7 @@ export function pageHtml(doc, { json = '' } = {}) {
   const head = fillHolders(sk.head, { title: esc(doc.title) });
   return `<!doctype html>\n<html${sk.htmlAttrs}>\n<head>${head}</head>\n<body${sk.bodyAttrs}>${dropMarks(fillHolders(sk.before, headMap(doc)))}${st}${after}`
     + (json ? `\n<script type="application/json" id="pf-doc">${json}${SC}\n` : '')
+    + (/data-pftip="1"/.test(st) ? TIP_GATE : '')
     + `</body>\n</html>\n`;
 }
 

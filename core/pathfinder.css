@@ -537,6 +537,11 @@ body.pf-player { background: var(--bg, #fdf8f3); }
 
 /* Tipps/Lösung für Schüler verborgen */
 .lp-task details.pf-hidden { opacity: .55; border-style: dashed; }
+.pf-tipwait:not(:empty) { margin-left: 10px; font-weight: 600; font-size: .85em; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+details[data-lock] > summary { cursor: not-allowed; opacity: .75; }
+.pf-tipwait.nudge { animation: pf-nudge .4s; }
+@keyframes pf-nudge { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.pf-tipwait { display: inline-block; }
 .pf-hid { font-size: .8em; font-weight: 600; color: var(--ink-2); background: var(--surface-2); border-radius: 6px; padding: 1px 6px; }
 .ed-form .list .pf-eye { flex: 0 0 auto; width: 38px; border: 1.5px solid #d9d2e4; background: #fff; border-radius: 8px; cursor: pointer; font-size: 16px; }
 .ed-form .list .pf-eye.off { background: #f1eef5; opacity: .8; }

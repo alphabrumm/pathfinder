@@ -29,6 +29,9 @@ die Seite später sehen. Gebaut für das iPad (mit oder ohne Tastatur).
   Antworten der Auswertung. Hypothese mit Begründung am besten als Freitext davor, eine Vorhersage als Aufgabe mit `Antwort:` danach.
 * **Schrittweise aufdecken** (`Aufdecken: schrittweise` im Kopf oder direkt nach einer Stationszeile, ⚙ Station): Der nächste
   Baustein erscheint erst, wenn die Aufgabe davor gelöst ist.
+* **Tipps nacheinander:** Bei Aufgaben mit mehreren Tipps lässt sich der nächste Tipp erst öffnen, wenn der vorige offen war,
+  und frühestens **2 Minuten** danach (Countdown neben „Tipp 2“). Die Zeiten werden mit dem Fortschritt gespeichert; das gilt auch
+  im Originaldesign. Im Editor und in der gelösten Vorschau sind alle Tipps frei.
 * **Freie Lücken** (`Frei: ja` im Lückentext): jede Wahl zählt, die Wortbank zeigt alle Möglichkeiten aus `[[a|b|c]]` – z. B. für Hypothesen.
 * **Indizes und Hochzahlen** im Text: `v_A`, `v_{End}`, `m/s^2`, `10^{-3}`.
 * Normaler Text nach einem Quiz, Lückentext usw. ist erlaubt: Er steht nach einer Leerzeile und beendet den Abschnitt.
