@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-26d';
+const PF_BUILD = '2026-11-27a';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -590,7 +590,22 @@ export function startPathFinder(opts = {}) {
     lp.classList.toggle('with-pts', !!doc.pointsOn);
     $('.lpwrap').style.background = cols.bg; $('.lpwrap').style.setProperty('--bg', cols.bg);
   }
+  /* Kopierschutz für Code: Code ohne Kopieren-Knopf sowie Code in Tipps, Lösungen und Aufklapp-Bereichen
+     lässt sich im Lernpfad nicht markieren, kopieren oder per Langdruck übernehmen – die Schüler sollen ihn selbst bauen. */
+  const NOCP = '.lp-code.nocp, .code[data-nocopy], details pre, details code, details .code, details .lp-code';
+  (function noCopy() {
+    const st = document.createElement('style');
+    st.textContent = `.pf-nocp #lp :is(${NOCP}) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }`;
+    document.head.appendChild(st);
+    const inside = n => { const el = n && (n.nodeType === 1 ? n : n.parentElement); return !!el?.closest?.('.pf-nocp #lp ' + NOCP.split(', ').join(', .pf-nocp #lp ')); };
+    const hits = () => { const s = getSelection(); if (!s || !s.rangeCount || s.isCollapsed) return false; if (inside(s.anchorNode) || inside(s.focusNode)) return true; return [...document.querySelectorAll(NOCP.split(', ').map(x => '.pf-nocp #lp ' + x).join(', '))].some(el => s.containsNode(el, true)); };
+    const stop = e => { if (!document.body.classList.contains('pf-nocp')) return; e.preventDefault(); e.stopPropagation(); toast('🔒 Diesen Code baust du selbst – Kopieren geht hier nicht.'); };
+    document.addEventListener('copy', e => { if (document.body.classList.contains('pf-nocp') && hits()) { stop(e); try { e.clipboardData.setData('text/plain', ''); } catch (er) { } } }, true);
+    document.addEventListener('cut', e => { if (document.body.classList.contains('pf-nocp') && hits()) stop(e); }, true);
+    for (const ev of ['selectstart', 'contextmenu', 'dragstart']) document.addEventListener(ev, e => { if (document.body.classList.contains('pf-nocp') && inside(e.target)) e.preventDefault(); }, true);
+  })();
   function render() {
+    document.body.classList.toggle('pf-nocp', !E()); // Kopierschutz nur für Schüler bzw. in der Vorschau, nicht beim Bearbeiten
     const sc = scroller.scrollTop;
     if (doc.skin) { try { skinRender(sc); } catch (e) { console.error(e); lp.innerHTML = `<div class="ed-hint" style="padding:40px">⚠ Originaldesign konnte nicht angezeigt werden: ${esc(e.message)}</div>`; } return; }
     if (lp.classList.contains('pf-skin')) { lp.classList.remove('pf-skin'); $('#pf-skin-css')?.remove(); }
@@ -928,7 +943,7 @@ export function startPathFinder(opts = {}) {
       case 'page': return wrap(b, `<div class="lp-pagebreak"><span>📄 Nächste Seite</span></div>`);
       case 'widget': return wrap(b, widgetHtml(b));
       case 'lock': { const ref = findBlock(b.after); return wrap(b, `<div class="lp-card" style="border-style:dashed;text-align:center;color:var(--ink-2)">🔒 <b>Sperre</b> – alles darunter in dieser Station wird erst frei, wenn <b>${ref ? esc(blockLabel(ref.b)) : '<i>(noch keine Aufgabe gewählt – ⚙)</i>'}</b> gelöst ist.</div>`); }
-      case 'code': return wrap(b, `<div class="lp-card lp-code"><b class="lp-ctitle">${esc(b.file || 'Code')}</b> ${b.file ? '' : `<span style="color:var(--ink-2);font-size:.85em">${esc(b.lang)}</span>`}${E() ? `<pre contenteditable="true" data-f="code" data-ph="Code …" spellcheck="false">${esc(b.code)}</pre>` : `<pre class="hl">${highlightCode(b.code || '', b.lang)}</pre>`}${b.nocopy ? (E() ? '<div class="ed-hint">ohne Knopf – nur zum Anschauen (⚙)</div>' : '') : `<button class="lp-btn alt" data-run="copy">⧉ ${esc(host.copyLabel || 'Kopieren')}</button>`}</div>`);
+      case 'code': return wrap(b, `<div class="lp-card lp-code${b.nocopy ? ' nocp' : ''}"><b class="lp-ctitle">${esc(b.file || 'Code')}</b> ${b.file ? '' : `<span style="color:var(--ink-2);font-size:.85em">${esc(b.lang)}</span>`}${E() ? `<pre contenteditable="true" data-f="code" data-ph="Code …" spellcheck="false">${esc(b.code)}</pre>` : `<pre class="hl">${highlightCode(b.code || '', b.lang)}</pre>`}${b.nocopy ? (E() ? '<div class="ed-hint">ohne Knopf – nur zum Anschauen (⚙)</div>' : '') : `<button class="lp-btn alt" data-run="copy">⧉ ${esc(host.copyLabel || 'Kopieren')}</button>`}</div>`);
       case 'uml': return wrap(b, `<div class="lp-uml">${ce('name', b.name, 'Klassenname', { tag: 'div', cls: 'un' })}<div class="us">${(b.attrs || []).map(a => `<div>${esc(a)}</div>`).join('') || '<div>&nbsp;</div>'}</div><div class="us">${(b.methods || []).map(a => `<div>${esc(a)}</div>`).join('') || '<div>&nbsp;</div>'}</div></div>${E() ? '<div class="ed-hint">Attribute und Methoden über ⚙</div>' : ''}`);
     }
     if (t?.render) return wrap(b, t.render(b, ctx));
