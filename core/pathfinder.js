@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-28d';
+const PF_BUILD = '2026-11-28e';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -2742,7 +2742,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       jpad: (info.art || 'lernpfad') === 'lernpfad' && info.fsel === 'Informatik' && info.proj === 'java', // Java-Projekt (Probe): Lernpfad mit Programmier-Aufgaben, daneben JPad
       mix: [p1, p2 - p1, 100 - p2],
       thema: (info.thema || '').trim() || (lb ? lb.t : ''),
-      fach, klasse: jg ? `Gymnasium in Bayern, Jahrgangsstufe ${jg}` : '',
+      fach, jg, klasse: jg ? `Gymnasium in Bayern, Jahrgangsstufe ${jg}` : '',
       kopf: [fach, jg ? jg + '. Klasse' : ''].filter(Boolean).join(' · '),
       umfang: `ca. ${min} Minuten Bearbeitungszeit für Schüler – ${ST[min] || 'passend viele Stationen'}`,
       lehrplan: lb ? `${L.SOURCE}, ${fach} Jahrgangsstufe ${jg}, Lernbereich ${lb.nr !== '–' ? lb.nr + ' ' : ''}„${lb.t}“${lb.g ? ` (${lb.g})` : ''}` : '',

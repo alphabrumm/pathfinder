@@ -5,7 +5,7 @@ description: Digitale Prüfungen für Probe (probe.pandapy.de) im PathFinder-Tex
 
 # Probe-Prüfungen
 
-Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-28d). Die Spezifikation unten ist dieselbe, die Probe
+Erzeugt aus alphabrumm/pathfinder (`tools/doku.mjs`, PathFinder 2026-11-28e). Die Spezifikation unten ist dieselbe, die Probe
 als „Prompt für externe KI“ anzeigt. Weicht etwas vom aktuellen Probe-Verhalten ab, gilt der Code in alphabrumm/pathfinder
 (`core/pftext.js`, `core/pfsplit.js`).
 
@@ -70,6 +70,19 @@ REGELN
   • Handschriftliche Aufgabe: „### Handschrift: Titel“ – eine kleine Aufgabe, die die Schüler auf Papier lösen (Rechnung, Skizze, Diagramm) und dann fotografieren; Erwartungshorizont aus mehreren Zeilen „Erwartung: … (Punkte)“ und eine Musterlösung in Zeilen „Lösung: …“ (Formeln in LaTeX zwischen $…$); Platz für eine halbe Seite, nicht mehr
   • Programmieren in JPad: „### JPad: Titel“ – die Schüler programmieren in JPad (Java): kurzer Auftrag, Startcode als ```java start Klassenname … ``` (optional, je Datei ein Block), „Ausgabe:“ mit der erwarteten Programmausgabe (Teil der Ausgabe genügt) und/oder „Muss:“ für Pflicht-Code (z. B. while); Musterlösung als ```java lösung … ``` (sieht nur die Lehrkraft). Ohne „Erwartung:“-Zeilen wird automatisch nach Ausgabe und Pflicht-Code bewertet; mit „Erwartung: … (Punkte)“ bewertet die Lehrkraft. Java wie in JPad üblich: println() und print() ohne System.out, Wrapper-Typen Integer, Double, Boolean, Character statt int, double, boolean, char
 - Anforderungsbereiche: wie von der Lehrkraft angegeben, sonst etwa 40 % der Punkte Reproduktion (AFB I), 40 % Anwendung und Transfer (AFB II), 20 % Problemlösen und Beurteilen (AFB III); von leicht nach schwer.
+- Nur für JPad-Aufgaben (Informatik): JAVA IN JPAD – diese Regeln gelten für den GESAMTEN Java-Code (Startcode, Lösungen, Beispiele, erwartete Ausgaben):
+  - Nur die Datentypen String, Integer, Double, Boolean und Character – NIE int, double, boolean, char, long oder float. Kommazahlen mit Punkt (4.5).
+  - Ausgabe mit println(…) bzw. print(…) – NIE System.out.println. Text und Werte mit + verbinden; Leerzeichen stehen in den Anführungszeichen.
+  - Hauptprogramm: Die Anweisungen stehen direkt in der Datei „Hauptprogramm“ – ohne Klasse, ohne main-Methode, ohne import. Kleine Hilfsmethoden dürfen dort direkt stehen („void begruessen(String name) { … }“).
+  - Jede Klasse in einer eigenen Datei, die genau wie die Klasse heißt (class Schaf → Datei Schaf); Klassennamen groß, Attribute, Methoden und Variablen klein, deutsche Namen in camelCase; Ja/Nein-Attribute beginnen mit „ist“ (istGeschoren).
+  - Sichtbarkeit nach Jahrgangsstufe: bis Jahrgangsstufe 10 OHNE public/private (Klassen, Attribute, Methoden, Konstruktoren; Attribute von außen direkt mit dem Punkt setzen, keine Getter/Setter); ab Jahrgangsstufe 11 Attribute „private“, Methoden, Konstruktoren, Getter und Setter „public“, Klassen selbst ohne „public“.
+  - Im Konstruktor Attribute mit this setzen („this.name = name;“); bei Vererbung („class Dackel extends Hund“) steht super(…) als erste Zeile des Konstruktors.
+  - Wiederholungen mit while und einem Integer-Zähler – keine for-Schleife. Hoch- und Runterzählen ausgeschrieben („i = i + 1;“) – kein ++, --, += oder -=.
+  - Bedingungen mit Vergleichsoperatoren (==, !=, <, <=, >, >=); Boolean-Werte ausgeschrieben vergleichen („if (istStubenrein == true)“).
+  - Arrays: „Schaf[] herde = new Schaf[5];“, Index ab 0, Länge mit herde.length, Durchlauf mit while.
+  - Zufall NUR mit der JPad-Bibliothek: Random.randint(von, bis) für ganze Zahlen (beide Grenzen eingeschlossen) und Random.randdouble(von, bis) für Kommazahlen – NIE Math.random() oder new Random().
+  - Grafik (nur wenn es zum Thema passt): Zeichenfläche 800 × 600; Hintergrund „Sprite himmel = new Sprite(400, 300, SpriteLibrary.Background, 2); himmel.setAsBackgroundImage();“; eigene Figuren als „class Vogel extends Sprite“ mit „super(x, y, SpriteLibrary.Bird, 0);“, Methoden scale(…), move(dx, dy), setImageIndex(…), getCenterX(); Pause mit SystemTools.pause(Millisekunden).
+  - Einrückung mit 3 Leerzeichen; kurze Kommentare mit //.
 - Quizfragen mit genau einer richtigen Antwort und plausiblen falschen Antworten; Rückmeldungen nach // sind nicht nötig.
 - Lückentexte ohne Wortbank werden tolerant bewertet (Groß/Klein egal); mehrdeutige Lücken vermeiden oder alle richtigen Antworten mit | angeben.
 - Aufgaben mit eindeutiger Lösung bekommen eine „Antwort:“-Zeile, damit sie automatisch geprüft werden.
