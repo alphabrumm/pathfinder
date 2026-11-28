@@ -353,6 +353,7 @@ export function startPathFinder(opts = {}) {
   const EXAMF = () => doc?.form === 'pruefung';
   /* Befragung: Fragen ohne richtig/falsch, keine Punkte, keine Sperren; NOLEARN = weder Lernpfad noch Challenge */
   const SURVEYF = () => doc?.form === 'befragung';
+  const heroNoLogo = () => opts.heroLogo === false && !EXAMF() && !SURVEYF(); // Probe: Lernpfade und Challenges ohne Bild zeigen kein App-Logo im Kopf
   const NOLEARN = () => EXAMF() || SURVEYF();
   const svy = {}; // Antworten in der Vorschau einer Befragung (nur im Speicher)
   const EXAM = () => EXAMF() && !E();
@@ -634,11 +635,12 @@ export function startPathFinder(opts = {}) {
     const d = doc.design, lines = doc.typeLines || [];
     const appLogo = opts.logo ? `<img src="${opts.logo}" alt="">` : esc(appName[0]);
     const ownImg = (d.hero === 'bild' || d.hero === 'gross') && d.heroImg, hackImg = (d.theme === 'grid' || d.theme === 'lumi') && !ownImg && d.hero !== 'hintergrund' && d.hero !== 'keins';
+    const noLogo = heroNoLogo() && d.hero === 'logo' && !hackImg; // opts.heroLogo === false: Lernpfade/Challenges ohne eigenes Bild zeigen kein App-Logo
     const logo = (ownImg ? `<img src="${d.heroImg}" alt="">` : hackImg ? `<img src="${d.theme === 'lumi' ? LUMI_OWL : HACK_SKULL}" alt="${d.theme === 'lumi' ? 'Lumi' : ''}">` : appLogo) + (d.hero === 'gross' && lines.length ? `<div class="lp-typing">${E() ? esc(lines.join('\n')) : ''}</div>` : '');
     let h = `<div class="fontsize"><button data-fz="-" aria-label="Schrift kleiner">A−</button><button data-fz="+" aria-label="Schrift größer">A+</button></div>`;
     const goals = doc.goals || [];
     h += `<header class="lp-hero${d.hero === 'hintergrund' && d.heroImg ? ' has-bg' : ''}${d.hero === 'gross' && d.heroImg ? ' big' : ''}"${d.hero === 'hintergrund' && d.heroImg ? ` style="background-image:url(${cssUrl(d.heroImg)})"` : ''}>`
-      + (d.hero !== 'hintergrund' && d.hero !== 'keins' ? `<div class="lp-logo${d.hero === 'logo' && opts.logo && !hackImg ? ' applogo' : ''}${(d.hero !== 'logo' && d.heroImg) || hackImg ? ' own' : ''}"${E() ? ' title="Antippen: eigenes Bild oder GIF setzen"' : ''}>${logo}</div>` : '')
+      + (d.hero !== 'hintergrund' && d.hero !== 'keins' && !noLogo ? `<div class="lp-logo${d.hero === 'logo' && opts.logo && !hackImg ? ' applogo' : ''}${(d.hero !== 'logo' && d.heroImg) || hackImg ? ' own' : ''}"${E() ? ' title="Antippen: eigenes Bild oder GIF setzen"' : ''}>${logo}</div>` : '')
       + `<div class="lp-herotxt" style="min-width:0">${ce('$kicker', doc.kicker, 'Kopfzeile, z. B. Fach · Jahrgangsstufe', { tag: 'small' })}${ce('$title', doc.title, EXAMF() ? 'Titel der Prüfung' : SURVEYF() ? 'Titel der Befragung' : 'Titel des Lernpfads', { tag: 'h1', anim: doc.anim?.title })}${ce('$subtitle', doc.subtitle, 'Untertitel', { tag: 'p', rich: true, anim: doc.anim?.subtitle })}`
       + (goals.length ? `<ul class="lp-goals">${goals.map((g, i) => ce('$goals.' + i, g, 'Lernziel', { tag: 'li', rich: true })).join('')}</ul>` : '')
       + (doc.rank ? `<div class="lp-rank">${ce('$rank', doc.rank, 'Rang', { tag: 'span', rich: true })}</div>` : '')
@@ -2208,7 +2210,8 @@ ${d.theme === 'lumi' ? `<span class="help">„Lumi“: Nachthimmel mit Pixel-Ste
         <fieldset><legend>Kopf</legend>
         <label>Muster im Hintergrund</label><div class="ed-pat">${PATTERNS.map(([v, n, t]) => `<button data-pat="${esc(v)}" title="${esc(t)}" aria-pressed="${v === pat}">${esc(n)}</button>`).join('')}<input type="text" id="patIn" maxlength="2" placeholder="eigenes" value="${custom ? esc(pat) : ''}" aria-label="eigenes Zeichen oder Emoji"></div>
         ${pat !== 'keins' ? `<div class="row"><label>Dichte<input type="range" id="patK" min="0.5" max="2" step="0.1" value="${d.patDensity || 1}"><span class="help">weiter ← → dichter</span></label><label>Sichtbarkeit<input type="range" id="patO" min="0.15" max="2" step="0.05" value="${d.patOpacity ?? 1}"><span class="help">durchsichtiger ← → kräftiger</span></label></div>` : ''}
-        ${seg('hero', [['logo', d.theme === 'grid' ? 'Pixel-Totenkopf' : d.theme === 'lumi' ? 'Eule Lumi' : 'App-Logo'], ['bild', 'eigenes Bild'], ['gross', 'großes Bild rechts'], ['hintergrund', 'Bild als Hintergrund'], ['keins', 'kein Bild']], d.hero)}
+        ${(() => { const hack = d.theme === 'grid' || d.theme === 'lumi', nl = heroNoLogo() && !hack; // ohne App-Logo: „kein Bild“ statt „App-Logo“
+          return seg('hero', [...(nl ? [] : [['logo', d.theme === 'grid' ? 'Pixel-Totenkopf' : d.theme === 'lumi' ? 'Eule Lumi' : 'App-Logo']]), ['bild', 'eigenes Bild'], ['gross', 'großes Bild rechts'], ['hintergrund', 'Bild als Hintergrund'], ['keins', 'kein Bild']], nl && d.hero === 'logo' ? 'keins' : d.hero); })()}
         ${d.hero !== 'logo' && d.hero !== 'keins' ? `<div class="imgprev">${d.heroImg ? `<img src="${d.heroImg}" alt="">` : ''}<label class="take" style="display:inline-flex;align-items:center;cursor:pointer">🖼 ${d.heroImg ? 'Anderes Bild' : 'Bild/GIF wählen'}<input type="file" accept="image/*" id="heroFile" hidden></label></div>` : ''}
         <label>Lernziele</label><div class="list">${(doc.goals || []).map((g, i) => `<div class="it"><input type="text" data-goal="${i}" value="${esc(plain(g))}" placeholder="Lernziel ${i + 1}"><button data-gdel="${i}" aria-label="entfernen">✕</button></div>`).join('')}<button class="add" data-gadd="1">＋ Lernziel</button></div>
         <label>Rang / Abzeichen (optional)<input type="text" id="rankIn" value="${esc(plain(doc.rank))}" placeholder="z. B. Dein Rang: HACKER NEWBIE"></label>

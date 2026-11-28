@@ -157,6 +157,7 @@ export async function checkApp(html, { timeout = 7000 } = {}) {
     if (!D.doc) errors.push('Der Demo-Lernpfad („demo“) lässt sich nicht lesen: ' + D.errors.slice(0, 3).join(' · '));
     else {
       const T = D.doc.stations.flatMap(s => s.blocks).filter(b => b.type === 'apptask');
+      if (!D.doc.design?.heroImg) warnings.push('Der Demo-Lernpfad hat kein Kopfbild („Kopfbild: anhang:kopf“ mit einem SVG im „## Anhang“).');
       if (!T.length) warnings.push('Der Demo-Lernpfad hat keine „### App-Aufgabe“ – er sollte zeigen, wie die App mit dem Lernpfad zusammenarbeitet.');
       const bad = [...new Set(T.filter(b => b.event && !m.events.some(e => e.name === b.event)).map(b => b.event))];
       if (bad.length) errors.push('Der Demo-Lernpfad verwendet Ereignisse, die nicht im Steckbrief stehen: ' + bad.join(', '));
@@ -422,6 +423,8 @@ DIE APP MUSS
    die genau die Ereignisse (und ggf. Vorlagen/Prüfungen) der App nutzen, dazu höchstens ein kurzes Quiz. Format (PathFinder-Textformat):
    # Titel der Demo
    Art: Lernpfad
+   Kopfbild: anhang:kopf
+   Kopfbild-Art: klein          (oder: Hintergrund)
    ## Station: Titel der Station
    Kurzer Erklärtext (Markdown, **fett** erlaubt).
    ### App-Aufgabe: Titel
@@ -434,6 +437,10 @@ DIE APP MUSS
    ? Frage
    [x] richtige Antwort
    [ ] falsche Antwort
+   ## Anhang
+   kopf: <svg viewBox="0 0 200 200" …>…</svg>
+   Das Kopfbild ist Pflicht: ein selbst gezeichnetes SVG, das zur App passt – bei „klein“ ein klares quadratisches Motiv (viewBox 0 0 200 200),
+   bei „Hintergrund“ eine breite, ruhige Szene (viewBox 0 0 1200 400, gedeckte Farben); kein Logo, keine Schrift, keine externen Quellen.
 
 BEVOR DU ANTWORTEST – prüfe selbst:
 - Kein „http“ in src, href oder url(); kein fetch/XMLHttpRequest/localStorage/alert in deinem Code.
