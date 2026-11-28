@@ -48,3 +48,10 @@ Steht in der App-Datei:
 Die Antwort (HTML) wird in Probe eingefügt, geprüft und als eigene App der Lehrkraft gespeichert.
 Im KI-Dialog von PathFinder (Schritt 2) erscheinen passende Apps (Fach/Jahrgangsstufe) als „Als …-Projekt realisieren“
 (`opts.kiApps`), die Regeln der App kommen über `appPromptRules` in den Lernpfad-Prompt.
+
+## Im PathFinder Player (Probe, `l.html`)
+
+- **Lernpfad + App** (`form: 'papp'`, `{ app: {id, m, html}, lernpfad }`): links `mountApp`, rechts `startPathFinder` mit `pappPlugin`
+  und `createAppHost`. Gespeichert wird `{ app: {state, summary}, sum, prog }`.
+- Beendete Einheiten öffnet der Player mit `readonly: true` (nichts lösen, nichts melden); private Kopien mit `progress: …` und eigener
+  Dokument-ID, damit sich der Stand nicht mit dem der Einheit mischt.
