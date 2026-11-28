@@ -451,7 +451,7 @@ export function startPathFinder(opts = {}) {
   addEventListener('pagehide', () => { if (prevT) { clearTimeout(prevT); const P = solvedView ? progReal : prog; if (!PLAYER && P) LS.set(PREVKEY(), JSON.stringify(P)); } });
   function progSave() {
     if (!PLAYER || opts.readonly) return; // nur ansehen (z. B. beendete Einheit): nichts speichern, nichts melden
-    const keep = { solved: prog.solved, tips: prog.tips, sol: prog.sol, visited: prog.visited, start: prog.start, active: prog.active, sent: prog.sent, quiz: prog.quiz, ...(EXAMF() ? { ans: prog.ans } : {}) };
+    const keep = { solved: prog.solved, tips: prog.tips, sol: prog.sol, visited: prog.visited, start: prog.start, active: prog.active, sent: prog.sent, quiz: prog.quiz, ...(EXAMF() ? { ans: prog.ans } : {}), ...(host.onProgress ? { here: curSid } : {}) };
     let txt = JSON.stringify(keep);
     if (txt.length > 4000) { delete keep.quiz; txt = JSON.stringify(keep); } // SCORM 1.2 erlaubt höchstens 4096 Zeichen
     LS.set(PROGKEY, txt);
@@ -1897,6 +1897,7 @@ export function startPathFinder(opts = {}) {
   /* Die Stationsleiste nur waagrecht mitführen – scrollIntoView würde auch den Lernpfad bewegen und einen laufenden Sprung abbrechen */
   const stopIntoView = a => { if (!a) return; let c = a.parentElement; while (c && c !== lp && !(c.scrollWidth > c.clientWidth + 1)) c = c.parentElement; if (!c || c === lp) return; const ar = a.getBoundingClientRect(), cr = c.getBoundingClientRect(); if (ar.left < cr.left + 8) c.scrollLeft -= cr.left + 8 - ar.left; else if (ar.right > cr.right - 8) c.scrollLeft += ar.right - cr.right + 8; };
   let jumpUntil = 0;
+  let hereT = 0;
   function goStation(sid, smooth) {
     curSid = sid; jumpUntil = Date.now() + (smooth ? 1200 : 150); stopIntoView($(`#stops a[data-sid="${sid}"]`, lp));
     if (single) { render(); scroller.scrollTop = 0; return; }
@@ -1911,7 +1912,7 @@ export function startPathFinder(opts = {}) {
     let cur = null; for (const s of $$('.lp-station', lp)) { if (s.getBoundingClientRect().top <= top) cur = s.dataset.sid; }
     cur = cur || $('.lp-station', lp)?.dataset.sid || doc.stations[0]?.id; // ganz oben: erste Station dieser Seite
     if (Date.now() < jumpUntil) return; // während eines Sprungs nicht dazwischenfunken
-    if (cur && cur !== curSid) { curSid = cur; if (mode === 'preview') prog.visited[cur] = 1; $$('.lp-station', lp).forEach(s => s.classList.toggle('cur', s.dataset.sid === cur)); $$('#stops a', lp).forEach(a => a.classList.toggle('cur', a.dataset.sid === cur)); stopIntoView($('#stops a.cur', lp)); }
+    if (cur && cur !== curSid) { curSid = cur; if (mode === 'preview') prog.visited[cur] = 1; if (PLAYER && host.onProgress) { clearTimeout(hereT); hereT = setTimeout(progSave, 1500); } /* eingebettet: Station melden (Live-Ansicht der Lehrkraft) */ $$('.lp-station', lp).forEach(s => s.classList.toggle('cur', s.dataset.sid === cur)); $$('#stops a', lp).forEach(a => a.classList.toggle('cur', a.dataset.sid === cur)); stopIntoView($('#stops a.cur', lp)); }
   }, { passive: true });
 
   /* ---------- Einstellungen (⚙) ---------- */
@@ -4059,6 +4060,9 @@ ${SC}
     E, esc, plain, uid, ce, toast, imgHtml, xpTag, taskCard, shuffled, findBlock, blockLabel, host,
     get prog() { return prog; }, get doc() { return doc; }, get mode() { return mode; },
     solve: id => solve(id), render: () => render(),
+    /** Live-Ansicht (Probe): Stand einer Schülerin, eines Schülers zeigen; follow = zur Station springen, in der sie gerade ist */
+    setProgress: (p, follow = false) => { const s = scroller.scrollTop; prog = { ...freshProg(), ...clone(p || {}) }; render(); if (follow && p?.here && doc.stations.some(x => x.id === p.here)) goStation(p.here, true); else scroller.scrollTop = s; },
+    goStation: sid => goStation(sid, true),
     openDoc: d => openDoc(d), get current() { return doc; },
     /** Lernpfad als Datei für die App (Erweiterung eingebaut) – für „Fertig“ im Editor der App */
     buildForApp: (o = {}) => { if (pending) commit(); return appHtml({ pass: doc.pass || 80, cert: doc.cert?.on !== false, scorm: !!o.scorm }); }, // scorm: Lernpfad meldet an ein SCORM-API (z. B. die App als Lernpaket in Moodle)
