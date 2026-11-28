@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-28a';
+const PF_BUILD = '2026-11-28b';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -360,6 +360,8 @@ export function startPathFinder(opts = {}) {
   // stabile Schlüssel für Antwortoptionen und Zuordnungskarten: Antworten bleiben gültig, auch wenn gemischt wird
   const keyOf = () => uid() + uid().slice(0, 3);
   function migrate(d) {
+    const E0 = emptyDoc(); for (const k of Object.keys(E0)) if (d[k] === undefined && k !== 'stations') d[k] = E0[k]; // unvollständige Dateien (z. B. von Hand oder per KI erzeugt) ergänzen
+    d.stations = d.stations || [];
     d.goals = d.goals || []; d.rank = d.rank || ''; d.id = d.id || uid(); d.anim = d.anim || {}; d.typeLines = d.typeLines || [];
     d.cert = d.cert || emptyDoc().cert;
     if (d.form === 'pruefung') d.pointsOn = true;
