@@ -970,6 +970,8 @@ ${!info.types?.length || info.types.includes('gap') ? `- Lückentexte ohne Wortb
 - Tipps erinnern an das nötige Vorwissen, statt es neu zu erklären.
 ${info.types?.length ? `- AUFGABENSTILE – verwende ${appR ? 'neben den App-Aufgaben (Pflicht, siehe unten) nur' : 'AUSSCHLIESSLICH'} diese Aufgabenarten (dazu höchstens kurze Merkkästen), und zwar JEDE mindestens einmal, sinnvoll auf die Stufen verteilt:
 ${EXAM_STYLES.filter(s => s[0] !== 'essay' && s[0] !== 'jpad' && info.types.includes(s[0])).map(s => `  • ${s[1]}: ${s[3]}`).join('\n')}
+` : ''}${info.jpad ? `- JPAD-CHALLENGE: Die Challenge steht in JPad direkt neben dem Code-Editor; die Schüler programmieren dort in Java (Dialekt der Online-IDE). Jede Stufe enthält mindestens eine „### Programmier-Aufgabe“ (Format siehe unten) mit „Ausgabe:“ und/oder „Muss:“, damit JPad die Lösung selbst prüft; Startcode als \`\`\`java start-Block, wo sinnvoll. Ergänzend Quiz und Lückentexte (z. B. Was gibt dieses Programm aus?).
+${javaRules(info.jg)}
 ` : ''}${appR ? `- APP-AUFGABEN SIND PFLICHT: Jede Stufe enthält mindestens eine „### App-Aufgabe“, in der die Schüler in der App links etwas tun; die Challenge lebt von der App. Fragen ohne App nur ergänzend.
 ${appR.replace(/\s*$/, '\n')}` : ''}`
     : `- Schreibe im Kopf die Zeile „Art: Lernpfad“.

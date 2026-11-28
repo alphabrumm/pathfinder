@@ -43,16 +43,27 @@ export function normManifest(raw, errors = [], warnings = []) {
     version: s(raw?.version, 20) || '1', summary: s(raw?.summary, 200), layout: raw?.layout === 'nur-app' ? 'nur-app' : 'geteilt', regeln: s(raw?.regeln, 4000),
     events: (Array.isArray(raw?.events) ? raw.events : []).slice(0, 40).map(e => ({ name: s(e?.name, 40).replace(/[^a-z0-9_-]/gi, '-').toLowerCase(), text: s(e?.text, 160) })).filter(e => e.name),
     ...(raw?.lernpfad && typeof raw.lernpfad === 'object' && Array.isArray(raw.lernpfad.stations) ? { lernpfad: raw.lernpfad } : {}),
-    ...(typeof raw?.lernpfadText === 'string' && raw.lernpfadText.trim() ? { lernpfadText: raw.lernpfadText.slice(0, 60000) } : {}), // eingebauter Lernpfad im PathFinder-Textformat
+    ...(typeof (raw?.demo ?? raw?.lernpfadText) === 'string' && (raw.demo ?? raw.lernpfadText).trim() ? { lernpfadText: (raw.demo ?? raw.lernpfadText).slice(0, 60000) } : {}), // Demo-Lernpfad im PathFinder-Textformat („demo“, früher „lernpfadText“)
     vorlagen: s(raw?.vorlagen, 2000), pruefung: s(raw?.pruefung, 2000), vorlageBeispiel: s(raw?.vorlageBeispiel, 4000), pruefungBeispiel: s(raw?.pruefungBeispiel, 400),
   };
   if (!m.name) errors.push('Im Steckbrief fehlt „name“.');
+  if (!m.lernpfad && !m.lernpfadText) errors.push('Die App bringt keinen Demo-Lernpfad mit („demo“ im Steckbrief): Jede Probe-App braucht einen kleinen Lernpfad, der ihre Grundfunktionen vorstellt.');
   if (!m.events.length && !m.pruefung) errors.push('Die App meldet nichts, was der Lernpfad prüfen kann: Im Steckbrief stehen weder Ereignisse („events“) noch Prüfungen („pruefung“).');
   if (m.vorlagen && !m.vorlageBeispiel) warnings.push('Im Steckbrief steht „vorlagen“, aber kein „vorlageBeispiel“ – der Probe-Check kann das Laden einer Vorlage nicht ausprobieren.');
   if (!m.beschreibung) warnings.push('Im Steckbrief fehlt eine „beschreibung“ – die KI weiß dann wenig über die App.');
   return { m, errors, warnings };
 }
 
+/** Demo-Lernpfad der App als PathFinder-Dokument → { doc, errors } (Steckbrief: lernpfad oder demo/lernpfadText) */
+export async function demoDoc(m) {
+  if (m?.lernpfad) return { doc: JSON.parse(JSON.stringify(m.lernpfad)), errors: [] };
+  if (!m?.lernpfadText) return { doc: null, errors: ['kein Demo-Lernpfad'] };
+  const T = await import('./pftext.js'), uid = () => Math.random().toString(36).slice(2, 10);
+  const emptyDoc = (form = 'lernpfad') => ({ v: 2, id: uid(), form, design: { pal: 0, font: 'pixel', shape: 'eckig', hero: 'logo', heroImg: '' }, kicker: '', title: '', subtitle: '', goals: [], rank: '', anim: {}, typeLines: [],
+    stations: [{ id: uid(), title: '', sub: '', check: false, blocks: [{ id: uid(), type: 'text', html: '' }] }], cert: { on: true, need: 'immer', pct: 80, text: 'hat den Lernpfad mit folgendem Ergebnis bearbeitet:', show: { zeit: true, tipps: true, quiz: true, xp: true } } });
+  const r = T.parseText(m.lernpfadText, { plugins: [pappPlugin], palettes: [{ n: 'Standard' }], figures: {}, uid, emptyDoc, isCheck: () => false, appName: 'Probe', attachments: {}, files: {} });
+  return { doc: r.errors?.length ? null : r.doc, errors: (r.errors || []).map(e => typeof e === 'string' ? e : `Zeile ${e.n}: ${e.m}`) };
+}
 /** passt die App zum Fach? (fach im Steckbrief: leer = alle Fächer, sonst Liste mit Kommas) */
 export function appFitsFach(m, fach) {
   const L = String(m?.fach || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
@@ -140,6 +151,17 @@ export async function checkApp(html, { timeout = 7000 } = {}) {
   if (/window\.open\s*\(|top\.location|parent\.location|target=["']_blank/.test(h)) errors.push('Die App öffnet Fenster oder Seiten (window.open, target="_blank", top.location) – das ist in Probe-Apps gesperrt.');
   if (!/probe-app/.test(h.replace(/<script[^>]*id=["']probe-app["'][\s\S]*?<\/script>/i, ''))) errors.push('Die App spricht das Probe-Protokoll nicht (postMessage mit type „probe-app“: ready, load, state, event).');
   if (errors.length && errors.some(e => /HTML-Seite|zu groß/.test(e))) return { ok: false, errors, warnings, m };
+  // Demo-Lernpfad: lesbar und nur mit Ereignissen der App
+  if (m && (m.lernpfad || m.lernpfadText)) {
+    const D = await demoDoc(m).catch(e => ({ doc: null, errors: [e.message] }));
+    if (!D.doc) errors.push('Der Demo-Lernpfad („demo“) lässt sich nicht lesen: ' + D.errors.slice(0, 3).join(' · '));
+    else {
+      const T = D.doc.stations.flatMap(s => s.blocks).filter(b => b.type === 'apptask');
+      if (!T.length) warnings.push('Der Demo-Lernpfad hat keine „### App-Aufgabe“ – er sollte zeigen, wie die App mit dem Lernpfad zusammenarbeitet.');
+      const bad = [...new Set(T.filter(b => b.event && !m.events.some(e => e.name === b.event)).map(b => b.event))];
+      if (bad.length) errors.push('Der Demo-Lernpfad verwendet Ereignisse, die nicht im Steckbrief stehen: ' + bad.join(', '));
+    }
+  }
   // Probelauf
   const box = document.createElement('div'); box.style.cssText = 'position:fixed;left:-3000px;top:0;width:1024px;height:700px;opacity:0;pointer-events:none';
   document.body.appendChild(box);
@@ -391,15 +413,34 @@ DIE APP MUSS
      "vorlagen": "nur bei 4b: Format der Vorlage, genau genug, dass eine andere KI gültige Vorlagen schreiben kann",
      "vorlageBeispiel": "nur bei 4b: eine vollständige, gültige Beispiel-Vorlage",
      "pruefung": "nur bei 4b: Format der Prüfung",
-     "pruefungBeispiel": "nur bei 4b: eine gültige Beispiel-Prüfung zur Beispiel-Vorlage" }
+     "pruefungBeispiel": "nur bei 4b: eine gültige Beispiel-Prüfung zur Beispiel-Vorlage",
+     "demo": "PFLICHT: der Demo-Lernpfad (siehe 10.) als JSON-Text, Zeilenumbrüche als \\n" }
    </script>
-   Felder, die nicht zutreffen, weglassen. Der Probe-Check lädt das Vorlage-Beispiel zur Probe.
+   Felder, die nicht zutreffen, weglassen. Der Probe-Check lädt das Vorlage-Beispiel und den Demo-Lernpfad zur Probe.
+10. Einen kleinen DEMO-LERNPFAD mitbringen (Pflicht, Feld „demo“): Lehrkräfte öffnen ihn mit „Demo ansehen“, um die App kennenzulernen.
+   1–2 Stationen, die die Grundfunktionen der App vorstellen: kurz erklären, was man in der App tut, dann 2–4 „### App-Aufgabe“-Abschnitte,
+   die genau die Ereignisse (und ggf. Vorlagen/Prüfungen) der App nutzen, dazu höchstens ein kurzes Quiz. Format (PathFinder-Textformat):
+   # Titel der Demo
+   Art: Lernpfad
+   ## Station: Titel der Station
+   Kurzer Erklärtext (Markdown, **fett** erlaubt).
+   ### App-Aufgabe: Titel
+   Arbeitsauftrag in einem Satz.
+   Ereignis: name-aus-events
+   Tipp: kleiner Hinweis
+   XP: 10
+   (bei Vorlagen statt oder neben „Ereignis:“ einen Block \`\`\`vorlage … \`\`\` und eine Zeile „Prüfung: …“)
+   ### Quiz
+   ? Frage
+   [x] richtige Antwort
+   [ ] falsche Antwort
 
 BEVOR DU ANTWORTEST – prüfe selbst:
 - Kein „http“ in src, href oder url(); kein fetch/XMLHttpRequest/localStorage/alert in deinem Code.
 - „ready“ kommt sofort und wiederholt sich, bis „load“ kam; „flush“ wird immer sofort mit derselben req beantwortet.
 - Jede Änderung ruft speichern() auf; zeigeStand() baut aus einem geladenen Stand die komplette Ansicht.
 - readonly sperrt alles; alle Ereignisnamen stehen genau so im Steckbrief.
+- Der Demo-Lernpfad steht im Steckbrief („demo“), ist gültiges JSON (Zeilenumbrüche als \\n, Anführungszeichen maskiert) und benutzt nur Ereignisse aus „events“.
 
 AUSGABE
 - Die komplette HTML-Datei in EINEM Codeblock (oder als Datei „app.html“), ohne Text davor oder danach.`;

@@ -17,12 +17,15 @@ Steht in der App-Datei:
   "fach": "Natur und Technik, Biologie", "jg": "5-8", "version": 1,
   "events": [ { "name": "zellkern-richtig", "text": "Zellkern richtig beschriftet" } ],
   "regeln": "Hinweise für eine KI, die einen Lernpfad zur App baut",
-  "lernpfadText": "… optional: Beispiel-Lernpfad im PathFinder-Textformat …" }
+  "demo": "… PFLICHT: kleiner Demo-Lernpfad im PathFinder-Textformat …" }
 </script>
 ```
 
 - `fach`: Komma-Liste (leer = alle Fächer), `jg`: „5-8“, „ab 11“, „7“ (leer = alle).
-- `lernpfad` (Dokument) oder `lernpfadText` (Textformat mit `### App-Aufgabe`, Schlüssel `Ereignis:` und `Anzahl:`).
+- **Demo-Lernpfad (Pflicht):** `demo` (früher `lernpfadText`; Textformat mit `### App-Aufgabe`, `Ereignis:`, `Anzahl:`, ```` ```vorlage ```` und `Prüfung:`)
+  oder `lernpfad` (Dokument). 1–2 Stationen, die die Grundfunktionen der App vorstellen; Probe zeigt ihn mit „▶ Demo ansehen“
+  (links die App, rechts die Demo, nichts wird gespeichert). Der Probe-Check meldet einen Fehler, wenn die Demo fehlt, sich nicht lesen
+  lässt oder Ereignisse benutzt, die nicht im Steckbrief stehen; `demoDoc(m)` liefert sie als PathFinder-Dokument.
 
 ## Protokoll (postMessage, `type: 'probe-app'`)
 

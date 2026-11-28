@@ -2737,7 +2737,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   /** Angaben aus dem KI-Dialog → Beschreibung für den Prompt */
   /** gewählte App-Umsetzung im KI-Dialog (nur Lernpfade; Liste kommt vom Host: opts.kiApps) */
   function kiAppOf(info) {
-    if ((info.art || 'lernpfad') !== 'lernpfad' || !info.proj) return null;
+    if (!['lernpfad', 'challenge'].includes(info.art || 'lernpfad') || !info.proj) return null; // Lernpfad oder Challenge mit App
     const a = (opts.kiApps || []).find(x => x.id === info.proj && x.ready !== false);
     return a && kiAppFits(a, info) ? a : null;
   }
@@ -2929,6 +2929,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (hit !== info.fsel || (hit === '*' && info.ffrei !== f)) { info.lb = ''; info.inh = []; }
       info.fsel = hit; if (hit === '*') info.ffrei = f;
     }
+    if (pre.proj !== undefined) info.proj = pre.proj; // Probe: „＋ Neuer Unterricht → JPad-Challenge“ usw.: App schon gewählt
     if (+pre.jg >= 5 && +pre.jg <= 13) { if (String(info.jg) !== String(+pre.jg)) { info.lb = ''; info.inh = []; } info.jg = String(+pre.jg); }
     if (+pre.min > 0) info.min = L.UMFANG.reduce((a, b) => Math.abs(b - pre.min) < Math.abs(a - pre.min) ? b : a);
     if (pre.thema) info.thema = pre.thema;
@@ -3033,7 +3034,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const drawMix = () => {
       const pj = $('#kiProj', el);
       if (pj) { // Umsetzung: Apps, die zu Fach (und Jahrgangsstufe) passen – höchstens eine
-        const A = (info.art || 'lernpfad') === 'lernpfad' ? (opts.kiApps || []).filter(a => kiAppFits(a, info)) : [];
+        const A = ['lernpfad', 'challenge'].includes(info.art || 'lernpfad') ? (opts.kiApps || []).filter(a => kiAppFits(a, info)) : [];
         pj.hidden = !A.length;
         pj.innerHTML = A.length ? `<label>Umsetzung als App <span class="help">(links die App, rechts der Lernpfad)</span></label>${A.map(a => `<label class="chk"><input type="checkbox" data-kproj="${esc(a.id)}"${info.proj === a.id ? ' checked' : ''}${a.ready === false ? ' disabled' : ''}>${esc(a.label || `Als ${a.name}-Projekt realisieren`)} <span class="help">– ${esc(a.ready === false ? 'in Vorbereitung' : a.hint || a.beschreibung || '')}</span></label>`).join('')}` : '';
       }
@@ -3444,7 +3445,8 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   /** Neue Prüfung: aus einem Lernpfad, mit KI oder leer beginnen. Eingebettet nur für Befragungen (Probe-Umfragen): gleicher Dialog für Befragungen */
   function examStart(view = 'start') {
     const SV = FORMS_OK.length === 1 && FORMS_OK[0] === 'befragung', LPM = !SV && !formOk('pruefung'); // LPM: nur Lernpfade/Challenges (Probe, Modul Unterricht)
-    const F = SV ? 'befragung' : LPM ? 'lernpfad' : 'pruefung', W = SV ? 'Befragung' : LPM ? 'Lernpfad' : 'Prüfung';
+    const CH = LPM && opts.newArt === 'challenge'; // Probe: „＋ Neuer Unterricht → Einfache Challenge“
+    const F = SV ? 'befragung' : CH ? 'challenge' : LPM ? 'lernpfad' : 'pruefung', W = SV ? 'Befragung' : CH ? 'Challenge' : LPM ? 'Lernpfad' : 'Prüfung';
     const fitForm = d => { if (LPM && !formOk(d.form)) { d.form = 'lernpfad'; delete d.exam; } return d; };
     const svN = d => (d.stations || []).flatMap(s => s.blocks || []).filter(b => def(b)?.survey).length;
     const asSurvey = d => { if (SV && d.form !== 'befragung') { d.form = 'befragung'; d.pointsOn = false; if (d.cert) d.cert.on = false; d.design = { ...(d.design || {}), theme: 'lumi' }; } return d; };
@@ -3465,11 +3467,11 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         </div></div>`; return; }
       if (view === 'vor') { el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>Aus einer Vorlage</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
         <div class="ex-lplist">${opts.vorlagen.map((v, i) => `<div class="ex-lp"><button data-vor="${i}"><b>📋 ${esc(v.title)}</b><span>${esc(v.sub || '')}</span></button></div>`).join('')}</div></div>`; return; }
-      if (view === 'start' && LPM) { el.innerHTML = `<header><b>📘 Neuer Lernpfad</b><button data-x="1">Abbrechen</button></header><div class="ed-form"><span class="help">Womit möchtest du beginnen? Danach kannst du alles bearbeiten und Stationen ergänzen.</span>
+      if (view === 'start' && LPM) { el.innerHTML = `<header><b>${CH ? '⚡ Neue Challenge' : '📘 Neuer Lernpfad'}</b><button data-x="1">Abbrechen</button></header><div class="ed-form"><span class="help">Womit möchtest du beginnen? Danach kannst du alles bearbeiten und Stationen ergänzen.</span>
         <div class="ex-choices">
-          <button data-v="ki"><span class="ic">${KI_ICON}</span><span class="tx"><b>Mit KI erstellen</b><span>Jahrgangsstufe, Fach und Lernbereich wählen – die KI schreibt den ganzen Lernpfad.</span></span></button>
-          <button data-v="new"><span class="ic">＋</span><span class="tx"><b>Leerer Lernpfad</b><span>Stationen und Bausteine selbst zusammenstellen.</span></span></button>
-          <button data-v="load"><span class="ic">⤒</span><span class="tx"><b>Fertigen Lernpfad laden</b><span>Einen Lernpfad im PathFinder-Textformat einfügen oder als Datei öffnen – z. B. von einer anderen KI erstellt. <span class="ex-plink" data-v="prompt" role="link" tabindex="0">Prompt für externe KI anzeigen ›</span></span></span></button>
+          <button data-v="ki"><span class="ic">${KI_ICON}</span><span class="tx"><b>Mit KI erstellen</b><span>Jahrgangsstufe, Fach und Lernbereich wählen – die KI schreibt ${CH ? 'die ganze Challenge' : 'den ganzen Lernpfad'}.</span></span></button>
+          <button data-v="new"><span class="ic">＋</span><span class="tx"><b>${CH ? 'Leere Challenge' : 'Leerer Lernpfad'}</b><span>${CH ? 'Stufen und Aufgaben' : 'Stationen und Bausteine'} selbst zusammenstellen.</span></span></button>
+          <button data-v="load"><span class="ic">⤒</span><span class="tx"><b>${CH ? 'Fertige Challenge laden' : 'Fertigen Lernpfad laden'}</b><span>Einen Lernpfad im PathFinder-Textformat einfügen oder als Datei öffnen – z. B. von einer anderen KI erstellt. <span class="ex-plink" data-v="prompt" role="link" tabindex="0">Prompt für externe KI anzeigen ›</span></span></span></button>
         </div></div>`; return; }
       if (view === 'start') { el.innerHTML = `<header><b>📝 Neue Prüfung</b><button data-x="1">Abbrechen</button></header><div class="ed-form"><span class="help">Womit möchtest du beginnen? Danach kannst du alles bearbeiten, Aufgaben ergänzen und Punkte anpassen.</span>
         <div class="ex-choices">
