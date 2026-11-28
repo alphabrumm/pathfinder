@@ -438,6 +438,7 @@ export function startPathFinder(opts = {}) {
     let saved = null;
     try { saved = JSON.parse((scorm && scorm.get('cmi.suspend_data')) || LS.get(PROGKEY) || 'null'); } catch (e) { }
     if (saved) prog = { ...freshProg(), ...saved };
+    if (opts.progress) prog = { ...freshProg(), ...clone(opts.progress) }; // eingebettet (Probe): Stand kommt von der Plattform (z. B. private Kopie)
     if (opts.answers) prog.ans = clone(opts.answers); // Prüfung: Antworten kommen von der Plattform (z. B. nach dem Neuladen)
     if (opts.answers && doc.form === 'befragung') Object.assign(svy, clone(opts.answers)); // Befragung: Entwurf der Plattform
   }
@@ -449,7 +450,7 @@ export function startPathFinder(opts = {}) {
   if (!PLAYER) prog = prevLoad();
   addEventListener('pagehide', () => { if (prevT) { clearTimeout(prevT); const P = solvedView ? progReal : prog; if (!PLAYER && P) LS.set(PREVKEY(), JSON.stringify(P)); } });
   function progSave() {
-    if (!PLAYER) return;
+    if (!PLAYER || opts.readonly) return; // nur ansehen (z. B. beendete Einheit): nichts speichern, nichts melden
     const keep = { solved: prog.solved, tips: prog.tips, sol: prog.sol, visited: prog.visited, start: prog.start, active: prog.active, sent: prog.sent, quiz: prog.quiz, ...(EXAMF() ? { ans: prog.ans } : {}) };
     let txt = JSON.stringify(keep);
     if (txt.length > 4000) { delete keep.quiz; txt = JSON.stringify(keep); } // SCORM 1.2 erlaubt höchstens 4096 Zeichen
@@ -467,6 +468,7 @@ export function startPathFinder(opts = {}) {
   }
 
   const lp = $('#lp'), scroller = $('#scroll');
+  if (PLAYER && opts.readonly) lp.classList.add('pf-ro');
   function save() {
     if (PLAYER || RO) return;
     const ok = LS.set(DOCKEY(doc.id), JSON.stringify(doc));
@@ -1659,6 +1661,7 @@ export function startPathFinder(opts = {}) {
   }
   const slotK = v => /^\d+$/.test(String(v)) ? +v : v;
   function solve(id, keepFocus) {
+    if (PLAYER && opts.readonly) return;
     prog.solved[id] = true;
     const r = findBlock(id); if (doc.form === 'challenge' && r?.b.xp) toast(`⚡ +${r.b.xp} XP`);
     if (keepFocus) { const s = scroller.scrollTop; const a = document.activeElement, n = a?.dataset?.n; render(); scroller.scrollTop = s; if (n != null) { const e = $(`.blk[data-id="${id}"] [data-n="${n}"]`, lp); e?.focus(); e && (e.selectionStart = e.value.length); } }
