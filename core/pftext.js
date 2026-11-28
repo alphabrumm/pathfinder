@@ -927,6 +927,7 @@ export function promptFor(info, env) {
   const f = (k, d) => (info[k] || '').trim() || d;
   const ch = info.art === 'challenge', ex = info.art === 'pruefung', mix = info.mix || [40, 40, 20];
   const sv = info.art === 'befragung';
+  const appR = !ex && !sv ? (info.appRules || env.appRules || '') : ''; // Lernpfad/Challenge zu einer App (Probe): Regeln und Ereignisse der App
   const app = env.appName && env.appName !== 'PathFinder' ? ` (App: ${env.appName})` : '';
   const intro = sv
     ? `Du erstellst eine BEFRAGUNG (Umfrage, Fragebogen oder Selbstreflexion) für die Plattform PathFinder${app}. Die Teilnehmenden füllen sie am iPad aus; es gibt kein richtig oder falsch und keine Punkte. Ausgewertet wird nach Abschluss als Statistik je Frage.`
@@ -967,9 +968,10 @@ ${!info.types?.length || info.types.includes('gap') ? `- Lückentexte ohne Wortb
 - Schreibe die Stufe in den Titel jeder Aufgabe (z. B. „### Aufgabe: Grundlagen – …“) und vergib XP nach Stufe: Grundlagen 10, Fortgeschritten 20, Experte 30.
 - Grundlagen = direkte Anwendung des Gelernten; Fortgeschritten = Transfer, mehrere Schritte; Experte = offene, knifflige Probleme oder neue Zusammenhänge.
 - Tipps erinnern an das nötige Vorwissen, statt es neu zu erklären.
-${info.types?.length ? `- AUFGABENSTILE – verwende AUSSCHLIESSLICH diese Aufgabenarten (dazu höchstens kurze Merkkästen), und zwar JEDE mindestens einmal, sinnvoll auf die Stufen verteilt:
+${info.types?.length ? `- AUFGABENSTILE – verwende ${appR ? 'neben den App-Aufgaben (Pflicht, siehe unten) nur' : 'AUSSCHLIESSLICH'} diese Aufgabenarten (dazu höchstens kurze Merkkästen), und zwar JEDE mindestens einmal, sinnvoll auf die Stufen verteilt:
 ${EXAM_STYLES.filter(s => s[0] !== 'essay' && s[0] !== 'jpad' && info.types.includes(s[0])).map(s => `  • ${s[1]}: ${s[3]}`).join('\n')}
-` : ''}`
+` : ''}${appR ? `- APP-AUFGABEN SIND PFLICHT: Jede Stufe enthält mindestens eine „### App-Aufgabe“, in der die Schüler in der App links etwas tun; die Challenge lebt von der App. Fragen ohne App nur ergänzend.
+${appR.replace(/\s*$/, '\n')}` : ''}`
     : `- Schreibe im Kopf die Zeile „Art: Lernpfad“.
 - Jede Station: kurzer Einstieg, dann Erklärung des Neuen (mit Beispiel, gern einem Schaubild), dann mindestens eine Übung (Aufgabe, Quiz, Lückentext oder Zuordnen), die das Neue sofort festigt.
 - Von einfach zu schwer; jede Station baut auf der vorigen auf. Eine abschließende Station wiederholt das Wichtigste.
@@ -978,7 +980,8 @@ ${info.jpad ? `- JPAD-LERNUMGEBUNG: Der Lernpfad steht in JPad direkt neben dem 
 - Code, den die Schüler übernehmen sollen (z. B. eine fertige Klasse), als \`\`\`java-Codeblock – er bekommt in JPad den Knopf „In JPad übernehmen“. Reine Anschauungsbeispiele als \`\`\`java ohne-knopf.
 - Ergänze die Programmier-Aufgaben durch Quiz und Lückentexte zum Verständnis (z. B. Was gibt dieses Programm aus?).
 ${javaRules(info.jg)}
-` : ''}${info.appRules ? info.appRules.replace(/\s*$/, '\n') : ''}`;
+` : ''}${appR ? `- APP-AUFGABEN SIND PFLICHT: Jede Station enthält mindestens eine „### App-Aufgabe“, in der die Schüler in der App links etwas tun.
+${appR.replace(/\s*$/, '\n')}` : ''}`;
   // Arbeitsmaterial der Lehrkraft (Arbeitsblätter, Hefteinträge …): direkt angehängt (API) oder für eine externe KI angekündigt
   const mat = info.material || {}, was = sv ? 'die Befragung' : ex ? 'die Prüfung' : ch ? 'die Challenge' : 'der Lernpfad';
   const matTop = mat.extern ? `ZUERST – ARBEITSMATERIAL DER LEHRKRAFT
@@ -1027,5 +1030,5 @@ ${info.ask ? '- Schreibe im Kopf die Zeile „Kopfzeile: <Fach> · <Jahrgangsstu
 - Innerhalb eines ###-Abschnitts (Aufgabe, Quiz, Lückentext, Zuordnen …) keine Bild-Zeilen und keine Infokästen: Sie beenden den Abschnitt. Bilder und Kästen gehören davor oder dahinter (bei Aufgaben stattdessen „Bild: anhang:name“). Normaler Text nach einem Abschnitt steht nach einer Leerzeile.
 - Im Lückentext ist JEDE [[Lücke]] eine Antwort, die Schüler einsetzen müssen – Arbeitsanweisungen ohne Lücken als normalen Text vor den Abschnitt schreiben.
 
-${formatHelp(env, info.art || 'lernpfad')}`;
+${formatHelp({ ...env, appRules: '' }, info.art || 'lernpfad')}`;
 }
