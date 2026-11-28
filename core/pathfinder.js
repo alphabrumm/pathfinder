@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-27a';
+const PF_BUILD = '2026-11-28a';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -453,6 +453,15 @@ export function startPathFinder(opts = {}) {
     if (txt.length > 4000) { delete keep.quiz; txt = JSON.stringify(keep); } // SCORM 1.2 erlaubt höchstens 4096 Zeichen
     LS.set(PROGKEY, txt);
     if (scorm) scorm.report(txt);
+    if (host.onProgress) try { host.onProgress(progSummary(), clone(keep)); } catch (e) { } // eingebettet (Probe, Modul Unterricht): Stand an die Lehrkraft
+  }
+  /** Bearbeitungsstand in Kurzform (für Dashboards): je Station gelöst/gesamt, Tipps, Lösungen; insgesamt Prozent und aktive Zeit */
+  function progSummary() {
+    const st = doc.stations.map(s => { const ch = checksOf(s), n = ch.filter(id => prog.solved[id]).length;
+      return { id: s.id, t: plain(s.title) || 'Station', n, of: ch.length, v: !!prog.visited[s.id], tips: Object.keys(prog.tips).filter(k => s.blocks.some(b => k.startsWith(b.id + ':'))).length, sols: s.blocks.filter(b => prog.sol[b.id]).length }; });
+    const total = st.reduce((a, s) => a + s.of, 0), solved = st.reduce((a, s) => a + s.n, 0);
+    return { pct: total ? Math.round(100 * solved / total) : Math.round(100 * st.filter(s => s.v).length / (st.length || 1)), solved, total, mins: Math.round((prog.active || 0) / 60000),
+      xp: doc.form === 'challenge' ? xpNow() : null, xpMax: doc.form === 'challenge' ? xpMax() : null, st };
   }
 
   const lp = $('#lp'), scroller = $('#scroll');
