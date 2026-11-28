@@ -34,6 +34,16 @@ Steht in der App-Datei:
 | App → Probe | `event` | `name`, `data` (optional) |
 | Probe → App | `flush` | `req` → App antwortet mit `state` und demselben `req` |
 | App → Probe | `error` | `msg` (wird vom Rahmen auch selbst gemeldet) |
+| Probe → App | `task` (v2) | `task {id, title, vorlage, pruefung}` – eine App-Aufgabe wird geöffnet („▶ In der App öffnen“) |
+| App → Probe | `solved` (v2) | `task` – die Prüfung der geöffneten Aufgabe ist erfüllt |
+
+### Vorlagen und Prüfungen (v2)
+
+Apps, deren Aufgaben unterschiedliche Ausgangslagen brauchen (Konstruktionen, Datensätze, Startwerte), beschreiben im Steckbrief
+`vorlagen` (Format der Vorlage), `pruefung` (Format der Prüfung) und je ein Beispiel (`vorlageBeispiel`, `pruefungBeispiel`).
+Die Vorlage steckt in der App-Aufgabe (Textformat: ```` ```vorlage ```` -Block und `Prüfung:`; im Editor auch als Datei, z. B. `.ggb`
+als data:-URL) – sie liegt also im Lernpfad, nicht im Internet. Beispiel: Zellaufbau, Vorlage `pflanzenzelle`,
+Prüfung `zellwand, vakuole, chloroplast`.
 
 ## Sicherheit
 
@@ -41,6 +51,15 @@ Steht in der App-Datei:
 - In die Datei wird eine CSP ohne Netz eingesetzt (`PAPP_CSP`): keine Verbindungen, keine Bilder/Schriften von außen.
 - **Probe-Check** (`checkApp`): Größe (≤ 3 MB), Steckbrief, keine externen Quellen, kein `fetch`/`XMLHttpRequest`/`WebSocket`,
   kein `localStorage`/`indexedDB`, Protokoll vorhanden, Testlauf im versteckten Rahmen (meldet `ready`, keine Fehler).
+
+## Vertrag für eigene Apps
+
+`appBuildPrompt` gibt der bauenden KI den vollständigen Vertrag mit: was die App **nicht darf** (nichts aus dem Internet, keine
+Online-Werkzeuge wie GeoGebra/Desmos – stattdessen selbst bauen oder weglassen und in `regeln` vermerken –, kein Browser-Speicher,
+keine Pop-ups) und was sie **muss** (Protokoll nach festem Gerüst, Stand vollständig wiederherstellbar, readonly, Prüfbares melden,
+iPad-tauglich, Steckbrief) plus eine Selbstprüfung. Der Probe-Check prüft das statisch und im Probelauf (ready, flush, Vorlage-Beispiel,
+Stand schreibgeschützt laden und unverändert zurückbekommen, CSP-Verstöße, Fehler). Bei Fehlern erzeugt `appFixPrompt(res)` einen
+Korrektur-Prompt für dieselbe KI.
 
 ## Eigene App mit KI
 
