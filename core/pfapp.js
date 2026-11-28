@@ -70,17 +70,18 @@ function overlay() {
   addEventListener('message', onMessage);
   OV = el; return el;
 }
-function frameFor(url) {
-  let f = frames.get(url);
+function frameFor(url, mode) {
+  const key = url + (mode ? '#' + mode : '');
+  let f = frames.get(key);
   if (f) return f;
   const ifr = document.createElement('iframe');
-  ifr.src = url + (url.includes('?') ? '&' : '?') + 'pfapp=' + APP_PROTOCOL;
+  ifr.src = url + (url.includes('?') ? '&' : '?') + 'pfapp=' + (mode || APP_PROTOCOL); // mode 'unterricht': Lernmodus (Probe, Modul Unterricht)
   ifr.allow = 'clipboard-read; clipboard-write; fullscreen';
   ifr.title = 'App';
   ifr.hidden = true;
   OV.querySelector('[data-body]').appendChild(ifr);
-  f = { url, origin: new URL(url, location.href).origin, ifr, ready: false, waiters: [], reqs: {} };
-  frames.set(url, f);
+  f = { url, key, origin: new URL(url, location.href).origin, ifr, ready: false, waiters: [], reqs: {} };
+  frames.set(key, f);
   return f;
 }
 function post(f, m) { try { f.ifr.contentWindow.postMessage(m, f.origin); } catch (e) { } }
@@ -108,8 +109,15 @@ function status(st) {
 }
 function sendLoad() {
   if (!cur) return; cur.loaded = true;
-  post(cur.frame, { type: 'pf-app', action: 'load', task: cur.task, title: cur.title, files: cur.files, readonly: !!cur.readonly, ...(cur.info ? { info: cur.info } : {}) });
+  post(cur.frame, { type: 'pf-app', action: 'load', ...(cur.extra || {}), task: cur.task, title: cur.title, files: cur.files, readonly: !!cur.readonly, ...(cur.info ? { info: cur.info } : {}) });
 }
+/** Live-Ansicht (Unterricht): neuen Stand in die offene, schreibgeschützte App schicken, ohne sie neu zu laden */
+export function updateApp(files) {
+  if (!cur?.loaded || !cur.readonly) return;
+  post(cur.frame, { type: 'pf-app', action: 'files', task: cur.task, files: cleanFiles(files) });
+}
+/** Zeile rechts in der Kopfleiste selbst setzen (z. B. „zuletzt geändert …“) */
+export function appStatus(text) { const el = OV?.querySelector('[data-s]'); if (el) el.textContent = text || ''; }
 
 /**
  * App-Fenster öffnen.
@@ -122,8 +130,10 @@ function sendLoad() {
  *   onState   (stand) => …  bei jeder Änderung: { files, sig, at, run? }
  *   onClose   () => …
  *   info      { html } – Aufgabenstellung als HTML-Seite, die die App neben dem Code anzeigt (optional)
+ *   mode      'unterricht' – Lernmodus der App (Probe, Modul Unterricht: mit Lernpfad und Hilfen); sonst Prüfungsmodus
+ *   extra     weitere Felder der load-Meldung (Unterricht: jcode, project, observe)
  */
-export function openApp({ app, url, task, title = '', files = [], readonly = false, onState, onClose, closeLabel, info } = {}) {
+export function openApp({ app, url, task, title = '', files = [], readonly = false, onState, onClose, closeLabel, info, mode, extra } = {}) {
   const d = appDef(app, url ? { [app]: url } : null);
   overlay();
   if (cur) closeApp(true);
@@ -135,17 +145,17 @@ export function openApp({ app, url, task, title = '', files = [], readonly = fal
   const host = document.fullscreenElement || document.webkitFullscreenElement || document.body;
   if (OV.parentElement !== host) host.appendChild(OV);
   OV.hidden = false;
-  if (!d.url) { msg.hidden = false; msg.innerHTML = `<b>${esc(d.n)} ist für Prüfungen noch nicht eingerichtet.</b><span>Bitte gib deiner Lehrkraft Bescheid.</span>`; cur = null; return { close: closeApp }; }
-  const f = frameFor(d.url);
+  if (!d.url) { msg.hidden = false; msg.innerHTML = `<b>${esc(d.n)} ist ${mode ? 'hier' : 'für Prüfungen'} noch nicht eingerichtet.</b><span>Bitte gib deiner Lehrkraft Bescheid.</span>`; cur = null; return { close: closeApp }; }
+  const f = frameFor(d.url, mode);
   frames.forEach(x => { x.ifr.hidden = x !== f; });
-  cur = { task, title, files: cleanFiles(files), readonly, onState, onClose, frame: f, loaded: false, info: info && typeof info.html === 'string' && info.html.length < 4e6 ? { html: info.html } : null };
+  cur = { task, title, files: cleanFiles(files), readonly, onState, onClose, frame: f, loaded: false, extra: extra || null, info: info && typeof info.html === 'string' && info.html.length < 4e6 ? { html: info.html } : null };
   if (f.ready) sendLoad();
   else {
     msg.hidden = false; msg.innerHTML = `<span>${esc(d.n)} wird geladen …</span>`;
     const me = cur, t = setTimeout(() => {
       if (cur !== me || f.ready) return;
-      msg.innerHTML = `<b>${esc(d.n)} antwortet nicht.</b><span>Prüfe die Internetverbindung. Deine bisherigen Antworten sind gespeichert.</span><button data-retry>Nochmal versuchen</button>`;
-      msg.querySelector('[data-retry]').onclick = () => { frames.delete(d.url); f.ifr.remove(); closeApp(true); openApp({ app, url, task, title, files: me.files, readonly, onState, onClose, closeLabel, info }); };
+      msg.innerHTML = `<b>${esc(d.n)} antwortet nicht.</b><span>Prüfe die Internetverbindung. ${mode ? 'Dein bisheriger Stand ist gespeichert.' : 'Deine bisherigen Antworten sind gespeichert.'}</span><button data-retry>Nochmal versuchen</button>`;
+      msg.querySelector('[data-retry]').onclick = () => { frames.delete(f.key); f.ifr.remove(); closeApp(true); openApp({ app, url, task, title, files: me.files, readonly, onState, onClose, closeLabel, info, mode, extra }); };
     }, 25000);
     f.waiters.push(() => { clearTimeout(t); if (cur === me) msg.hidden = true; });
   }

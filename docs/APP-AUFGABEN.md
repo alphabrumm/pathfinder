@@ -33,6 +33,20 @@ Regeln für die App im Prüfungsmodus:
 - Eigenes, verstecktes Arbeitsprojekt; das „aktuelle Projekt“ der App außerhalb der Prüfung bleibt unverändert.
 - `readonly`: Anzeigen und Ausführen erlaubt, aber keine `state`-Meldungen (Lehrkraft bei der Korrektur).
 
+## Unterricht (Probe, Modul Unterricht)
+
+Dieselbe Anbindung dient auch dem Unterricht: `openApp({ …, mode: 'unterricht', extra })` öffnet die App mit `?pfapp=unterricht`
+(Lernmodus: Lernpfad und Hilfen bleiben) in einem eigenen iframe. `extra` wird in die `load`-Meldung übernommen:
+
+| Feld | Bedeutung |
+| --- | --- |
+| `jcode` | JPad lädt das Projekt hinter dem JCode selbst (Startcode, Lernpfad, Sprites) |
+| `project`, `projectKey` | Projektdatei (Format der Online-IDE) statt JCode |
+| `observe` | Live-Ansicht der Lehrkraft: gesperrter Editor, keine `state`-Meldungen |
+
+Mitgeschickte `files` gehen vor dem Startcode. Live-Ansicht: `updateApp(files)` schickt `{ action:'files', task, files }` an die
+offene, schreibgeschützte App, die nur die geänderten Stellen ersetzt; `appStatus(text)` setzt die Zeile rechts in der Kopfleiste.
+
 ## Neue App anbinden (z. B. QPad, FlowPad)
 
 1. **pfapp.js**: Eintrag in `APPS` mit Standardadresse (`url`), Sprache und Name der Startdatei (`main`).
