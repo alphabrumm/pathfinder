@@ -2739,7 +2739,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const p1 = info.p1 ?? 40, p2 = info.p2 ?? 80;
     return {
       art: ['challenge', 'pruefung', 'befragung'].includes(info.art) ? info.art : 'lernpfad',
-      jpad: info.art === 'jpad', // JPad-Lernumgebung (Probe): Lernpfad mit Programmier-Aufgaben, daneben JPad
+      jpad: (info.art || 'lernpfad') === 'lernpfad' && info.fsel === 'Informatik' && info.proj === 'java', // Java-Projekt (Probe): Lernpfad mit Programmier-Aufgaben, daneben JPad
       mix: [p1, p2 - p1, 100 - p2],
       thema: (info.thema || '').trim() || (lb ? lb.t : ''),
       fach, klasse: jg ? `Gymnasium in Bayern, Jahrgangsstufe ${jg}` : '',
@@ -2766,7 +2766,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       [EX1 ? 'Klasse & Thema' : 'Art, Klasse & Thema', EX1 ? 'Für welche Klasse und welches Thema? Wähle Jahrgangsstufe, Fach und Lernbereich – oder beschreibe ein eigenes Thema.' : 'Was soll entstehen und für wen? Wähle die Art, Jahrgangsstufe, Fach und Lernbereich – oder beschreibe ein eigenes Thema.',
         [lab('[data-k="art"]'), q('#kiBasis'), up(q('[data-k="jg"]'), '.row'), q('#kiFrei'), lab('#kiLb'), q('#kiLpHint'), q('#kiInh'), lab('[data-k="thema"]'), up(q('[data-k="min"]'), '.row')]],
       ['Aufgaben', EX1 ? 'Wie anspruchsvoll, welche Aufgaben? Lege den Anteil der Anforderungsbereiche fest und wähle die Aufgabenstile.' : 'Wie anspruchsvoll, welche Aufgaben? Lege den Anteil der Schwierigkeitsstufen fest und wähle die Aufgabenstile.',
-        [q('#kiMix'), q('#kiTypes'), Object.assign(document.createElement('p'), { className: 'ed-hint', id: 'kiWizNo2', textContent: 'Bei einem Lernpfad wählt die KI Erklärungen, Beispiele und Übungen passend zum Thema – hier gibt es nichts einzustellen. Weiter mit Schritt 3.' })]],
+        [q('#kiProj'), q('#kiMix'), q('#kiTypes'), Object.assign(document.createElement('p'), { className: 'ed-hint', id: 'kiWizNo2', textContent: 'Bei einem Lernpfad wählt die KI Erklärungen, Beispiele und Übungen passend zum Thema – hier gibt es nichts einzustellen. Weiter mit Schritt 3.' })]],
       ['Hinweise & Prompt', 'Was soll die KI noch wissen? Ergänze Hinweise und Material. Dann den Prompt erstellen – er wird kopiert – und in deiner KI (z. B. ByLKI oder Claude) einfügen und abschicken.' + (EX1 ? '' : ' Mit hinterlegtem API-Key geht es auch direkt.'),
         [lab('[data-k="extra"]'), q('#kiMat'), up(q('[data-copy="prompt"]'), '.ki-btns'), q('#kiDirRow'), q('#kiLive')]],
       ['Antwort einfügen', 'Füge hier die komplette Antwort der KI ein – oder lade ihre Datei. Fehler im Format zeigt PathFinder sofort an.',
@@ -2789,7 +2789,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     });
     const man = q('#kiManual'); if (man) man.hidden = true; // leer: alles ist jetzt auf den Seiten
     const go = n => {
-      const no2 = q('#kiWizNo2'); if (no2) { no2.hidden = !q('#kiMix').hidden || !q('#kiTypes').hidden; pages[1].querySelector('.ki-wintro').hidden = !no2.hidden; } // Lernpfad: Schritt 2 leer
+      const no2 = q('#kiWizNo2'), pj = q('#kiProj'); if (no2) { const vis = !q('#kiMix').hidden || !q('#kiTypes').hidden; no2.hidden = vis || (!!pj && !pj.hidden); pages[1].querySelector('.ki-wintro').hidden = !vis; } // Lernpfad: Schritt 2 leer (bei Informatik: Umsetzung als Java-Projekt …)
       pages.forEach(p => { p.hidden = +p.dataset.wpage !== n; });
       $$('.ki-wstep', bar).forEach(b => { const k = +b.dataset.wgo; b.classList.toggle('on', k === n); b.classList.toggle('done', k < n); });
       el.scrollTop = 0; if (n === 4) setTimeout(() => q('#kiIn')?.focus(), 50);
@@ -2900,7 +2900,9 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     if (pre.art) info.art = pre.art;
     if (info.art === 'befragung') info.art = 'lernpfad'; // Befragungen: eigener Dialog „Umfrage erstellen“
     const JP = !!opts.jpad?.create; // Host bietet die JPad-Lernumgebung an (Probe, Modul Unterricht) – nur für Informatik
-    if (info.art === 'jpad' ? !JP : !formOk(info.art || 'lernpfad')) info.art = FORMS_OK.find(f => f !== 'befragung') || 'lernpfad';
+    if (info.art === 'jpad') { info.art = 'lernpfad'; info.proj = 'java'; } // ältere Angabe
+    if (!formOk(info.art || 'lernpfad')) info.art = FORMS_OK.find(f => f !== 'befragung') || 'lernpfad';
+    const asJava = () => JP && (info.art || 'lernpfad') === 'lernpfad' && info.fsel === 'Informatik' && info.proj === 'java';
     if (pre.fach) {
       const f = String(pre.fach).trim(), hit = L.FAECHER.find(x => x.toLowerCase() === f.toLowerCase()) || '*';
       if (hit !== info.fsel || (hit === '*' && info.ffrei !== f)) { info.lb = ''; info.inh = []; }
@@ -2925,13 +2927,17 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       <div class="ed-form">
         <div class="ki-api" id="kiApi"></div>
         <div class="ki-step"><span class="n">1</span><b>Beschreibung</b></div>
-        <label>Art des Pfades<select data-k="art">${JP ? `<option value="jpad"${info.art === 'jpad' ? ' selected' : ''}${info.fsel === 'Informatik' ? '' : ' hidden disabled'}>☕ JPad-Lernumgebung – Java-Projekt mit Lernpfad</option>` : ''}${formOk('lernpfad') ? opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad') : ''}${formOk('challenge') ? opt('challenge', 'Challenge – Übungsaufgaben', info.art) : ''}${formOk('pruefung') ? opt('pruefung', 'Digitale Prüfung – mit Punkten, ohne Rückmeldung', info.art) : ''}</select></label>
+        <label>Art des Pfades<select data-k="art">${formOk('lernpfad') ? opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad') : ''}${formOk('challenge') ? opt('challenge', 'Challenge – Übungsaufgaben', info.art) : ''}${formOk('pruefung') ? opt('pruefung', 'Digitale Prüfung – mit Punkten, ohne Rückmeldung', info.art) : ''}</select></label>
         <div id="kiBasis"></div>
         <div id="kiMix" hidden>
           <label>Anteil der Aufgaben</label>
           <div class="ex-tri"><div class="ex-bar" id="kiBar"></div><input type="range" id="kiP1" min="0" max="100" step="5" value="${info.p1 ?? 40}" aria-label="Grenze Grundlagen / Fortgeschritten"><input type="range" id="kiP2" min="0" max="100" step="5" value="${info.p2 ?? 80}" aria-label="Grenze Fortgeschritten / Experte"></div>
           <div class="ex-lv" id="kiLv"></div>
         </div>
+        ${JP ? `<div id="kiProj" hidden><label>Umsetzung <span class="help">(Informatik)</span></label>
+          <label class="chk"><input type="checkbox" data-kproj="java"${info.proj === 'java' ? ' checked' : ''}>Als Java-Projekt realisieren <span class="help">– Lernpfad und Code nebeneinander in JPad, mit Programmier-Aufgaben</span></label>
+          <label class="chk"><input type="checkbox" data-kproj="sql"${info.proj === 'sql' ? ' checked' : ''}>Als SQL-Projekt realisieren <span class="help">– in Vorbereitung</span></label>
+          <label class="chk"><input type="checkbox" data-kproj="tabelle"${info.proj === 'tabelle' ? ' checked' : ''}>Als Tabellen-Projekt realisieren <span class="help">– in Vorbereitung</span></label></div>` : ''}
         <div id="kiTypes" hidden><label>Aufgabenstile</label><div class="ex-types">${T.EXAM_STYLES.map(([k, n, h]) => `<label class="chk"${k === 'essay' || k === 'hand' || k === 'jpad' ? ' data-exonly="1"' : ''}><input type="checkbox" data-kty="${k}"${(info.types || T.EXAM_STYLES_DEFAULT).includes(k) ? ' checked' : ''}>${esc(n)} <span class="help">– ${esc(h)}</span></label>`).join('')}</div><span class="help">Die KI nimmt jede angekreuzte Art mindestens einmal auf – und keine anderen.</span></div>
         <div class="row"><label>Jahrgangsstufe<select data-k="jg">${opt('', '– wählen –', info.jg || '')}${[5, 6, 7, 8, 9, 10, 11, 12, 13].map(j => opt(j, j + '. Jahrgangsstufe', info.jg)).join('')}</select></label>
           <label>Fach<select data-k="fsel">${opt('', '– wählen –', info.fsel || '')}${L.FAECHER.map(f => opt(f, f, info.fsel)).join('')}${opt('*', 'anderes Fach …', info.fsel)}</select></label></div>
@@ -3007,6 +3013,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const drawBasis = () => { $('#kiBasis', el).innerHTML = kiBasis ? `<div class="ed-hint">📘 Grundlage: Lernpfad „${esc(kiBasis.title)}“ – die KI schreibt neue Prüfungsaufgaben zu genau diesen Inhalten. <button class="lp-btn alt" data-nobasis="1">✕ ohne Grundlage</button></div>` : ''; };
     drawBasis();
     const drawMix = () => {
+      const pj = $('#kiProj', el); if (pj) pj.hidden = !(JP && (info.art || 'lernpfad') === 'lernpfad' && info.fsel === 'Informatik');
       $('#kiTypes', el).hidden = info.art !== 'pruefung' && info.art !== 'challenge';
       $$('[data-exonly]', el).forEach(x => { x.hidden = info.art !== 'pruefung'; }); // Freitext gibt es nur in Prüfungen
       const ch = info.art === 'challenge' || info.art === 'pruefung'; $('#kiMix', el).hidden = !ch; if (!ch) return;
@@ -3060,16 +3067,13 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (k) {
         info[k] = t.value;
         if (k === 'jg' || k === 'fsel') { info.lb = ''; info.inh = []; drawLb(); }
-        if (k === 'fsel' && JP) { // JPad-Lernumgebung nur für Informatik – dann ganz oben in der Auswahl
-          const o = $('[data-k="art"] option[value="jpad"]', el), inf = info.fsel === 'Informatik'; if (o) { o.hidden = !inf; o.disabled = !inf; }
-          if (!inf && info.art === 'jpad') { info.art = 'lernpfad'; $('[data-k="art"]', el).value = 'lernpfad'; drawMix(); drawMat(); }
-          if (inf && o && info.art === 'lernpfad') { info.art = 'jpad'; $('[data-k="art"]', el).value = 'jpad'; }
-        }
+        if (k === 'fsel') drawMix(); // „Als Java-Projekt realisieren“ nur bei Informatik
         if (k === 'lb') { info.inh = []; drawInh(); }
         if (k === 'art') { drawMix(); drawMat(); }
         save();
       }
       if (t.dataset.kmat != null) { info.matExt = t.checked; save(); }
+      if (t.dataset.kproj) { info.proj = t.checked ? t.dataset.kproj : ''; $$('[data-kproj]', el).forEach(x => { if (x !== t) x.checked = false; }); save(); } // höchstens eine Umsetzung
       if (t.dataset.kty != null) { info.types = $$('[data-kty]', el).filter(x => x.checked).map(x => x.dataset.kty); save(); }
       if (t.id === 'kiP1' || t.id === 'kiP2') {
         let p1 = +$('#kiP1', el).value, p2 = +$('#kiP2', el).value;
@@ -3114,12 +3118,12 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (t.dataset.copy === 'show') { const pre = document.createElement('pre'); pre.className = 'ki-fmt'; pre.textContent = T.formatHelp(env); t.closest('.ki-btns').after(pre); t.remove(); }
       if (t.id === 'kiOpen' && parsed && !parsed.errors.length) {
         const d = parsed.doc, pi = kiPromptInfo(info, L); if (!plain(d.kicker || '').trim()) d.kicker = esc(pi.kopf);
-        if (info.art === 'jpad' && JP) { d.form = 'lernpfad'; delete d.exam; }
+        const java = asJava(); if (java) { d.form = 'lernpfad'; delete d.exam; }
         if (d.form !== 'pruefung' && d.form !== 'befragung' && (pi.fach || info.jg)) { // Einordnung aus dem KI-Dialog übernehmen
           const lb = L.lernbereiche(info.fsel, +info.jg || 0).find(x => x.id === info.lb);
           d.meta = { ...(pi.fach ? { fach: pi.fach } : {}), ...(info.jg ? { jg: +info.jg } : {}), ...(lb ? { lb: lb.id, lbt: (lb.nr !== '–' ? lb.nr + ' ' : '') + lb.t } : {}) };
         }
-        if (info.art === 'jpad' && JP) { closeDlg(false); opts.jpad.create(d); return; } // weiter in JPad (Code und Lernpfad nebeneinander)
+        if (java) { closeDlg(false); opts.jpad.create(d); return; } // Java-Projekt: weiter in JPad (Code und Lernpfad nebeneinander)
         closeDlg(false); openDoc(d); toast(`„${esc(d.title)}“ angelegt – jetzt kannst du alles im Editor anpassen.`);
       }
     });
@@ -3440,8 +3444,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         <div class="ex-lplist">${opts.vorlagen.map((v, i) => `<div class="ex-lp"><button data-vor="${i}"><b>📋 ${esc(v.title)}</b><span>${esc(v.sub || '')}</span></button></div>`).join('')}</div></div>`; return; }
       if (view === 'start' && LPM) { el.innerHTML = `<header><b>📘 Neuer Lernpfad</b><button data-x="1">Abbrechen</button></header><div class="ed-form"><span class="help">Womit möchtest du beginnen? Danach kannst du alles bearbeiten und Stationen ergänzen.</span>
         <div class="ex-choices">
-          <button data-v="ki"><span class="ic">${KI_ICON}</span><span class="tx"><b>Mit KI erstellen</b><span>Jahrgangsstufe, Fach und Lernbereich wählen – die KI schreibt den ganzen Lernpfad.${opts.jpad?.create ? ' Bei Informatik auch als JPad-Lernumgebung.' : ''}</span></span></button>
-          ${opts.jpad?.create ? `<button data-v="jnew"><span class="ic">☕</span><span class="tx"><b>JPad-Lernumgebung</b><span>Java-Projekt mit Lernpfad: Code und Lernpfad nebeneinander in JPad, mit Programmier-Aufgaben, die JPad nach jedem Programmlauf prüft.</span></span></button>` : ''}
+          <button data-v="ki"><span class="ic">${KI_ICON}</span><span class="tx"><b>Mit KI erstellen</b><span>Jahrgangsstufe, Fach und Lernbereich wählen – die KI schreibt den ganzen Lernpfad.</span></span></button>
           <button data-v="new"><span class="ic">＋</span><span class="tx"><b>Leerer Lernpfad</b><span>Stationen und Bausteine selbst zusammenstellen.</span></span></button>
           <button data-v="load"><span class="ic">⤒</span><span class="tx"><b>Fertigen Lernpfad laden</b><span>Einen Lernpfad im PathFinder-Textformat einfügen oder als Datei öffnen – z. B. von einer anderen KI erstellt. <span class="ex-plink" data-v="prompt" role="link" tabindex="0">Prompt für externe KI anzeigen ›</span></span></span></button>
         </div></div>`; return; }
@@ -3517,7 +3520,6 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (t.dataset.pcopy) { const T = await loadText(); toast(await copyText(promptText(T)) ? '📋 Prompt kopiert – jetzt im KI-Chat einfügen' : 'Kopieren ging nicht'); return; }
       if (t.id === 'exOpen' && parsed && !parsed.errors.length) { const d = asSurvey(parsed.doc); if (!plain(d.kicker || '').trim() && opts.ki?.kopf) d.kicker = esc(opts.ki.kopf); closeDlg(false); fitForm(d); if (!LPM && d.form !== F) convertNext = true; openDoc(d); toast(SV ? `„${esc(plain(d.title))}“ geladen – prüfe die Fragen im Editor.` : LPM ? `„${esc(plain(d.title))}“ geladen – prüfe ihn im Editor.` : `„${esc(plain(d.title))}“ geladen – prüfe Aufgaben und Punkte im Editor.`); return; }
       if (t.dataset.v === 'new') { closeDlg(false); const d = emptyDoc(F); if (opts.ki?.kopf) d.kicker = opts.ki.kopf; openDoc(d); toast(SV ? 'Leere Befragung angelegt – Titel antippen, Fragen über ＋ einfügen' : LPM ? 'Leerer Lernpfad angelegt – Titel antippen, Bausteine über ＋ einfügen' : 'Leere Prüfung angelegt – Titel antippen, Aufgaben über ＋ einfügen'); return; }
-      if (t.dataset.v === 'jnew' && opts.jpad?.create) { closeDlg(false); const d = emptyDoc('lernpfad'); if (opts.ki?.kopf) d.kicker = opts.ki.kopf; opts.jpad.create(d); return; }
       if (t.dataset.v === 'ki') { closeDlg(false); openKI({ art: F }); return; }
       if (t.dataset.pick) { sel = sel === t.dataset.pick ? null : t.dataset.pick; draw(); return; }
       if (t.dataset.take) { const d = load(t.dataset.take); if (!d) { toast('Lernpfad nicht gefunden'); return; } closeDlg(false); convertNext = true; openDoc(d); return; }
