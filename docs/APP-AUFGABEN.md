@@ -46,6 +46,8 @@ Dieselbe Anbindung dient auch dem Unterricht: `openApp({ …, mode: 'unterricht'
 
 Mitgeschickte `files` gehen vor dem Startcode. Live-Ansicht: `updateApp(files)` schickt `{ action:'files', task, files }` an die
 offene, schreibgeschützte App, die nur die geänderten Stellen ersetzt; `appStatus(text)` setzt die Zeile rechts in der Kopfleiste.
+Bearbeiten und Kommentieren: `setAppReadonly(on, text)` (→ `readonly`), `appComments(list)` (→ `comments`), `appCursor()` (→ `cursor`,
+liefert Datei, Zeile und Zeilentext), `appBar()` für eigene Knöpfe in der Kopfleiste.
 
 ## Neue App anbinden (z. B. QPad, FlowPad)
 

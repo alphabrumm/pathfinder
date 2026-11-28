@@ -93,6 +93,7 @@ function onMessage(e) {
     if (cur?.frame === f && !cur.loaded) sendLoad();
     return;
   }
+  if (m.action === 'cursor') { if (m.req && f.reqs[m.req]) { const w = f.reqs[m.req]; delete f.reqs[m.req]; w(m); } return; }
   if (m.action === 'state') {
     if (m.req && f.reqs[m.req]) { const w = f.reqs[m.req]; delete f.reqs[m.req]; w(m); }
     if (!cur || cur.frame !== f || m.task !== cur.task || cur.readonly) return;
@@ -116,6 +117,21 @@ export function updateApp(files) {
   if (!cur?.loaded || !cur.readonly) return;
   post(cur.frame, { type: 'pf-app', action: 'files', task: cur.task, files: cleanFiles(files) });
 }
+/** Unterricht: schreibgeschützt umschalten (Lehrkraft übernimmt bzw. gibt zurück); text = Hinweis in der App */
+export function setAppReadonly(on, text = '') {
+  if (!cur) return; cur.readonly = !!on;
+  if (cur.loaded) post(cur.frame, { type: 'pf-app', action: 'readonly', task: cur.task, on: !!on, text });
+}
+/** Unterricht: Kommentare der Lehrkraft [{ id, file, line, text, snip }] */
+export function appComments(list) { if (cur?.loaded) post(cur.frame, { type: 'pf-app', action: 'comments', task: cur.task, list: list || [] }); }
+/** Unterricht: Datei, Zeile und Zeilentext an der Cursorposition der App */
+export function appCursor(ms = 1500) {
+  if (!cur?.frame?.ready) return Promise.resolve(null);
+  const f = cur.frame, req = 'c' + Math.random().toString(36).slice(2);
+  return new Promise(ok => { const t = setTimeout(() => { delete f.reqs[req]; ok(null); }, ms); f.reqs[req] = m => { clearTimeout(t); ok(m); }; post(f, { type: 'pf-app', action: 'cursor', req, task: cur.task }); });
+}
+/** Kopfleiste des App-Fensters (z. B. für eigene Knöpfe) */
+export const appBar = () => OV?.querySelector('.pfapp-bar') || null;
 /** Zeile rechts in der Kopfleiste selbst setzen (z. B. „zuletzt geändert …“) */
 export function appStatus(text) { const el = OV?.querySelector('[data-s]'); if (el) el.textContent = text || ''; }
 
