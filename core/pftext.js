@@ -921,7 +921,7 @@ diagramm: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 160">
   …  (SVG darf über mehrere Zeilen gehen, endet mit </svg>)
 </svg>
 foto: data:image/png;base64,iVBORw0KGgo…
-${extra.length ? '\nZUSÄTZLICH IN DIESER APP:\n' + extra.join('\n\n') + '\n' : ''}`;
+${extra.length ? '\nZUSÄTZLICH IN DIESER APP:\n' + extra.join('\n\n') + '\n' : ''}${env.appRules ? '\n' + env.appRules.replace(/\s*$/, '\n') : ''}`;
 }
 export function promptFor(info, env) {
   const f = (k, d) => (info[k] || '').trim() || d;
