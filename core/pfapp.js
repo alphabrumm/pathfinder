@@ -52,6 +52,9 @@ const CSS = `
 .pfapp-body iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
 .pfapp-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:24px;text-align:center;background:var(--bg,#fff);font:16px/1.4 -apple-system,system-ui,sans-serif}
 .pfapp-msg[hidden]{display:none}
+.pfapp-ov.pf-compact .pfapp-bar{gap:8px;padding:2px 8px;padding-top:max(2px,env(safe-area-inset-top));font:600 13px/1.2 -apple-system,system-ui,sans-serif;min-height:26px}
+.pfapp-ov.pf-compact .pfapp-bar .s{font-size:11.5px}
+.pfapp-ov.pf-compact .pfapp-bar button{font:600 12.5px -apple-system,system-ui,sans-serif;padding:3px 10px;min-height:22px;border-radius:7px}
 .pfapp-msg button{font:600 15px -apple-system,system-ui,sans-serif;border:0;border-radius:10px;padding:10px 16px;background:var(--a1,#3157f5);color:#fff}
 `;
 
@@ -158,6 +161,7 @@ export function openApp({ app, url, task, title = '', files = [], readonly = fal
   const msg = OV.querySelector('[data-msg]');
   OV.querySelector('[data-t]').textContent = `${d.ic} ${d.n}${title ? ' · ' + title : ''}`;
   OV.querySelector('[data-close]').textContent = closeLabel || (readonly ? 'Schließen' : '✓ Fertig – zurück zur Prüfung');
+  OV.classList.toggle('pf-compact', !!mode); // Unterricht: flache Kopfleiste – mehr Platz für die App
   status(null);
   // im Vollbild muss das Fenster im Vollbild-Element liegen, sonst ist es unsichtbar
   const host = document.fullscreenElement || document.webkitFullscreenElement || document.body;
