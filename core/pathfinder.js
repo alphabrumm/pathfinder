@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-28b';
+const PF_BUILD = '2026-11-28c';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -2126,6 +2126,7 @@ export function startPathFinder(opts = {}) {
   function skinDesignUI(el, live) {
     el.innerHTML = `${live ? '<div class="pf-ptitle">Allgemein</div>' : '<header><b>Allgemein</b><button class="ok" data-x="ok">Fertig</button></header>'}<div class="ed-form">
       <span class="help">Dieser Lernpfad behält sein <b>Originaldesign</b>: Farben, Schriften, Bilder und Animationen kommen aus der ursprünglichen Seite. Kopfzeile, Titel, Untertitel, Lernziele, Stationen und Bausteine bearbeitest du direkt im Lernpfad. <b>▶ Vorschau</b> zeigt ihn genau so, wie ihn Schüler sehen.</span>
+      ${metaUI()}
       <label>Für Fortgeschrittene</label>
       <div class="ki-btns" style="flex-direction:column;align-items:stretch">
         <button class="lp-btn alt" data-sked="before">Kopfbereich (HTML)</button>
@@ -2134,6 +2135,7 @@ export function startPathFinder(opts = {}) {
       </div>
       <span class="help">Eingebettete Bilder stehen dort als [[bild1]], [[bild2]] … und bleiben erhalten. Die Platzhalter {{pf:title}}, {{pf:kicker}} … nicht löschen.</span>
     </div>`;
+    el.onchange = e => { if (/^meta/.test(e.target.id)) { if (metaSet(e.target.id, e.target.value)) skinDesignUI(el, live); if (live) softCommit(); else commit(); } };
     el.onclick = e => {
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.x) { closeDlg(true); return; }
@@ -2149,6 +2151,30 @@ export function startPathFinder(opts = {}) {
     };
   }
   const paletteDiv = d => { const c = (PALETTES[d.pal] || PALETTES[0]).l.a3 || '#f6bf3a'; return /^#[0-9a-f]{6}$/i.test(c) ? c : '#f6bf3a'; };
+  /* ---------- Einordnung (Metadaten, im Lernpfad gespeichert, nicht angezeigt): Fach, Jahrgangsstufe, Lernbereich im LehrplanPLUS ---------- */
+  let LPL = null, LPLwait = false;
+  function metaUI() {
+    if (SURVEYF() || EXAMF()) return '';
+    if (!LPL && !LPLwait) { LPLwait = true; loadLp().then(m => { LPL = m; if (panelOpen && panelWhat === 'design') drawPanel(); else if (dlg) $('#metaFach')?.dispatchEvent(new Event('pf-meta')); }).catch(() => { }); }
+    const m = doc.meta || {}, lbs = LPL && m.fach && m.jg ? LPL.lernbereiche(m.fach, +m.jg) : [];
+    return `<fieldset><legend>Einordnung</legend>
+      <div class="row"><label>Fach<input type="text" id="metaFach" list="metaFaecher" value="${esc(m.fach || '')}" placeholder="z. B. Physik" autocomplete="off"></label>
+      <label>Jahrgangsstufe<select id="metaJg"><option value="">–</option>${[5, 6, 7, 8, 9, 10, 11, 12, 13].map(j => `<option value="${j}"${+m.jg === j ? ' selected' : ''}>${j}</option>`).join('')}</select></label></div>
+      <datalist id="metaFaecher">${(LPL?.FAECHER || []).map(f => `<option value="${esc(f)}">`).join('')}</datalist>
+      ${lbs.length ? `<label>Lernbereich im LehrplanPLUS<select id="metaLb"><option value="">– keiner –</option>${lbs.map(x => `<option value="${esc(x.id)}"${m.lb === x.id ? ' selected' : ''}>${esc((x.nr !== '–' ? x.nr + ' ' : '') + x.t)}</option>`).join('')}</select></label>`
+        : m.lbt ? `<span class="help">Lernbereich: ${esc(m.lbt)}</span>` : m.fach && m.jg ? '<span class="help">Für dieses Fach und diese Jahrgangsstufe ist kein Lehrplan hinterlegt.</span>' : ''}
+      <span class="help">Wird im Lernpfad gespeichert, aber nicht angezeigt – z. B. damit Probe deine Lernpfade nach Fach und Jahrgangsstufe ordnet. Der KI-Dialog trägt die Angaben selbst ein.</span></fieldset>`;
+  }
+  /** Einordnung ändern; true, wenn die Auswahl der Lernbereiche neu gezeichnet werden muss */
+  function metaSet(id, v) {
+    const m = { ...(doc.meta || {}) };
+    if (id === 'metaFach') m.fach = v.trim(); else if (id === 'metaJg') m.jg = v ? +v : ''; else if (id === 'metaLb') { m.lb = v; const x = v && LPL ? LPL.lernbereiche(m.fach, +m.jg).find(y => y.id === v) : null; m.lbt = x ? (x.nr !== '–' ? x.nr + ' ' : '') + x.t : ''; }
+    else return false;
+    if (id !== 'metaLb' && m.lb && !m.lb.startsWith(`${m.fach}|${m.jg}|`)) { delete m.lb; delete m.lbt; } // Lernbereich passt nicht mehr
+    for (const k of Object.keys(m)) if (m[k] === '' || m[k] == null) delete m[k];
+    if (Object.keys(m).length) doc.meta = m; else delete doc.meta;
+    return id !== 'metaLb';
+  }
   function designUI(el, live) {    if (doc.skin) { skinDesignUI(el, live); return; }
     const seg = (k, o, cur) => `<span class="ed-dseg" data-seg="${k}">${o.map(([v, n]) => `<button data-v="${v}" aria-pressed="${v === cur}">${n}</button>`).join('')}</span>`;
     const sel = (k, cur) => `<select data-anim-k="${k}">${ANIM_OPTS.map(([v, n]) => `<option value="${v}"${(cur || '') === v ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
@@ -2162,6 +2188,7 @@ export function startPathFinder(opts = {}) {
         ${NOLEARN() ? '' : `<label class="chk"><input type="checkbox" id="ptsIn"${doc.pointsOn ? ' checked' : ''}>Punkte für Aufgaben vergeben</label><span class="help">Die Punkte stehen links neben jeder Aufgabe, lassen sich dort anpassen und zählen im SCORM-Lernpaket.</span>`}
         <label class="chk"><input type="checkbox" id="pagesIn"${doc.pages === 'stationen' ? ' checked' : ''}>Stationen auf eigene Seiten</label><span class="help">Schüler sehen jede Station auf einer eigenen Seite und blättern mit „Weiter“ und „Zurück“. Weitere Seitenumbrüche: Baustein „Nächste Seite“ (＋ unter einem Baustein).</span>
         </fieldset>
+        ${metaUI()}
         <fieldset><legend>Aussehen</legend>
         <label>Farbpalette <span class="help">${d.theme === 'lumi' ? 'Lumi · immer hell' : d.theme === 'grid' ? 'Hack · immer dunkel' : esc(PALETTES[d.pal].n) + ' · ' + (scheme() === 'dunkel' ? 'dunkler' : 'heller') + ' Modus'}</span></label><div class="ed-sw">${PALETTES.map((p, i) => { const c = scheme() === 'dunkel' ? p.d || p.l : p.l, on = d.theme !== 'grid' && i === d.pal; return PAL_ICONS[p.fx] ? `<button class="ic" data-pal="${i}" title="${esc(p.n)}" aria-pressed="${on}">${PAL_ICONS[p.fx]}</button>` : `<button data-pal="${i}" title="${esc(p.n)}" aria-pressed="${on}" style="background:${c.bg}"><span style="background:${c.a1}"></span><span style="background:${c.a2}"></span><span style="background:${c.a3}"></span></button>`; }).join('')}<button class="ic" data-hack="1" title="Hack (immer dunkel)" aria-pressed="${d.theme === 'grid'}">${PAL_ICONS.hack}</button><button class="ic lumi" data-lumi="1" title="Lumi (Eule, Nachthimmel, Papier – immer hell)" aria-pressed="${d.theme === 'lumi'}"><img src="${LUMI_OWL}" alt="Lumi" style="image-rendering:pixelated;width:100%;height:100%;background:#221e44;border-radius:4px"></button></div>
 ${d.theme === 'lumi' ? `<span class="help">„Lumi“: Nachthimmel mit Pixel-Sternen, Inhalt auf einem Papierblatt, als Kopfbild die animierte Eule Lumi (eigenes Bild unter Kopf möglich). Standard für Befragungen.</span>` : d.theme === 'grid' ? `<span class="help">„Hack“: immer dunkel, Raster-Kopf mit grünem Pixel-Totenkopf (eigenes Bild unter Kopf möglich), Aufgaben mit farbiger Kante und Schild (#1 · FORMEL).</span>` : `
@@ -2212,7 +2239,10 @@ ${d.theme === 'lumi' ? `<span class="help">„Lumi“: Nachthimmel mit Pixel-Ste
       if (t.id === 'patO') { doc.design.patOpacity = +t.value; applyDesign(); }
       if (live) softCommit();
     });
-    el.addEventListener('change', async e => { if (e.target.id === 'heroFile' && e.target.files[0]) { doc.design.heroImg = await loadImage(e.target.files[0]); draw(); render(); if (live) softCommit(); } });
+    el.addEventListener('change', async e => {
+      if (e.target.id === 'heroFile' && e.target.files[0]) { doc.design.heroImg = await loadImage(e.target.files[0]); draw(); render(); if (live) softCommit(); }
+      if (/^meta/.test(e.target.id)) { if (metaSet(e.target.id, e.target.value)) draw(); if (live) softCommit(); else commit(); }
+    });
   }
 
   /* ---------- Seitenleiste rechts (wie am iPad): Design und Einstellungen des gewählten Bausteins ---------- */
@@ -3076,7 +3106,12 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (t.dataset.copy === 'doc') toast(await copyText('Überarbeite diesen Lernpfad. Behalte das Format genau bei und antworte nur mit dem vollständigen Lernpfad in einem Codeblock. Verweise wie anhang:bild1 ohne Eintrag im Anhang einfach stehen lassen.\n\n' + T.formatHelp(env) + '\nLERNPFAD:\n' + T.docToText(doc, env)) ? `📋 ${W.a} als Text kopiert (mit Formatbeschreibung)` : 'Kopieren ging nicht');
       if (t.dataset.copy === 'show') { const pre = document.createElement('pre'); pre.className = 'ki-fmt'; pre.textContent = T.formatHelp(env); t.closest('.ki-btns').after(pre); t.remove(); }
       if (t.id === 'kiOpen' && parsed && !parsed.errors.length) {
-        const d = parsed.doc; if (!plain(d.kicker || '').trim()) d.kicker = esc(kiPromptInfo(info, L).kopf); closeDlg(false); openDoc(d); toast(`„${esc(d.title)}“ angelegt – jetzt kannst du alles im Editor anpassen.`);
+        const d = parsed.doc, pi = kiPromptInfo(info, L); if (!plain(d.kicker || '').trim()) d.kicker = esc(pi.kopf);
+        if (d.form !== 'pruefung' && d.form !== 'befragung' && (pi.fach || info.jg)) { // Einordnung aus dem KI-Dialog übernehmen
+          const lb = L.lernbereiche(info.fsel, +info.jg || 0).find(x => x.id === info.lb);
+          d.meta = { ...(pi.fach ? { fach: pi.fach } : {}), ...(info.jg ? { jg: +info.jg } : {}), ...(lb ? { lb: lb.id, lbt: (lb.nr !== '–' ? lb.nr + ' ' : '') + lb.t } : {}) };
+        }
+        closeDlg(false); openDoc(d); toast(`„${esc(d.title)}“ angelegt – jetzt kannst du alles im Editor anpassen.`);
       }
     });
     refreshApi();
