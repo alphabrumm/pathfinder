@@ -978,7 +978,7 @@ ${info.jpad ? `- JPAD-LERNUMGEBUNG: Der Lernpfad steht in JPad direkt neben dem 
 - Code, den die Schüler übernehmen sollen (z. B. eine fertige Klasse), als \`\`\`java-Codeblock – er bekommt in JPad den Knopf „In JPad übernehmen“. Reine Anschauungsbeispiele als \`\`\`java ohne-knopf.
 - Ergänze die Programmier-Aufgaben durch Quiz und Lückentexte zum Verständnis (z. B. Was gibt dieses Programm aus?).
 ${javaRules(info.jg)}
-` : ''}`;
+` : ''}${info.appRules ? info.appRules.replace(/\s*$/, '\n') : ''}`;
   // Arbeitsmaterial der Lehrkraft (Arbeitsblätter, Hefteinträge …): direkt angehängt (API) oder für eine externe KI angekündigt
   const mat = info.material || {}, was = sv ? 'die Befragung' : ex ? 'die Prüfung' : ch ? 'die Challenge' : 'der Lernpfad';
   const matTop = mat.extern ? `ZUERST – ARBEITSMATERIAL DER LEHRKRAFT
