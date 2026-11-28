@@ -2955,7 +2955,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
           <div class="ex-tri"><div class="ex-bar" id="kiBar"></div><input type="range" id="kiP1" min="0" max="100" step="5" value="${info.p1 ?? 40}" aria-label="Grenze Grundlagen / Fortgeschritten"><input type="range" id="kiP2" min="0" max="100" step="5" value="${info.p2 ?? 80}" aria-label="Grenze Fortgeschritten / Experte"></div>
           <div class="ex-lv" id="kiLv"></div>
         </div>
-        ${JP ? '<div id="kiProj" hidden></div>' : ''}${opts.kiApp ? `<p class="ed-hint" id="kiAppFix">🧩 Dieser Lernpfad gehört zur App <b>${esc(opts.kiApp.name || 'App')}</b> (links). Die KI kennt ihre Ereignisse und baut App-Aufgaben, die die App prüft.</p>` : ''}
+        ${JP ? '<div id="kiProj" hidden></div>' : ''}${opts.kiApp ? `<p class="ed-hint" id="kiAppFix">🧩 Umsetzung mit der App <b>${esc(opts.kiApp.name || 'App')}</b> (links). Die KI kennt ihre Ereignisse und baut App-Aufgaben, die die App prüft.</p>` : ''}
         <div id="kiTypes" hidden><label>Aufgabenstile</label><div class="ex-types">${T.EXAM_STYLES.map(([k, n, h]) => `<label class="chk"${k === 'essay' || k === 'hand' || k === 'jpad' ? ' data-exonly="1"' : ''}><input type="checkbox" data-kty="${k}"${(info.types || T.EXAM_STYLES_DEFAULT).includes(k) ? ' checked' : ''}>${esc(n)} <span class="help">– ${esc(h)}</span></label>`).join('')}</div><span class="help">Die KI nimmt jede angekreuzte Art mindestens einmal auf – und keine anderen.</span></div>
         <div class="row"><label>Jahrgangsstufe<select data-k="jg">${opt('', '– wählen –', info.jg || '')}${[5, 6, 7, 8, 9, 10, 11, 12, 13].map(j => opt(j, j + '. Jahrgangsstufe', info.jg)).join('')}</select></label>
           <label>Fach<select data-k="fsel">${opt('', '– wählen –', info.fsel || '')}${L.FAECHER.map(f => opt(f, f, info.fsel)).join('')}${opt('*', 'anderes Fach …', info.fsel)}</select></label></div>
@@ -4082,7 +4082,7 @@ ${SC}
   save(); render(); updUndo();
   aiFloat();
   host.attach?.(ctx);
-  if (!PLAYER && opts.startDialog === 'ki') setTimeout(() => openKI({ art: 'lernpfad' }), 250); // eingebettet (Probe, App-Lernpfad „Mit KI erstellen“): gleich der KI-Dialog
+  if (!PLAYER && opts.startDialog === 'ki') setTimeout(() => openKI({ art: 'lernpfad', ...(opts.kiPreset || {}) }), 250); // eingebettet (Probe, App-Lernpfad „Mit KI erstellen“): gleich der KI-Dialog, Art und Fach vorgewählt
   else if (!PLAYER && ((startHere && (formOk('pruefung') || FORMS_OK[0] === 'befragung')) || opts.startDialog)) setTimeout(() => examStart(), 250);
   return ctx;
 }
