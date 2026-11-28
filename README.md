@@ -32,6 +32,11 @@ die Seite später sehen. Gebaut für das iPad (mit oder ohne Tastatur).
 * **Einordnung** (⚙ Allgemein → Einordnung): Fach, Jahrgangsstufe und Lernbereich im LehrplanPLUS werden im Lernpfad gespeichert
   (`doc.meta = { fach, jg, lb, lbt }`, nicht angezeigt). Der KI-Dialog trägt sie beim Anlegen selbst ein; bei bestehenden Lernpfaden
   lassen sie sich dort ergänzen, auch im Originaldesign. Probe nutzt sie, um „Meine Lernpfade“ zu ordnen.
+* **JPad-Lernumgebung** (Host-Option `jpad: { create(doc) }`, z. B. Probe, Modul Unterricht): Im KI-Dialog steht bei Fach Informatik
+  ganz oben die Art „☕ JPad-Lernumgebung“ (Prompt mit Programmier-Aufgaben, Baustein aus `core/pfjpad.js` = Kopie von JPad
+  `public/editor/jpad-plugin.js`), im Startdialog „Neuer Lernpfad“ eine eigene Wahl. Der fertige Lernpfad geht an `create(doc)` – der Host
+  öffnet damit JPad im Modus `?pfapp=autor` (Code und Lernpfad-Editor nebeneinander). Der Startdialog in Probe sagt jetzt „Neuer Lernpfad“
+  statt „Neue Prüfung“, wenn nur Lernpfade und Challenges erlaubt sind.
 * **Tipps nacheinander:** Bei Aufgaben mit mehreren Tipps lässt sich der nächste Tipp erst öffnen, wenn der vorige offen war,
   und frühestens **2 Minuten** danach (Countdown neben „Tipp 2“). Die Zeiten werden mit dem Fortschritt gespeichert; das gilt auch
   im Originaldesign. Im Editor und in der gelösten Vorschau sind alle Tipps frei.

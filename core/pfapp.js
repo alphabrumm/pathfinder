@@ -99,6 +99,7 @@ function onMessage(e) {
     if (!cur || cur.frame !== f || m.task !== cur.task || cur.readonly) return;
     const files = cleanFiles(m.files), sig = filesSig(files);
     const st = { files, sig, at: Date.now() };
+    if (typeof m.lernpfadHtml === 'string' && m.lernpfadHtml.length < 2e7) { st.lernpfadHtml = m.lernpfadHtml; st.lernpfadTitle = String(m.lernpfadTitle || '').slice(0, 200); } // JPad-Lernumgebung (Probe)
     if (m.run && typeof m.run === 'object') st.run = { output: String(m.run.output ?? '').slice(0, MAX_OUT), error: !!m.run.error, at: Date.now(), sig };
     cur.onState?.(st);
     status(st);
@@ -147,9 +148,10 @@ export function appStatus(text) { const el = OV?.querySelector('[data-s]'); if (
  *   onClose   () => …
  *   info      { html } – Aufgabenstellung als HTML-Seite, die die App neben dem Code anzeigt (optional)
  *   mode      'unterricht' – Lernmodus der App (Probe, Modul Unterricht: mit Lernpfad und Hilfen); sonst Prüfungsmodus
- *   extra     weitere Felder der load-Meldung (Unterricht: jcode, project, observe)
+ *   extra     weitere Felder der load-Meldung (Unterricht: jcode, project, observe; Lernumgebung bauen: lernpfadDoc)
+ *   flushMs   so lange wartet „Fertig“ auf den letzten Stand (Standard 800 ms)
  */
-export function openApp({ app, url, task, title = '', files = [], readonly = false, onState, onClose, closeLabel, info, mode, extra } = {}) {
+export function openApp({ app, url, task, title = '', files = [], readonly = false, onState, onClose, closeLabel, info, mode, extra, flushMs } = {}) {
   const d = appDef(app, url ? { [app]: url } : null);
   overlay();
   if (cur) closeApp(true);
@@ -164,14 +166,14 @@ export function openApp({ app, url, task, title = '', files = [], readonly = fal
   if (!d.url) { msg.hidden = false; msg.innerHTML = `<b>${esc(d.n)} ist ${mode ? 'hier' : 'für Prüfungen'} noch nicht eingerichtet.</b><span>Bitte gib deiner Lehrkraft Bescheid.</span>`; cur = null; return { close: closeApp }; }
   const f = frameFor(d.url, mode);
   frames.forEach(x => { x.ifr.hidden = x !== f; });
-  cur = { task, title, files: cleanFiles(files), readonly, onState, onClose, frame: f, loaded: false, extra: extra || null, info: info && typeof info.html === 'string' && info.html.length < 4e6 ? { html: info.html } : null };
+  cur = { task, title, files: cleanFiles(files), readonly, onState, onClose, frame: f, loaded: false, extra: extra || null, flushMs: flushMs || 800, info: info && typeof info.html === 'string' && info.html.length < 4e6 ? { html: info.html } : null };
   if (f.ready) sendLoad();
   else {
     msg.hidden = false; msg.innerHTML = `<span>${esc(d.n)} wird geladen …</span>`;
     const me = cur, t = setTimeout(() => {
       if (cur !== me || f.ready) return;
       msg.innerHTML = `<b>${esc(d.n)} antwortet nicht.</b><span>Prüfe die Internetverbindung. ${mode ? 'Dein bisheriger Stand ist gespeichert.' : 'Deine bisherigen Antworten sind gespeichert.'}</span><button data-retry>Nochmal versuchen</button>`;
-      msg.querySelector('[data-retry]').onclick = () => { frames.delete(f.key); f.ifr.remove(); closeApp(true); openApp({ app, url, task, title, files: me.files, readonly, onState, onClose, closeLabel, info, mode, extra }); };
+      msg.querySelector('[data-retry]').onclick = () => { frames.delete(f.key); f.ifr.remove(); closeApp(true); openApp({ app, url, task, title, files: me.files, readonly, onState, onClose, closeLabel, info, mode, extra, flushMs }); };
     }, 25000);
     f.waiters.push(() => { clearTimeout(t); if (cur === me) msg.hidden = true; });
   }
@@ -188,7 +190,7 @@ export function flushApp(ms = 1500) {
 export async function closeApp(silent = false) {
   if (!OV || OV.hidden) return;
   const c = cur;
-  if (c && !silent) await flushApp(800);
+  if (c && !silent) await flushApp(c.flushMs || 800);
   if (c) post(c.frame, { type: 'pf-app', action: 'stop' });
   if (cur === c) cur = null;
   OV.hidden = true;

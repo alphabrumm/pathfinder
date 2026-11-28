@@ -27,7 +27,7 @@ const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return
 
 /* ---------- Design ---------- */
 /** Stand der Zusatzmodule: bei jeder Änderung an pftext/pfskin/pfexam erhöhen – sonst lädt der Browser evtl. eine alte Fassung aus dem Zwischenspeicher */
-const PF_BUILD = '2026-11-28c';
+const PF_BUILD = '2026-11-28d';
 const modUrl = f => new URL(f + (new URL(import.meta.url).search || '?v=' + PF_BUILD), import.meta.url).href;
 
 /** Farbpaletten: l = heller, d = dunkler Modus (der Lernpfad folgt dem Gerät oder dem Modus, den die Lehrkraft festlegt) */
@@ -2739,6 +2739,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const p1 = info.p1 ?? 40, p2 = info.p2 ?? 80;
     return {
       art: ['challenge', 'pruefung', 'befragung'].includes(info.art) ? info.art : 'lernpfad',
+      jpad: info.art === 'jpad', // JPad-Lernumgebung (Probe): Lernpfad mit Programmier-Aufgaben, daneben JPad
       mix: [p1, p2 - p1, 100 - p2],
       thema: (info.thema || '').trim() || (lb ? lb.t : ''),
       fach, klasse: jg ? `Gymnasium in Bayern, Jahrgangsstufe ${jg}` : '',
@@ -2898,7 +2899,8 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
     const pre = { ...(opts.ki || {}), ...preset };
     if (pre.art) info.art = pre.art;
     if (info.art === 'befragung') info.art = 'lernpfad'; // Befragungen: eigener Dialog „Umfrage erstellen“
-    if (!formOk(info.art || 'lernpfad')) info.art = FORMS_OK.find(f => f !== 'befragung') || 'lernpfad';
+    const JP = !!opts.jpad?.create; // Host bietet die JPad-Lernumgebung an (Probe, Modul Unterricht) – nur für Informatik
+    if (info.art === 'jpad' ? !JP : !formOk(info.art || 'lernpfad')) info.art = FORMS_OK.find(f => f !== 'befragung') || 'lernpfad';
     if (pre.fach) {
       const f = String(pre.fach).trim(), hit = L.FAECHER.find(x => x.toLowerCase() === f.toLowerCase()) || '*';
       if (hit !== info.fsel || (hit === '*' && info.ffrei !== f)) { info.lb = ''; info.inh = []; }
@@ -2923,7 +2925,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       <div class="ed-form">
         <div class="ki-api" id="kiApi"></div>
         <div class="ki-step"><span class="n">1</span><b>Beschreibung</b></div>
-        <label>Art des Pfades<select data-k="art">${formOk('lernpfad') ? opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad') : ''}${formOk('challenge') ? opt('challenge', 'Challenge – Übungsaufgaben', info.art) : ''}${formOk('pruefung') ? opt('pruefung', 'Digitale Prüfung – mit Punkten, ohne Rückmeldung', info.art) : ''}</select></label>
+        <label>Art des Pfades<select data-k="art">${JP ? `<option value="jpad"${info.art === 'jpad' ? ' selected' : ''}${info.fsel === 'Informatik' ? '' : ' hidden disabled'}>☕ JPad-Lernumgebung – Java-Projekt mit Lernpfad</option>` : ''}${formOk('lernpfad') ? opt('lernpfad', 'Lernpfad für neues Wissen', info.art || 'lernpfad') : ''}${formOk('challenge') ? opt('challenge', 'Challenge – Übungsaufgaben', info.art) : ''}${formOk('pruefung') ? opt('pruefung', 'Digitale Prüfung – mit Punkten, ohne Rückmeldung', info.art) : ''}</select></label>
         <div id="kiBasis"></div>
         <div id="kiMix" hidden>
           <label>Anteil der Aufgaben</label>
@@ -3058,6 +3060,11 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (k) {
         info[k] = t.value;
         if (k === 'jg' || k === 'fsel') { info.lb = ''; info.inh = []; drawLb(); }
+        if (k === 'fsel' && JP) { // JPad-Lernumgebung nur für Informatik – dann ganz oben in der Auswahl
+          const o = $('[data-k="art"] option[value="jpad"]', el), inf = info.fsel === 'Informatik'; if (o) { o.hidden = !inf; o.disabled = !inf; }
+          if (!inf && info.art === 'jpad') { info.art = 'lernpfad'; $('[data-k="art"]', el).value = 'lernpfad'; drawMix(); drawMat(); }
+          if (inf && o && info.art === 'lernpfad') { info.art = 'jpad'; $('[data-k="art"]', el).value = 'jpad'; }
+        }
         if (k === 'lb') { info.inh = []; drawInh(); }
         if (k === 'art') { drawMix(); drawMat(); }
         save();
@@ -3107,10 +3114,12 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (t.dataset.copy === 'show') { const pre = document.createElement('pre'); pre.className = 'ki-fmt'; pre.textContent = T.formatHelp(env); t.closest('.ki-btns').after(pre); t.remove(); }
       if (t.id === 'kiOpen' && parsed && !parsed.errors.length) {
         const d = parsed.doc, pi = kiPromptInfo(info, L); if (!plain(d.kicker || '').trim()) d.kicker = esc(pi.kopf);
+        if (info.art === 'jpad' && JP) { d.form = 'lernpfad'; delete d.exam; }
         if (d.form !== 'pruefung' && d.form !== 'befragung' && (pi.fach || info.jg)) { // Einordnung aus dem KI-Dialog übernehmen
           const lb = L.lernbereiche(info.fsel, +info.jg || 0).find(x => x.id === info.lb);
           d.meta = { ...(pi.fach ? { fach: pi.fach } : {}), ...(info.jg ? { jg: +info.jg } : {}), ...(lb ? { lb: lb.id, lbt: (lb.nr !== '–' ? lb.nr + ' ' : '') + lb.t } : {}) };
         }
+        if (info.art === 'jpad' && JP) { closeDlg(false); opts.jpad.create(d); return; } // weiter in JPad (Code und Lernpfad nebeneinander)
         closeDlg(false); openDoc(d); toast(`„${esc(d.title)}“ angelegt – jetzt kannst du alles im Editor anpassen.`);
       }
     });
@@ -3407,7 +3416,9 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
   const examTakenMsg = r => `Aus „${esc(r.from || 'Lernpfad')}“ übernommen: ${r.tasks} Aufgabe${r.tasks === 1 ? '' : 'n'}${r.removed ? `, ${r.removed} App-Baustein${r.removed === 1 ? '' : 'e'} weggelassen` : ''}. Lösche Erklärungen, die nicht in die Prüfung gehören, und prüfe die Punkte.`;
   /** Neue Prüfung: aus einem Lernpfad, mit KI oder leer beginnen. Eingebettet nur für Befragungen (Probe-Umfragen): gleicher Dialog für Befragungen */
   function examStart(view = 'start') {
-    const SV = FORMS_OK.length === 1 && FORMS_OK[0] === 'befragung', F = SV ? 'befragung' : 'pruefung', W = SV ? 'Befragung' : 'Prüfung';
+    const SV = FORMS_OK.length === 1 && FORMS_OK[0] === 'befragung', LPM = !SV && !formOk('pruefung'); // LPM: nur Lernpfade/Challenges (Probe, Modul Unterricht)
+    const F = SV ? 'befragung' : LPM ? 'lernpfad' : 'pruefung', W = SV ? 'Befragung' : LPM ? 'Lernpfad' : 'Prüfung';
+    const fitForm = d => { if (LPM && !formOk(d.form)) { d.form = 'lernpfad'; delete d.exam; } return d; };
     const svN = d => (d.stations || []).flatMap(s => s.blocks || []).filter(b => def(b)?.survey).length;
     const asSurvey = d => { if (SV && d.form !== 'befragung') { d.form = 'befragung'; d.pointsOn = false; if (d.cert) d.cert.on = false; d.design = { ...(d.design || {}), theme: 'lumi' }; } return d; };
     if (pending) commit();
@@ -3427,6 +3438,13 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         </div></div>`; return; }
       if (view === 'vor') { el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>Aus einer Vorlage</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
         <div class="ex-lplist">${opts.vorlagen.map((v, i) => `<div class="ex-lp"><button data-vor="${i}"><b>📋 ${esc(v.title)}</b><span>${esc(v.sub || '')}</span></button></div>`).join('')}</div></div>`; return; }
+      if (view === 'start' && LPM) { el.innerHTML = `<header><b>📘 Neuer Lernpfad</b><button data-x="1">Abbrechen</button></header><div class="ed-form"><span class="help">Womit möchtest du beginnen? Danach kannst du alles bearbeiten und Stationen ergänzen.</span>
+        <div class="ex-choices">
+          <button data-v="ki"><span class="ic">${KI_ICON}</span><span class="tx"><b>Mit KI erstellen</b><span>Jahrgangsstufe, Fach und Lernbereich wählen – die KI schreibt den ganzen Lernpfad.${opts.jpad?.create ? ' Bei Informatik auch als JPad-Lernumgebung.' : ''}</span></span></button>
+          ${opts.jpad?.create ? `<button data-v="jnew"><span class="ic">☕</span><span class="tx"><b>JPad-Lernumgebung</b><span>Java-Projekt mit Lernpfad: Code und Lernpfad nebeneinander in JPad, mit Programmier-Aufgaben, die JPad nach jedem Programmlauf prüft.</span></span></button>` : ''}
+          <button data-v="new"><span class="ic">＋</span><span class="tx"><b>Leerer Lernpfad</b><span>Stationen und Bausteine selbst zusammenstellen.</span></span></button>
+          <button data-v="load"><span class="ic">⤒</span><span class="tx"><b>Fertigen Lernpfad laden</b><span>Einen Lernpfad im PathFinder-Textformat einfügen oder als Datei öffnen – z. B. von einer anderen KI erstellt. <span class="ex-plink" data-v="prompt" role="link" tabindex="0">Prompt für externe KI anzeigen ›</span></span></span></button>
+        </div></div>`; return; }
       if (view === 'start') { el.innerHTML = `<header><b>📝 Neue Prüfung</b><button data-x="1">Abbrechen</button></header><div class="ed-form"><span class="help">Womit möchtest du beginnen? Danach kannst du alles bearbeiten, Aufgaben ergänzen und Punkte anpassen.</span>
         <div class="ex-choices">
           ${opts.examFromLernpfad === false ? '' : `<button data-v="lp"><span class="ic">📘</span><span class="tx"><b>Aus einem Lernpfad</b><span>Aufgaben eines Lernpfads übernehmen, mit dem deine Klasse gelernt hat – oder die KI neue Prüfungsaufgaben zu seinem Inhalt schreiben lassen.</span></span></button>`}
@@ -3436,20 +3454,20 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
         </div></div>`; return; }
       if (view === 'prompt') {
         el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>Prompt für externe KI</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
-          <span class="help">Mit diesem Prompt erstellt jede KI (ByLKI, ChatGPT, Gemini, Copilot, Mistral, Claude …) eine ${W}, die ${esc(appName)} ohne Nacharbeit einlesen kann. ${SV ? 'Die KI fragt zuerst nach Zielgruppe, Anlass und Thema.' : 'Die KI fragt zuerst nach Fach, Jahrgangsstufe, Thema, Zeit und Aufgabenarten.'}</span>
-          <ol class="ex-steps"><li><b>Prompt kopieren</b> und in den KI-Chat einfügen.</li><li>Die <b>Rückfragen der KI</b> beantworten${SV ? '' : ' – gern mit Arbeitsblättern als Datei'}.</li><li>Den <b>Textblock</b> der Antwort kopieren (oder die Datei ${F}.txt laden).</li><li>Hier unter <b>Fertige ${W} laden</b> einfügen.</li></ol>
+          <span class="help">Mit diesem Prompt erstellt jede KI (ByLKI, ChatGPT, Gemini, Copilot, Mistral, Claude …) ${LPM ? 'einen Lernpfad' : 'eine ' + W}, die ${esc(appName)} ohne Nacharbeit einlesen kann. ${SV ? 'Die KI fragt zuerst nach Zielgruppe, Anlass und Thema.' : 'Die KI fragt zuerst nach Fach, Jahrgangsstufe, Thema, Zeit und Aufgabenarten.'}</span>
+          <ol class="ex-steps"><li><b>Prompt kopieren</b> und in den KI-Chat einfügen.</li><li>Die <b>Rückfragen der KI</b> beantworten${SV ? '' : ' – gern mit Arbeitsblättern als Datei'}.</li><li>Den <b>Textblock</b> der Antwort kopieren (oder die Datei ${F}.txt laden).</li><li>Hier unter <b>${LPM ? 'Fertigen Lernpfad' : 'Fertige ' + W} laden</b> einfügen.</li></ol>
           <div class="ki-btns"><button class="lp-btn" data-pcopy="1">📋 Prompt kopieren</button><button class="lp-btn alt" data-v="load">Weiter: ${W} laden ›</button></div>
           <pre class="ki-fmt" id="exPrompt">lädt …</pre></div>`;
         loadText().then(T => { const p = $('#exPrompt', el); if (p) p.textContent = promptText(T); });
         return;
       }
       if (view === 'load') {
-        el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>Fertige ${W} laden</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
-          <span class="help">Füge den Text der ${W} ein (beginnt mit „# Titel“) oder wähle eine Datei. Noch keine ${W}? <span class="ex-plink" data-v="prompt" role="link" tabindex="0">Prompt für externe KI anzeigen ›</span></span>
-          <textarea id="exIn" rows="10" spellcheck="false" placeholder="# Titel der ${W}&#10;Art: ${W}&#10;&#10;## Station: ${SV ? 'Teil 1' : 'Teil A'} | …">${esc(pasted)}</textarea>
+        el.innerHTML = `<header><button data-v="start">‹ Zurück</button><b>${LPM ? 'Fertigen Lernpfad' : 'Fertige ' + W} laden</b><button data-x="1">Abbrechen</button></header><div class="ed-form">
+          <span class="help">Füge den Text ${LPM ? 'des Lernpfads' : 'der ' + W} ein (beginnt mit „# Titel“) oder wähle eine Datei. Noch ${LPM ? 'kein Lernpfad' : 'keine ' + W}? <span class="ex-plink" data-v="prompt" role="link" tabindex="0">Prompt für externe KI anzeigen ›</span></span>
+          <textarea id="exIn" rows="10" spellcheck="false" placeholder="# Titel ${LPM ? 'des Lernpfads' : 'der ' + W}&#10;Art: ${W}&#10;&#10;## Station: ${SV ? 'Teil 1' : 'Teil A'} | …">${esc(pasted)}</textarea>
           <div class="ki-btns"><label class="lp-btn alt" style="cursor:pointer">📎 Datei wählen<input type="file" id="exFiles" multiple accept="${SV ? '.txt,.md,.json' : '.txt,.md,.json,.html,.htm,.zip,.svg,.png,.gif,.jpg,.jpeg,.webp'}" hidden></label><span class="help" style="align-self:center">${SV ? 'befragung.txt einer KI oder eine gesicherte Befragung (.json)' : 'pruefung.txt einer KI (gern mit Bildern), eine gesicherte Prüfung (.probe.json) oder ein PathFinder-Export (.html, .zip)'}</span></div>
           <div id="exRes" class="ki-res"></div>
-          <div class="ki-btns"><button class="lp-btn" id="exOpen" disabled>＋ Als neue ${W} öffnen</button></div></div>`;
+          <div class="ki-btns"><button class="lp-btn" id="exOpen" disabled>＋ Als ${LPM ? 'neuen' : 'neue'} ${W} öffnen</button></div></div>`;
         exCheck(); return;
       }
       const L = list();
@@ -3469,7 +3487,7 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       res.innerHTML = errors.length
         ? `<div class="bad">✗ ${errors.length} Fehler – bitte korrigieren oder die KI bitten, genau diese Stellen zu korrigieren:</div><ul>${errors.map(x => `<li>Zeile ${x.n}: ${esc(x.m)}</li>`).join('')}</ul>`
         : SV ? `<div class="good">✓ Erkannt: „${esc(plain(parsed.doc.title))}“ · ${stats.stations} Teil${stats.stations === 1 ? '' : 'e'} · ${svN(parsed.doc)} Frage${svN(parsed.doc) === 1 ? '' : 'n'}</div>`
-        : `<div class="good">✓ Erkannt: „${esc(plain(parsed.doc.title))}“ · ${stats.stations} Station${stats.stations === 1 ? '' : 'en'} · ${stats.tasks} Aufgabe${stats.tasks === 1 ? '' : 'n'}${parsed.doc.form !== 'pruefung' ? ' · wird zur Prüfung umgewandelt' : ''}</div>`
+        : `<div class="good">✓ Erkannt: „${esc(plain(parsed.doc.title))}“ · ${stats.stations} Station${stats.stations === 1 ? '' : 'en'} · ${stats.tasks} Aufgabe${stats.tasks === 1 ? '' : 'n'}${!LPM && parsed.doc.form !== 'pruefung' ? ' · wird zur Prüfung umgewandelt' : ''}</div>`
           + (warnings.length ? `<div class="warn">Hinweise:</div><ul>${warnings.map(x => `<li>Zeile ${x.n}: ${esc(x.m)}</li>`).join('')}</ul>` : '');
       ob.disabled = !!errors.length;
     };
@@ -3482,10 +3500,10 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (js) {
         let d; try { d = JSON.parse(await js.text()); if (!Array.isArray(d?.stations)) throw new Error('keine Prüfungsdatei'); } catch (er) { toast('Datei ließ sich nicht öffnen: ' + esc(er.message), 4000); return; }
         d.id = uid(); delete d.exam; if (opts.ki?.kopf) d.kicker = esc(opts.ki.kopf); asSurvey(d);
-        closeDlg(false); if (d.form !== F) convertNext = true; openDoc(d); toast(`„${esc(plain(d.title || 'ohne Titel'))}“ geladen – passe Titel, Aufgaben und Punkte für die neue Prüfung an.`, 5000); return;
+        closeDlg(false); fitForm(d); if (!LPM && d.form !== F) convertNext = true; openDoc(d); toast(`„${esc(plain(d.title || 'ohne Titel'))}“ geladen – passe Titel, Aufgaben und Punkte für die neue Prüfung an.`, 5000); return;
       }
       const whole = !SV && fs.find(f => /\.(html?|zip)$/i.test(f.name)); // PathFinder-Export: direkt öffnen
-      if (whole) { closeDlg(false); convertNext = true; try { await openFile(whole); } finally { convertNext = false; } return; }
+      if (whole) { closeDlg(false); convertNext = !LPM; try { await openFile(whole); } finally { convertNext = false; } return; }
       const T = await loadText(), r = await T.readFiles(fs); Object.assign(files, r.att);
       if (r.text) { pasted = r.text; $('#exIn', el).value = r.text; }
       await exCheck(); if (r.notes.some(n => !n.startsWith('✓'))) $('#exRes', el).insertAdjacentHTML('beforeend', `<ul>${r.notes.filter(n => !n.startsWith('✓')).map(n => `<li>${esc(n)}</li>`).join('')}</ul>`);
@@ -3497,8 +3515,9 @@ ${codeOnly ? '- Hier geht es nur um Code (HTML/SVG): Verwende ausschließlich Ä
       if (t.dataset.vor) { const v = opts.vorlagen[+t.dataset.vor]; if (!v) return; let src = v.doc; if (!src && v.text) { const T = await loadText(), r = T.parseText(v.text, { ...textEnv(), attachments: {}, files: {} }); if (r.errors.length) { toast('Vorlage fehlerhaft: ' + esc(r.errors[0].m)); return; } src = r.doc; } const d = asSurvey(migrate(JSON.parse(JSON.stringify(src)))); d.id = uid(); if (opts.ki?.kopf && !plain(d.kicker || '').trim()) d.kicker = esc(opts.ki.kopf); closeDlg(false); openDoc(d); toast(`„${esc(plain(d.title))}“ übernommen – passe die Fragen an.`); return; }
       if (t.dataset.v === 'start' || t.dataset.v === 'lp' || t.dataset.v === 'load' || t.dataset.v === 'prompt' || t.dataset.v === 'vor') { view = t.dataset.v; sel = null; draw(); return; }
       if (t.dataset.pcopy) { const T = await loadText(); toast(await copyText(promptText(T)) ? '📋 Prompt kopiert – jetzt im KI-Chat einfügen' : 'Kopieren ging nicht'); return; }
-      if (t.id === 'exOpen' && parsed && !parsed.errors.length) { const d = asSurvey(parsed.doc); if (!plain(d.kicker || '').trim() && opts.ki?.kopf) d.kicker = esc(opts.ki.kopf); closeDlg(false); if (d.form !== F) convertNext = true; openDoc(d); toast(SV ? `„${esc(plain(d.title))}“ geladen – prüfe die Fragen im Editor.` : `„${esc(plain(d.title))}“ geladen – prüfe Aufgaben und Punkte im Editor.`); return; }
-      if (t.dataset.v === 'new') { closeDlg(false); const d = emptyDoc(F); if (opts.ki?.kopf) d.kicker = opts.ki.kopf; openDoc(d); toast(SV ? 'Leere Befragung angelegt – Titel antippen, Fragen über ＋ einfügen' : 'Leere Prüfung angelegt – Titel antippen, Aufgaben über ＋ einfügen'); return; }
+      if (t.id === 'exOpen' && parsed && !parsed.errors.length) { const d = asSurvey(parsed.doc); if (!plain(d.kicker || '').trim() && opts.ki?.kopf) d.kicker = esc(opts.ki.kopf); closeDlg(false); fitForm(d); if (!LPM && d.form !== F) convertNext = true; openDoc(d); toast(SV ? `„${esc(plain(d.title))}“ geladen – prüfe die Fragen im Editor.` : LPM ? `„${esc(plain(d.title))}“ geladen – prüfe ihn im Editor.` : `„${esc(plain(d.title))}“ geladen – prüfe Aufgaben und Punkte im Editor.`); return; }
+      if (t.dataset.v === 'new') { closeDlg(false); const d = emptyDoc(F); if (opts.ki?.kopf) d.kicker = opts.ki.kopf; openDoc(d); toast(SV ? 'Leere Befragung angelegt – Titel antippen, Fragen über ＋ einfügen' : LPM ? 'Leerer Lernpfad angelegt – Titel antippen, Bausteine über ＋ einfügen' : 'Leere Prüfung angelegt – Titel antippen, Aufgaben über ＋ einfügen'); return; }
+      if (t.dataset.v === 'jnew' && opts.jpad?.create) { closeDlg(false); const d = emptyDoc('lernpfad'); if (opts.ki?.kopf) d.kicker = opts.ki.kopf; opts.jpad.create(d); return; }
       if (t.dataset.v === 'ki') { closeDlg(false); openKI({ art: F }); return; }
       if (t.dataset.pick) { sel = sel === t.dataset.pick ? null : t.dataset.pick; draw(); return; }
       if (t.dataset.take) { const d = load(t.dataset.take); if (!d) { toast('Lernpfad nicht gefunden'); return; } closeDlg(false); convertNext = true; openDoc(d); return; }

@@ -948,7 +948,11 @@ ${EXAM_STYLES.filter(s => s[0] !== 'essay' && s[0] !== 'jpad' && info.types.incl
     : `- Schreibe im Kopf die Zeile „Art: Lernpfad“.
 - Jede Station: kurzer Einstieg, dann Erklärung des Neuen (mit Beispiel, gern einem Schaubild), dann mindestens eine Übung (Aufgabe, Quiz, Lückentext oder Zuordnen), die das Neue sofort festigt.
 - Von einfach zu schwer; jede Station baut auf der vorigen auf. Eine abschließende Station wiederholt das Wichtigste.
-`;
+${info.jpad ? `- JPAD-LERNUMGEBUNG: Der Lernpfad steht in JPad direkt neben dem Code-Editor; die Schüler programmieren dort in Java (Dialekt der Online-IDE: Anweisungen des Hauptprogramms stehen ohne Klasse und ohne main-Methode direkt im Hauptprogramm, Ausgabe mit println(…); eigene Klassen jeweils als eigene Datei).
+- Gib JEDER Station mindestens eine „### Programmier-Aufgabe“ (Format siehe unten) mit „Ausgabe:“ und/oder „Muss:“, damit JPad die Lösung nach dem Programmlauf selbst prüfen kann; Startcode als \`\`\`java start-Block, wenn die Schüler nicht bei null beginnen sollen.
+- Code, den die Schüler übernehmen sollen (z. B. eine fertige Klasse), als \`\`\`java-Codeblock – er bekommt in JPad den Knopf „In JPad übernehmen“. Reine Anschauungsbeispiele als \`\`\`java ohne-knopf.
+- Ergänze die Programmier-Aufgaben durch Quiz und Lückentexte zum Verständnis (z. B. Was gibt dieses Programm aus?).
+` : ''}`;
   // Arbeitsmaterial der Lehrkraft (Arbeitsblätter, Hefteinträge …): direkt angehängt (API) oder für eine externe KI angekündigt
   const mat = info.material || {}, was = sv ? 'die Befragung' : ex ? 'die Prüfung' : ch ? 'die Challenge' : 'der Lernpfad';
   const matTop = mat.extern ? `ZUERST – ARBEITSMATERIAL DER LEHRKRAFT
